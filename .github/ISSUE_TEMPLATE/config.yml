@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📚 Documentation
+    url: https://docs.servflow.io
+    about: Check our documentation for guides, tutorials, and API reference
+  - name: 🆘 Support
+    url: https://servflow.io/support
+    about: Contact our support team for urgent issues or enterprise support
+  - name: 💬 Community Discussion
+    url: https://github.com/servflow/servflow/discussions
+    about: Ask questions, share ideas, and discuss with the community

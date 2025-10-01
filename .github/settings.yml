@@ -1,0 +1,114 @@
+# Repository configuration for servflow public release repository
+# This file can be used with the GitHub Settings app or similar tools
+
+repository:
+  name: servflow
+  description: "Servflow - No-code backend tool for building powerful workflows and APIs"
+  homepage: https://servflow.io
+  topics:
+    - no-code
+    - backend
+    - workflows
+    - api
+    - automation
+    - low-code
+    - servflow
+  private: false
+  has_issues: true
+  has_projects: false
+  has_wiki: false
+  has_downloads: true
+  default_branch: main
+  allow_squash_merge: true
+  allow_merge_commit: false
+  allow_rebase_merge: false
+  delete_branch_on_merge: true
+  enable_automated_security_fixes: true
+  enable_vulnerability_alerts: true
+
+# Issue labels configuration
+labels:
+  # Type labels
+  - name: bug
+    color: d73a4a
+    description: Something isn't working as expected
+
+  - name: enhancement
+    color: a2eeef
+    description: New feature or request
+
+  - name: action-request
+    color: 7057ff
+    description: Request for a new workflow action
+
+  - name: feedback
+    color: fbca04
+    description: General feedback or questions
+
+  - name: documentation
+    color: 0075ca
+    description: Improvements or additions to documentation
+
+  # Priority labels
+  - name: high-priority
+    color: e99695
+    description: Critical issues requiring immediate attention
+
+  - name: low-priority
+    color: c2e0c6
+    description: Nice-to-have improvements
+
+  # Status labels
+  - name: investigating
+    color: d4c5f9
+    description: Currently being looked into by the team
+
+  - name: planned
+    color: c5def5
+    description: Accepted and planned for implementation
+
+  - name: help-wanted
+    color: 008672
+    description: Community contributions welcome
+
+  - name: duplicate
+    color: cfd3d7
+    description: This issue already exists
+
+  - name: wontfix
+    color: ffffff
+    description: This will not be worked on
+
+  - name: invalid
+    color: e4e669
+    description: This doesn't seem right
+
+# Branch protection rules
+branches:
+  - name: main
+    protection:
+      required_status_checks:
+        strict: false
+        contexts: []
+      enforce_admins: false
+      required_pull_request_reviews:
+        required_approving_review_count: 1
+        dismiss_stale_reviews: true
+        require_code_owner_reviews: false
+      restrictions:
+        users: []
+        teams: []
+        apps: []
+      allow_force_pushes: false
+      allow_deletions: false
+
+# Collaborators and teams (example - adjust as needed)
+# collaborators:
+#   - username: servflow-bot
+#     permission: maintain
+
+# teams:
+#   - name: maintainers
+#     permission: admin
+#   - name: contributors
+#     permission: write

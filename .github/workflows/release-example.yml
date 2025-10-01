@@ -1,0 +1,230 @@
+# Example GitHub Actions workflow for releasing binaries
+# This file should be placed in the private repo's .github/workflows directory
+# It builds and releases binaries to the public servflow-release repository
+
+name: Release Binaries
+
+on:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags like v1.0.0, v1.2.3-beta, etc.
+
+env:
+  BINARY_NAME: servflow
+  PUBLIC_REPO: servflow/servflow  # The public release repository
+
+jobs:
+  build:
+    name: Build Binaries
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          # Linux builds
+          - goos: linux
+            goarch: amd64
+            suffix: linux-amd64
+          - goos: linux
+            goarch: arm64
+            suffix: linux-arm64
+          - goos: linux
+            goarch: arm
+            goarm: 7
+            suffix: linux-arm
+
+          # macOS builds
+          - goos: darwin
+            goarch: amd64
+            suffix: darwin-amd64
+          - goos: darwin
+            goarch: arm64
+            suffix: darwin-arm64
+
+          # Windows builds
+          - goos: windows
+            goarch: amd64
+            suffix: windows-amd64
+            extension: .exe
+
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.23'
+
+      - name: Get dependencies
+        run: go mod download
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          GOARM: ${{ matrix.goarm }}
+          CGO_ENABLED: 0
+        run: |
+          # Extract version from tag
+          VERSION=${GITHUB_REF#refs/tags/}
+
+          # Build binary with version info
+          go build \
+            -ldflags="-X main.version=${VERSION} -X main.commit=${GITHUB_SHA} -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ) -s -w" \
+            -o ${BINARY_NAME}-${{ matrix.suffix }}${{ matrix.extension }} \
+            ./main.go
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: binaries
+          path: ${{ env.BINARY_NAME }}-${{ matrix.suffix }}${{ matrix.extension }}
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history for changelog
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: binaries
+          path: ./binaries
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Generate changelog since last tag
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+          if [ -n "$PREVIOUS_TAG" ]; then
+            echo "## Changes since ${PREVIOUS_TAG}" > changelog.md
+            echo "" >> changelog.md
+            git log ${PREVIOUS_TAG}..HEAD --pretty=format:"- %s" --no-merges >> changelog.md
+          else
+            echo "## Initial Release" > changelog.md
+            echo "" >> changelog.md
+            echo "- First release of Servflow" >> changelog.md
+          fi
+
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          cat changelog.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create checksums
+        run: |
+          cd binaries
+          sha256sum * > SHA256SUMS
+
+      - name: Create installation script
+        run: |
+          # Copy installation script to binaries directory
+          cp install.sh binaries/ || echo "No install script found in private repo"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          repository: ${{ env.PUBLIC_REPO }}  # Release to public repo
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body: |
+            ${{ steps.changelog.outputs.changelog }}
+
+            ## Installation
+
+            ### Quick Install (Linux/macOS)
+            ```bash
+            curl -fsSL https://github.com/${{ env.PUBLIC_REPO }}/releases/download/${{ github.ref_name }}/install.sh | bash
+            ```
+
+            ### Manual Download
+            Download the appropriate binary for your platform:
+
+            - **Linux AMD64**: `${{ env.BINARY_NAME }}-linux-amd64`
+            - **Linux ARM64**: `${{ env.BINARY_NAME }}-linux-arm64`
+            - **Linux ARM**: `${{ env.BINARY_NAME }}-linux-arm`
+            - **macOS Intel**: `${{ env.BINARY_NAME }}-darwin-amd64`
+            - **macOS Apple Silicon**: `${{ env.BINARY_NAME }}-darwin-arm64`
+            - **Windows**: `${{ env.BINARY_NAME }}-windows-amd64.exe`
+
+            ### Docker
+            ```bash
+            docker pull ghcr.io/${{ env.PUBLIC_REPO }}:${{ github.ref_name }}
+            ```
+
+            ## Verification
+            Verify downloads with checksums in `SHA256SUMS`
+
+            ## Documentation
+            - [Installation Guide](https://github.com/${{ env.PUBLIC_REPO }}#installation)
+            - [User Documentation](https://docs.servflow.io)
+
+          files: |
+            binaries/*
+          token: ${{ secrets.PUBLIC_REPO_TOKEN }}  # Token with access to public repo
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+
+  docker:
+    name: Build and Push Docker Image
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ env.PUBLIC_REPO }}
+          tags: |
+            type=ref,event=tag
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ github.ref_name }}
+            COMMIT=${{ github.sha }}
+            DATE=${{ steps.meta.outputs.created }}
+
+  notify:
+    name: Notify Release
+    needs: [release, docker]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Notify success
+        if: needs.release.result == 'success' && needs.docker.result == 'success'
+        run: |
+          echo "✅ Release ${{ github.ref_name }} completed successfully!"
+          echo "📦 Binaries: https://github.com/${{ env.PUBLIC_REPO }}/releases/tag/${{ github.ref_name }}"
+          echo "🐳 Docker: ghcr.io/${{ env.PUBLIC_REPO }}:${{ github.ref_name }}"
+
+      - name: Notify failure
+        if: needs.release.result == 'failure' || needs.docker.result == 'failure'
+        run: |
+          echo "❌ Release ${{ github.ref_name }} failed!"
+          exit 1

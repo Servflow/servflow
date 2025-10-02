@@ -20,33 +20,60 @@
 
 ### Binary Installation (Recommended)
 
-#### Linux/macOS (via curl)
+#### Quick Install (Linux/macOS)
 ```bash
-# Download and install latest version
 curl -fsSL https://github.com/servflow/servflow/releases/latest/download/install.sh | bash
-
-# Or download specific version
-curl -L "https://github.com/servflow/servflow/releases/download/v1.0.0/servflow-linux-amd64" -o servflow
-chmod +x servflow
-sudo mv servflow /usr/local/bin/
-```
-
-#### Windows (via PowerShell)
-```powershell
-# Download latest release
-Invoke-WebRequest -Uri "https://github.com/servflow/servflow/releases/latest/download/servflow-windows-amd64.exe" -OutFile "servflow.exe"
-
-# Add to PATH (optional)
-$env:PATH += ";$PWD"
 ```
 
 #### Manual Download
 
-Download the latest release for your platform from the [Releases page](https://github.com/servflow/servflow/releases):
+Download the latest release archive for your platform from the [Releases page](https://github.com/servflow/servflow/releases):
 
-- **Linux**: `servflow-linux-amd64`
-- **macOS**: `servflow-darwin-amd64` (Intel) or `servflow-darwin-arm64` (Apple Silicon)
-- **Windows**: `servflow-windows-amd64.exe`
+- **Linux (x64)**: `servflow-vX.X.X-linux-amd64.tar.gz`
+- **Linux (ARM64)**: `servflow-vX.X.X-linux-arm64.tar.gz`
+- **macOS (Intel)**: `servflow-vX.X.X-darwin-amd64.tar.gz`
+- **macOS (Apple Silicon)**: `servflow-vX.X.X-darwin-arm64.tar.gz`
+- **Windows (x64)**: `servflow-vX.X.X-windows-amd64.zip`
+
+#### Linux/macOS Manual Installation
+```bash
+# Download and extract (example for Linux x64 - replace with your platform's archive)
+wget https://github.com/servflow/servflow/releases/latest/download/servflow-vX.X.X-linux-amd64.tar.gz
+tar -xzf servflow-vX.X.X-linux-amd64.tar.gz
+chmod +x servflow
+sudo mv servflow /usr/local/bin/
+```
+
+#### Windows Manual Installation
+```powershell
+# Download and extract
+Invoke-WebRequest -Uri "https://github.com/servflow/servflow/releases/latest/download/servflow-vX.X.X-windows-amd64.zip" -OutFile "servflow.zip"
+Expand-Archive -Path "servflow.zip" -DestinationPath "."
+# Add servflow.exe to your PATH
+```
+
+#### Verifying Downloads (Recommended)
+
+For security, verify the integrity of your download using the provided checksums:
+
+```bash
+# Download the checksums file
+wget https://github.com/servflow/servflow/releases/latest/download/checksums.txt
+
+# Verify your download (Linux/macOS example)
+sha256sum -c checksums.txt --ignore-missing
+
+# Or verify individual file
+echo "EXPECTED_SHA256  servflow-vX.X.X-linux-amd64.tar.gz" | sha256sum -c
+```
+
+On Windows:
+```powershell
+# Download checksums.txt and verify
+$expectedHash = "EXPECTED_SHA256_HERE"
+$actualHash = (Get-FileHash -Path "servflow-vX.X.X-windows-amd64.zip" -Algorithm SHA256).Hash
+if ($expectedHash -eq $actualHash) { Write-Host "✓ Checksum verified" } else { Write-Host "✗ Checksum mismatch" }
+```
 
 ### Docker Installation
 

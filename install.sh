@@ -1,22 +1,17 @@
 #!/bin/bash
 set -e
 
-# Servflow Installation Script
-# Usage: curl -fsSL https://github.com/servflow/servflow/releases/latest/download/install.sh | bash
-
 REPO="servflow/servflow"
 BINARY_NAME="servflow"
 INSTALL_DIR="/usr/local/bin"
 TEMP_DIR=$(mktemp -d)
 
-# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Print colored output
 print_status() {
     echo -e "${BLUE}[INFO]${NC} $1"
 }
@@ -33,7 +28,6 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Detect OS and architecture
 detect_platform() {
     local os arch
 
@@ -60,9 +54,6 @@ detect_platform() {
         arm64|aarch64)
             arch="arm64"
             ;;
-        armv7l|armv6l)
-            arch="arm"
-            ;;
         *)
             print_error "Unsupported architecture: $(uname -m)"
             exit 1
@@ -72,10 +63,8 @@ detect_platform() {
     echo "${os}-${arch}"
 }
 
-# Get latest release version
 get_latest_version() {
     print_status "Fetching latest release information..."
-
     local version
     version=$(curl -s "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
 
@@ -87,36 +76,52 @@ get_latest_version() {
     echo "$version"
 }
 
-# Download binary
-download_binary() {
+download_and_extract() {
     local version="$1"
     local platform="$2"
-    local binary_name="${BINARY_NAME}"
+    local archive_ext="tar.gz"
 
+    if [[ "$platform" == *"windows"* ]]; then
+        archive_ext="zip"
+    fi
+
+    local filename="${BINARY_NAME}-${version}-${platform}.${archive_ext}"
+    local download_url="https://github.com/${REPO}/releases/download/${version}/${filename}"
+    local temp_archive="${TEMP_DIR}/${filename}"
+
+    print_status "Downloading ${filename}..."
+
+    if ! curl -fsSL "$download_url" -o "$temp_archive"; then
+        print_error "Failed to download archive from $download_url"
+        exit 1
+    fi
+
+    print_status "Extracting archive..."
+    if [[ "$archive_ext" == "zip" ]]; then
+        if ! command -v unzip >/dev/null 2>&1; then
+            print_error "unzip is required but not installed"
+            exit 1
+        fi
+        unzip -q "$temp_archive" -d "$TEMP_DIR"
+    else
+        tar -xzf "$temp_archive" -C "$TEMP_DIR"
+    fi
+
+    local binary_name="${BINARY_NAME}"
     if [[ "$platform" == *"windows"* ]]; then
         binary_name="${BINARY_NAME}.exe"
     fi
 
-    local filename="${BINARY_NAME}-${platform}"
-    if [[ "$platform" == *"windows"* ]]; then
-        filename="${filename}.exe"
-    fi
-
-    local download_url="https://github.com/${REPO}/releases/download/${version}/${filename}"
-    local temp_file="${TEMP_DIR}/${binary_name}"
-
-    print_status "Downloading ${filename} from ${download_url}..."
-
-    if ! curl -fsSL "$download_url" -o "$temp_file"; then
-        print_error "Failed to download binary from $download_url"
+    local extracted_binary="${TEMP_DIR}/${binary_name}"
+    if [ ! -f "$extracted_binary" ]; then
+        print_error "Binary not found in extracted archive"
         exit 1
     fi
 
-    chmod +x "$temp_file"
-    echo "$temp_file"
+    chmod +x "$extracted_binary"
+    echo "$extracted_binary"
 }
 
-# Install binary
 install_binary() {
     local temp_file="$1"
     local binary_name="${BINARY_NAME}"
@@ -129,11 +134,10 @@ install_binary() {
 
     print_status "Installing ${binary_name} to ${install_path}..."
 
-    # Check if we need sudo
     if [ -w "$INSTALL_DIR" ]; then
         cp "$temp_file" "$install_path"
     else
-        print_status "Administrator privileges required for installation to ${INSTALL_DIR}"
+        print_status "Administrator privileges required for installation"
         if command -v sudo >/dev/null 2>&1; then
             sudo cp "$temp_file" "$install_path"
         else
@@ -144,7 +148,6 @@ install_binary() {
     fi
 }
 
-# Verify installation
 verify_installation() {
     local binary_name="${BINARY_NAME}"
 
@@ -158,34 +161,28 @@ verify_installation() {
         local version
         version=$("$binary_name" --version 2>/dev/null || echo "unknown")
         print_success "Servflow installed successfully! Version: $version"
-        print_success "Run '${binary_name} --help' to get started"
     else
         print_warning "Binary installed but not found in PATH"
-        print_warning "You may need to add ${INSTALL_DIR} to your PATH or restart your terminal"
+        print_warning "You may need to restart your terminal or add ${INSTALL_DIR} to PATH"
     fi
 }
 
-# Cleanup
 cleanup() {
     if [ -d "$TEMP_DIR" ]; then
         rm -rf "$TEMP_DIR"
     fi
 }
 
-# Main installation process
 main() {
     print_status "Starting Servflow installation..."
 
-    # Set trap for cleanup
     trap cleanup EXIT
 
-    # Check dependencies
     if ! command -v curl >/dev/null 2>&1; then
         print_error "curl is required but not installed"
         exit 1
     fi
 
-    # Override version if specified
     local version="${SERVFLOW_VERSION:-}"
     if [ -z "$version" ]; then
         version=$(get_latest_version)
@@ -193,24 +190,18 @@ main() {
 
     print_status "Installing Servflow version: $version"
 
-    # Detect platform
     local platform
     platform=$(detect_platform)
     print_status "Detected platform: $platform"
 
-    # Override install directory if specified
     if [ -n "${SERVFLOW_INSTALL_DIR:-}" ]; then
         INSTALL_DIR="$SERVFLOW_INSTALL_DIR"
     fi
 
-    # Download binary
     local temp_file
-    temp_file=$(download_binary "$version" "$platform")
+    temp_file=$(download_and_extract "$version" "$platform")
 
-    # Install binary
     install_binary "$temp_file"
-
-    # Verify installation
     verify_installation
 
     print_success "Installation completed successfully!"
@@ -221,8 +212,6 @@ main() {
     echo "  3. Visit http://localhost:8080 to access the web interface"
     echo
     print_status "Documentation: https://docs.servflow.io"
-    print_status "Issues: https://github.com/${REPO}/issues"
 }
 
-# Run main function
 main "$@"

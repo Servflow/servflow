@@ -1,16 +1,16 @@
-# Servflow
+# Servflow Engine
 
 [![GitHub Release](https://img.shields.io/github/release/servflow/servflow.svg)](https://github.com/servflow/servflow/releases)
 [![License](https://img.shields.io/github/license/servflow/servflow.svg)](LICENSE)
 [![Issues](https://img.shields.io/github/issues/servflow/servflow.svg)](https://github.com/servflow/servflow/issues)
 
-**Servflow** is a powerful no-code backend tool that helps you build robust backends and workflows without writing code. Create complex data processing pipelines, API integrations, and business logic through an intuitive visual interface.
+**Servflow Engine** is a powerful declarative API engine that allows you to build robust backend APIs without traditional backend code. The engine processes API configurations and handles data processing pipelines, database integrations, and business logic execution.
 
 ## 🚀 Features
 
-- **Visual Workflow Builder**: Design complex workflows with drag-and-drop simplicity
-- **Pre-built Actions**: Extensive library of ready-to-use workflow actions
+- **Declarative API Engine**: Process API endpoint definitions without traditional backend coding
 - **Database Integration**: Connect to PostgreSQL, MySQL, MongoDB, and more
+- **Configuration-Driven**: Define APIs and integrations through YAML configurations
 - **API Integrations**: Seamlessly integrate with external APIs and services
 - **Real-time Processing**: Handle real-time data streams and events
 - **Scalable Architecture**: Built for high-performance and horizontal scaling
@@ -79,145 +79,171 @@ if ($expectedHash -eq $actualHash) { Write-Host "✓ Checksum verified" } else {
 
 ```bash
 # Pull the latest image
-docker pull ghcr.io/servflow/servflow:latest
+docker pull servflow/servflow:latest
 
-# Run with basic configuration
+# Run with proper configuration folders
 docker run -d \
   --name servflow \
   -p 8080:8080 \
-  ghcr.io/servflow/servflow:latest
-
-# Run with persistent data and custom config
-docker run -d \
-  --name servflow \
-  -p 8080:8080 \
-  -v $(pwd)/data:/app/data \
-  -v $(pwd)/config:/app/config \
-  -e SERVFLOW_DATABASE_URL="postgres://user:pass@host:5432/dbname" \
-  ghcr.io/servflow/servflow:latest
+  -v $(pwd)/configs/apis:/confs \
+  -v $(pwd)/configs/integrations:/integrations \
+  -e SERVFLOW_PORT=8080 \
+  servflow/servflow:latest start /confs --integrations /integrations
 ```
 
-### Docker Compose
 
-Create a `docker-compose.yml` file:
-
-```yaml
-version: '3.8'
-
-services:
-  servflow:
-    image: ghcr.io/servflow/servflow:latest
-    ports:
-      - "8080:8080"
-    environment:
-      - SERVFLOW_DATABASE_URL=postgres://servflow:password@postgres:5432/servflow
-      - SERVFLOW_REDIS_URL=redis://redis:6379
-    volumes:
-      - ./data:/app/data
-      - ./config:/app/config
-    depends_on:
-      - postgres
-      - redis
-
-  postgres:
-    image: postgres:15
-    environment:
-      - POSTGRES_DB=servflow
-      - POSTGRES_USER=servflow
-      - POSTGRES_PASSWORD=password
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-  redis:
-    image: redis:7-alpine
-    volumes:
-      - redis_data:/data
-
-volumes:
-  postgres_data:
-  redis_data:
-```
-
-Then run:
-```bash
-docker-compose up -d
-```
 
 ## 🏃‍♂️ Quick Start
 
-1. **Start Servflow**:
+### Prerequisites
+
+Before running the Servflow Engine, ensure you have the following (optional but recommended):
+
+- **Database** - PostgreSQL, MySQL, or MongoDB for data persistence
+
+### Configuration Setup
+
+The Servflow Engine requires configuration folders for APIs and integrations:
+
+```bash
+# Create required directories
+mkdir -p configs/apis
+mkdir -p configs/integrations
+```
+
+
+
+### Running the Engine
+
+1. **Start the Servflow Engine**:
    ```bash
-   servflow start
+   servflow start configs/apis --integrations configs/integrations
    ```
 
-2. **Open the Web Interface**:
-   Navigate to `http://localhost:8080` in your browser
+2. **Verify Engine is Running**:
+   ```bash
+   curl http://localhost:8080/health
+   ```
+   
+   Expected response:
+   ```json
+   {
+     "status": "healthy",
+     "timestamp": "2024-01-15T10:30:00Z"
+   }
+   ```
 
-3. **Create Your First Workflow**:
-   - Click "New Workflow"
-   - Drag actions from the sidebar
-   - Connect actions to create your data flow
-   - Configure each action's parameters
-   - Save and run your workflow
+3. **Create Your First Integration and API**:
+   - Set up database connections in `configs/integrations/`
+   - Define API endpoints in `configs/apis/`
+   - Test your endpoints with HTTP requests
+
+### Directory Structure
+
+After setup, your project should look like this:
+
+```
+your-project/
+├── servflow                    # The Servflow Engine binary
+├── .env                       # Environment configuration
+├── configs/
+│   ├── apis/                  # API endpoint definitions
+│   │   └── your-api.yaml      # Your API configurations
+│   └── integrations/          # Integration configurations
+│       └── database.yaml      # Database connections
+└── docker-compose.yml         # Optional Docker setup
+```
 
 ## ⚙️ Configuration
 
-Servflow can be configured via environment variables or a configuration file.
-
-### Environment Variables
+Servflow can be configured via environment variables if needed:
 
 ```bash
-# Server configuration
+# Optional server configuration (defaults shown)
 SERVFLOW_PORT=8080
-SERVFLOW_HOST=0.0.0.0
-
-# Database
-SERVFLOW_DATABASE_URL=postgres://user:pass@localhost:5432/servflow
-
-# Redis (for caching and queues)
-SERVFLOW_REDIS_URL=redis://localhost:6379
-
-# Security
-SERVFLOW_JWT_SECRET=your-secret-key
-SERVFLOW_CORS_ORIGINS=http://localhost:3000,https://yourdomain.com
-
-# Observability
-SERVFLOW_OTEL_ENDPOINT=http://localhost:4317
-SERVFLOW_LOG_LEVEL=info
+SERVFLOW_ENV=debug
 ```
 
-### Configuration File
+### Configuration Files
 
-Create a `config.yaml` file:
+Create integration configurations in `configs/integrations/database.yaml`:
 
 ```yaml
-server:
-  host: "0.0.0.0"
-  port: 8080
+# Integration Configuration
+datasources:
+  - id: user_database
+    type: mongo
+    config:
+      connectionString: "{{ secret 'MONGODB_CONNECTION_STRING' }}"
+      dbName: myapp
 
-database:
-  url: "postgres://user:pass@localhost:5432/servflow"
-
-redis:
-  url: "redis://localhost:6379"
-
-security:
-  jwt_secret: "your-secret-key"
-  cors_origins:
-    - "http://localhost:3000"
-    - "https://yourdomain.com"
-
-observability:
-  otel_endpoint: "http://localhost:4317"
-  log_level: "info"
+  - id: openai_service
+    type: openai
+    config:
+      api_key: "{{ secret 'OPENAI_API_KEY' }}"
 ```
+
+Create API configurations in `configs/apis/example.yaml`:
+
+```yaml
+# API Endpoint Configuration
+id: example_api
+name: Example API
+
+http:
+  listenPath: /users
+  method: GET
+  next: $action.fetchUsers
+
+actions:
+  fetchUsers:
+    type: fetch
+    config:
+      integrationID: user_database
+      table: users
+      filters:
+        - field: status
+          operator: eq
+          value: "active"
+    next: $response.success
+
+responses:
+  success:
+    code: 200
+    responseObject:
+      fields:
+        status:
+          value: "success"
+        data:
+          value: "{{ .variable_actions_fetchUsers }}"
+```
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+**"Config folder for APIs must be specified"**
+- Ensure you've provided the API config folder as a command line argument
+- Check that the folder path exists and is accessible
+
+**"Database config folder must be specified"**  
+- Use the `--integrations` flag when starting the Servflow Engine
+
+**"Permission denied" when running binary**
+- Make the binary executable: `chmod +x servflow`
+
+**Port already in use**
+- Change the port in your `.env` file: `SERVFLOW_PORT=8081`
+- Or kill the process using port 8080: `lsof -ti:8080 | xargs kill`
 
 ## 📚 Documentation
 
-- **[User Guide](https://docs.servflow.io)** - Complete user documentation
-- **[API Reference](https://docs.servflow.io/api)** - REST API documentation
-- **[Action Library](https://docs.servflow.io/actions)** - Available workflow actions
-- **[Examples](https://docs.servflow.io/examples)** - Sample workflows and use cases
+- **[Getting Started](https://docs.servflow.io/getting-started/installation)** - Installation and setup guide
+- **[Database Agent Tutorial](https://docs.servflow.io/getting-started/db-agent)** - Build an AI-powered database query endpoint
+- **[User Registration Tutorial](https://docs.servflow.io/getting-started/user-registration)** - Create a complete user registration API
+- **[API Configuration Concepts](https://docs.servflow.io/concepts/)** - Learn how to structure API workflows
+- **[Actions Reference](https://docs.servflow.io/concepts/actions)** - Complete guide to available actions
+- **[Integrations Guide](https://docs.servflow.io/concepts/integrations)** - Connect to databases and external services
 
 ## 🐛 Bug Reports & Feature Requests
 
@@ -239,13 +265,17 @@ Found a bug or have a feature request? Please check our [issue tracker](https://
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
+## 📝 Important Notes
+
+**About Servflow Engine**: This repository contains the Servflow Engine - the backend API processing engine that executes your API configurations through declarative YAML files.
+
 ## 🔗 Links
 
 - **Website**: [servflow.io](https://servflow.io)
 - **Documentation**: [docs.servflow.io](https://docs.servflow.io)
 - **Releases**: [GitHub Releases](https://github.com/servflow/servflow/releases)
-- **Docker Images**: [GitHub Container Registry](https://github.com/servflow/servflow/pkgs/container/servflow)
+- **Docker Images**: [Docker Hub](https://hub.docker.com/r/servflow/servflow)
 
 ---
 
-Made with ❤️ by the Servflow team. Happy workflow building! 🚀
+Made with ❤️ by the Servflow team. Happy API building! 🚀

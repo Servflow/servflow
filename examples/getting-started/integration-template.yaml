@@ -1,0 +1,122 @@
+# Integration Configuration Template
+# This file provides examples of how to configure various integrations
+# for the ServFlow Engine. Copy and modify these examples for your needs.
+
+# Replace placeholder values with your actual configuration
+integrations:
+  # MongoDB Integration Example
+  - id: my_mongodb
+    type: mongo
+    config:
+      connectionString: '{{ secret "MONGODB_CONNECTION_STRING" }}'
+      dbName: myapp
+      # Optional: Connection pool settings
+      maxPoolSize: 10
+      minPoolSize: 2
+      maxIdleTimeMS: 30000
+
+  # PostgreSQL Integration Example
+  - id: my_postgres
+    type: sql
+    config:
+      connectionString: '{{ secret "POSTGRES_CONNECTION_STRING" }}'
+      driver: postgres
+      # Optional: Connection pool settings
+      maxOpenConns: 25
+      maxIdleConns: 5
+      connMaxLifetime: 5m
+
+  # MySQL Integration Example
+  - id: my_mysql
+    type: sql
+    config:
+      connectionString: '{{ secret "MYSQL_CONNECTION_STRING" }}'
+      driver: mysql
+      maxOpenConns: 25
+      maxIdleConns: 5
+
+  # OpenAI Integration Example
+  - id: my_openai
+    type: openai
+    config:
+      api_key: '{{ secret "OPENAI_API_KEY" }}'
+      model: gpt-3.5-turbo
+      temperature: 0.7
+      max_tokens: 1500
+      timeout: 30s
+
+  # Qdrant Vector Database Integration Example
+  - id: my_qdrant
+    type: qdrant
+    config:
+      host: '{{ secret "QDRANT_HOST" }}'
+      port: 6333
+      api_key: '{{ secret "QDRANT_API_KEY" }}'
+      # Optional: Collection settings
+      collection: embeddings
+      vector_size: 1536
+
+  # Google Sheets Integration Example
+  - id: my_sheets
+    type: sheets
+    config:
+      credentials: '{{ secret "GOOGLE_SHEETS_CREDENTIALS" }}'
+      spreadsheet_id: '{{ secret "SPREADSHEET_ID" }}'
+      # Optional: Default sheet name
+      sheet_name: Sheet1
+
+  # Redis Integration Example (for caching)
+  - id: my_redis
+    type: redis
+    config:
+      host: '{{ secret "REDIS_HOST" }}'
+      port: 6379
+      password: '{{ secret "REDIS_PASSWORD" }}'
+      db: 0
+      # Optional: Connection settings
+      poolSize: 10
+      minIdleConns: 5
+
+# Example Environment Variables to Set:
+#
+# MongoDB:
+# MONGODB_CONNECTION_STRING=mongodb://username:password@localhost:27017
+#
+# PostgreSQL:
+# POSTGRES_CONNECTION_STRING=postgres://username:password@localhost:5432/dbname
+#
+# MySQL:
+# MYSQL_CONNECTION_STRING=username:password@tcp(localhost:3306)/dbname
+#
+# OpenAI:
+# OPENAI_API_KEY=sk-your-openai-api-key-here
+#
+# Qdrant:
+# QDRANT_HOST=localhost
+# QDRANT_API_KEY=your-qdrant-api-key
+#
+# Google Sheets:
+# GOOGLE_SHEETS_CREDENTIALS={"type":"service_account",...}
+# SPREADSHEET_ID=your-google-sheets-id
+#
+# Redis:
+# REDIS_HOST=localhost
+# REDIS_PASSWORD=your-redis-password
+
+# Security Best Practices:
+# 1. Never hardcode sensitive values like passwords or API keys
+# 2. Always use the {{ secret "SECRET_NAME" }} template syntax
+# 3. Store secrets securely using environment variables or a secrets manager
+# 4. Use appropriate connection limits to prevent resource exhaustion
+# 5. Enable SSL/TLS for production database connections
+
+# Connection String Examples:
+#
+# MongoDB with SSL:
+# mongodb://username:password@localhost:27017/dbname?ssl=true
+#
+# PostgreSQL with SSL:
+# postgres://username:password@localhost:5432/dbname?sslmode=require
+#
+# MySQL with SSL:
+# username:password@tcp(localhost:3306)/dbname?tls=true

@@ -85,10 +85,10 @@ docker pull servflow/servflow:latest
 docker run -d \
   --name servflow \
   -p 8080:8080 \
-  -v $(pwd)/configs/apis:/confs \
-  -v $(pwd)/configs/integrations:/integrations \
+  -v $(pwd)/integrations.yaml:/app/integrations.yaml \
+  -v $(pwd)/configs/apis:/app/configs \
   -e SERVFLOW_PORT=8080 \
-  servflow/servflow:latest start /confs --integrations /integrations
+  servflow/servflow:latest start --integrations /app/integrations.yaml /app/configs
 ```
 
 
@@ -108,7 +108,7 @@ The Servflow Engine requires configuration folders for APIs and integrations:
 ```bash
 # Create required directories
 mkdir -p configs/apis
-mkdir -p configs/integrations
+touch integrations.yaml
 ```
 
 
@@ -117,7 +117,7 @@ mkdir -p configs/integrations
 
 1. **Start the Servflow Engine**:
    ```bash
-   servflow start configs/apis --integrations configs/integrations
+   servflow start --integrations integrations.yaml configs/apis
    ```
 
 2. **Verify Engine is Running**:
@@ -134,7 +134,7 @@ mkdir -p configs/integrations
    ```
 
 3. **Create Your First Integration and API**:
-   - Set up database connections in `configs/integrations/`
+   - Set up database connections in `integrations.yaml`
    - Define API endpoints in `configs/apis/`
    - Test your endpoints with HTTP requests
 
@@ -146,13 +146,37 @@ After setup, your project should look like this:
 your-project/
 ├── servflow                    # The Servflow Engine binary
 ├── .env                       # Environment configuration
+├── integrations.yaml          # Integration configurations
 ├── configs/
-│   ├── apis/                  # API endpoint definitions
-│   │   └── your-api.yaml      # Your API configurations
-│   └── integrations/          # Integration configurations
-│       └── database.yaml      # Database connections
+│   └── apis/                  # API endpoint definitions
+│       └── your-api.yaml      # Your API configurations
 └── docker-compose.yml         # Optional Docker setup
 ```
+
+## 📁 Examples
+
+Ready-to-use examples are available in the [`examples/`](./examples/) directory. These examples demonstrate common API patterns and are based on our [Getting Started Guide](https://docs.servflow.io/getting-started/).
+
+### Available Examples
+
+| Example | Description | Features |
+|---------|-------------|----------|
+| [**User Registration**](./examples/getting-started/user-registration/) | Complete user registration API with validation and security | Input validation, password hashing, database storage, JWT tokens |
+| [**Database Agent**](./examples/getting-started/db-agent/) | AI-powered database query endpoint using natural language | Natural language queries, AI integration, safe database access, conversation history |
+
+### Quick Start with Examples
+
+1. **Choose an example** from the [`examples/`](./examples/) directory
+2. **Navigate to the example** (e.g., `cd examples/getting-started/user-registration/`)
+3. **Follow the README** in that directory for detailed setup instructions
+4. **Copy configurations** to your ServFlow Engine folders
+5. **Test the API** using the provided curl commands
+
+Each example includes:
+- Complete YAML configurations
+- Integration setup instructions
+- Test requests and expected responses
+- Troubleshooting guides
 
 ## ⚙️ Configuration
 
@@ -166,11 +190,11 @@ SERVFLOW_ENV=debug
 
 ### Configuration Files
 
-Create integration configurations in `configs/integrations/database.yaml`:
+Create integration configurations in `integrations.yaml`:
 
 ```yaml
 # Integration Configuration
-datasources:
+integrations:
   - id: user_database
     type: mongo
     config:
@@ -226,8 +250,8 @@ responses:
 - Ensure you've provided the API config folder as a command line argument
 - Check that the folder path exists and is accessible
 
-**"Database config folder must be specified"**  
-- Use the `--integrations` flag when starting the Servflow Engine
+**"Integration file must be specified"**  
+- Use the `--integrations` flag with the path to your integrations.yaml file when starting the Servflow Engine
 
 **"Permission denied" when running binary**
 - Make the binary executable: `chmod +x servflow`

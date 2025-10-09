@@ -181,3 +181,7 @@ func (a *APIConfig) Normalize() {
 		a.HttpConfig.CORSAllowedOrigins = a.Request.CORSAllowedOrigins
 	}
 }
+
+func (a *APIConfig) Validate() error {
+
+}

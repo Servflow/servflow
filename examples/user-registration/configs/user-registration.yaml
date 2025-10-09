@@ -1,0 +1,126 @@
+# User Registration API Example
+# This example demonstrates how to build a complete user registration endpoint
+# with validation, password hashing, and database storage using ServFlow Engine.
+
+# Integration Configuration
+integrations:
+  my_database:
+    type: mongo
+    config:
+      connectionString: '{{ secret "MONGODB_STRING" }}'
+      dbName: myapp
+
+# API Endpoint Configuration
+id: user_registration
+name: User Registration API
+
+http:
+  listenPath: /register
+  method: POST
+  next: $conditional.validateInput
+
+conditionals:
+  validateInput:
+    expression: |
+      {{ and
+        (notempty (param "email") "Email" true)
+        (notempty (param "password") "Password" true)
+        (notempty (param "name") "Name" true)
+      }}
+    validPath: $action.checkExistingUser
+    invalidPath: $response.validationError
+
+  userExists:
+    expression: "{{ gt (len .variable_actions_checkExistingUser) 0 }}"
+    validPath: $response.userAlreadyExists
+    invalidPath: $action.hashPassword
+
+actions:
+  checkExistingUser:
+    type: fetch
+    config:
+      integrationID: my_database
+      table: users
+      filters:
+        - field: email
+          operator: eq
+          value: '{{ param "email" }}'
+    next: $conditional.userExists
+    fail: $action.hashPassword
+
+  hashPassword:
+    type: hash
+    config:
+      value: '{{ param "password" }}'
+      algorithm: bcrypt
+    next: $action.createUser
+    fail: $response.serverError
+
+  createUser:
+    type: store
+    config:
+      integrationID: my_database
+      table: users
+      fields:
+        email: '{{ param "email" }}'
+        name: '{{ param "name" }}'
+        password: "{{ .variable_actions_hashPassword }}"
+        created_at: "{{ now }}"
+        status: active
+      mode: insert
+    next: $action.generateToken
+    fail: $response.serverError
+
+  generateToken:
+    type: jwt
+    config:
+      key: '{{ secret "JWT_SECRET" }}'
+      field: '{{ param "email" }}'
+      mode: encode
+    next: $response.registrationSuccess
+    fail: $response.serverError
+
+responses:
+  registrationSuccess:
+    code: 201
+    responseObject:
+      fields:
+        success:
+          value: true
+        message:
+          value: "User registered successfully"
+        token:
+          value: "{{ .variable_actions_generateToken }}"
+        user:
+          fields:
+            email:
+              value: '{{ param "email" }}'
+            name:
+              value: '{{ param "name" }}'
+
+  validationError:
+    code: 400
+    responseObject:
+      fields:
+        success:
+          value: false
+        message:
+          value: "Missing required fields: email, password, and name are required"
+
+  userAlreadyExists:
+    code: 409
+    responseObject:
+      fields:
+        success:
+          value: false
+        message:
+          value: "User with this email already exists"
+
+  serverError:
+    code: 500
+    responseObject:
+      fields:
+        success:
+          value: false
+        message:
+          value: "Internal server error occurred"

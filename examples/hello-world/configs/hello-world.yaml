@@ -1,0 +1,19 @@
+id: hello_world
+name: Hello World API
+
+http:
+  listenPath: /hello
+  method: GET
+  next: $response.success
+
+responses:
+  success:
+    code: 200
+    responseObject:
+      fields:
+        message:
+          value: "Hello from ServFlow Engine!"
+        timestamp:
+          value: "{{ now }}"
+        engine:
+          value: "ServFlow"

@@ -1,0 +1,44 @@
+# Integration Configuration for Database Agent Example
+# This file shows how to configure MongoDB and OpenAI integrations
+# required for the AI-powered database agent endpoint.
+
+integrations:
+  # MongoDB Integration
+  my_database:
+    type: mongo
+    config:
+      connectionString: '{{ secret "MONGODB_STRING" }}'
+      dbName: myapp
+
+  # OpenAI Integration for AI capabilities
+  my_openai_service:
+    type: openai
+    config:
+      api_key: '{{ secret "OPENAI_API_KEY" }}'
+      model: gpt-3.5-turbo
+      temperature: 0.7
+      max_tokens: 1500
+# Example secrets that need to be configured:
+# MONGODB_STRING: mongodb://username:password@localhost:27017
+# OPENAI_API_KEY: sk-your-openai-api-key-here
+#
+# To set secrets in ServFlow Engine:
+# 1. Use environment variables
+# 2. Use a secrets management system
+# 3. Configure them through the ServFlow dashboard (if available)
+#
+# Alternative database integrations you can use instead of MongoDB:
+#
+# PostgreSQL Integration:
+# my_database:
+#   type: sql
+#   config:
+#     connectionString: '{{ secret "POSTGRES_CONNECTION_STRING" }}'
+#     driver: postgres
+#
+# MySQL Integration:
+# my_database:
+#   type: sql
+#   config:
+#     connectionString: '{{ secret "MYSQL_CONNECTION_STRING" }}'
+#     driver: mysql

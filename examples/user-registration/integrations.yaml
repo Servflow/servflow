@@ -1,0 +1,28 @@
+# Integration Configuration for User Registration Example
+# This file shows how to configure database and JWT integrations
+# required for the user registration API endpoint.
+
+integrations:
+  # MongoDB Integration
+  my_database:
+    type: mongo
+    config:
+      connectionString: '{{ secret "MONGODB_STRING" }}'
+      dbName: myapp
+
+  # JWT Integration (if using separate JWT service)
+  # Note: JWT can also be handled directly in actions without a separate integration
+  jwt_service:
+    type: jwt
+    config:
+      secret: '{{ secret "JWT_SECRET" }}'
+      algorithm: HS256
+      expiration: 24h
+# Example secrets that need to be configured:
+# MONGODB_STRING: mongodb://username:password@localhost:27017
+# JWT_SECRET: your-super-secure-jwt-secret-key-here
+#
+# To set secrets in ServFlow Engine:
+# 1. Use environment variables
+# 2. Use a secrets management system
+# 3. Configure them through the ServFlow dashboard (if available)

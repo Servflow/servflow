@@ -1,0 +1,5 @@
+# Hello World Example - No integrations needed
+# This example demonstrates the simplest possible ServFlow API
+# that returns a static response without external dependencies
+
+integrations: {}

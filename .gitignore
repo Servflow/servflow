@@ -1,0 +1,12 @@
+.idea
+apidesigner
+testconfs
+test_serviceaccount.json
+servflow
+servflow-debug
+.env
+*.prof
+*.test
+*.out
+data/
+.DS_Store

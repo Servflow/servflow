@@ -1,0 +1,75 @@
+id: register
+listenPath: register
+method: POST
+conditionals:
+  validate:
+    expression: |
+      {{ and
+                (notempty (param "email") "Email")
+                (email (param "email") "Email" )
+                (notempty (param "password") "Password")
+                (notempty (param "name") "Name")
+                }}
+    validPath: $action.fetchemail
+    invalidPath: $response.400
+  userExists:
+    expression: |
+      {{  empty .variable_actions_fetchemail "User" }}
+    validPath: $action.encryptpass
+    invalidPath: $response.exists
+request:
+  next: $conditional.validate
+actions:
+  fetchemail:
+    type: fetch
+    config:
+      integrationID: mongo
+      table: users
+      filters:
+        - field: email
+          operation: "=="
+          comparator: '{{ param "email" }}'
+    next: $conditional.userExists
+
+  encryptpass:
+    type: hash
+    config:
+      value: '{{ param "password" }}'
+      algorithm: bcrypt
+    next: $action.storedb
+
+  storedb:
+    type: store
+    config:
+      integrationID: mongo
+      table: users
+      fields:
+        email: '{{ param "email" }}'
+        password: "{{ .variable_actions_encryptpass }}"
+        name: '{{ param "name" }}'
+    next: $response.200
+
+responses:
+  "200":
+    type: json
+    template: |
+      {
+        "success": true
+      }
+    code: 200
+
+  "400":
+    type: json
+    template: |
+      {
+        "errors": {{ .error }}
+      }
+    code: 400
+
+  exists:
+    type: json
+    template: |
+      {
+        "errors": ["user already exists"]
+      }
+    code: 400

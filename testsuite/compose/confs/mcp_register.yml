@@ -1,0 +1,74 @@
+id: register
+mcpTool:
+  name: register
+  description: Register a new user
+  start: $conditional.validate
+  result: '{{ pluck .variable_actions_fetchdone "email" }}'
+  args:
+    email:
+      name: email
+      type: string
+    password:
+      name: password
+      type: string
+    name:
+      name: name
+      type: string
+conditionals:
+  validate:
+    expression: |
+      {{ and
+                (notempty (tool_param "email") "Email" true)
+                (email (tool_param "email") "Email" true)
+                (notempty (tool_param "password") "Password" true)
+                (notempty (tool_param "name") "Name" true)
+                }}
+    validPath: $action.fetchemail
+  #    invalidPath: $response.400
+  userExists:
+    expression: |
+      {{  empty .variable_actions_fetchemail "User" false }}
+    validPath: $action.encryptpass
+request:
+  next: $conditional.validate
+actions:
+  fetchemail:
+    type: fetch
+    config:
+      integrationID: mongo
+      table: users
+      filters:
+        - field: email
+          operation: "=="
+          comparator: '{{ tool_param "email" }}'
+    next: $conditional.userExists
+
+  encryptpass:
+    type: hash
+    config:
+      value: '{{ tool_param "password" }}'
+      algorithm: bcrypt
+    next: $action.storedb
+
+  storedb:
+    type: store
+    config:
+      integrationID: mongo
+      table: users
+      fields:
+        email: '{{ tool_param "email" }}'
+        password: "{{ .variable_actions_encryptpass }}"
+        name: '{{ tool_param "name" }}'
+    next: $action.fetchdone
+
+  fetchdone:
+    type: fetch
+    config:
+      shouldFail: true
+      single: true
+      integrationID: mongo
+      table: users
+      filters:
+        - field: email
+          operation: "=="
+          comparator: '{{ tool_param "email" }}'

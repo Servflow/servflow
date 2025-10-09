@@ -1,0 +1,294 @@
+kind: pipeline
+type: docker
+name: default
+
+platform:
+  os: linux
+
+services:
+  - name: cache
+    image: redis
+#  - name: database
+#    image: postgres
+#    environment:
+#      POSTGRES_PASSWORD: password
+
+trigger:
+  branch:
+    - main
+  event:
+    - push
+    - pull_request
+
+steps:
+  - name: debug-docker
+    image: docker
+    privileged: true
+    volumes:
+      - name: docker-sock
+        path: /var/run/docker.sock
+    commands:
+      - docker version
+      - docker info
+
+  - name: wait-for-redis
+    image: redis
+    commands:
+      - until redis-cli -h cache ping; do sleep 1; done
+
+  #  - name: wait-for-postgres
+  #    image: postgres
+  #    commands:
+  #      - until pg_isready -h database -U postgres; do sleep 1; done
+
+  - name: code-quality
+    image: golang
+    volumes:
+      - name: deps
+        path: /go
+    commands:
+      - go install honnef.co/go/tools/cmd/staticcheck@2025.1.1
+      - gofmt -d .
+      - if [ "$(gofmt -l .)" ]; then echo "Code not formatted properly"; exit 1; fi
+      - staticcheck ./...
+
+  - name: test
+    image: golang
+    privileged: true
+    depends_on:
+      - wait-for-redis
+      - code-quality
+    environment:
+      DATABASE_URL: "user=postgres password=password host=database port=5432 dbname=postgres sslmode=disable"
+      TESTCONTAINERS_RYUK_DISABLED: true
+    volumes:
+      - name: deps
+        path: /go
+      - name: shared-data
+        path: /shared
+      - name: docker-sock
+        path: /var/run/docker.sock
+    commands:
+      - go test ./...
+
+  - name: build
+    image: golang
+    depends_on:
+      - wait-for-redis
+      - code-quality
+    volumes:
+      - name: deps
+        path: /go
+    commands:
+      - CGO_ENABLED=0 GOOS=linux go build -o servflow
+
+  - name: e2e-tests
+    image: docker:27.3.1
+    privileged: true
+    depends_on:
+      - wait-for-redis
+      - build
+    commands:
+      - apk add --no-cache bash curl jq python3
+      - dockerd & # Start the Docker daemon
+      - sleep 5 # Wait for the daemon to initialize
+      - docker info
+      - cd testsuite && bash ./runtest.sh
+
+volumes:
+  - name: deps
+    host:
+      path: /var/lib/cache/drone/go
+  - name: shared-data
+    temp: {}
+  - name: docker-sock
+    host:
+      path: /var/run/docker.sock
+---
+kind: pipeline
+type: docker
+name: push prod
+
+trigger:
+  event:
+    - tag
+
+platform:
+  os: linux
+
+steps:
+  - name: build-gen-tag
+    image: golang
+    volumes:
+      - name: deps
+        path: /go
+    commands:
+      - echo "servflow/servflow:$DRONE_TAG"
+      - echo -n "servflow/servflow:$DRONE_TAG" > .image-tag
+      - echo -n "$DRONE_TAG" > .version
+
+  - name: code-quality
+    image: golang
+    volumes:
+      - name: deps
+        path: /go
+    commands:
+      - go install honnef.co/go/tools/cmd/staticcheck@2025.1.1
+      - gofmt -d .
+      - if [ "$(gofmt -l .)" ]; then echo "Code not formatted properly"; exit 1; fi
+      - staticcheck ./...
+
+  - name: build-linux-amd64
+    image: golang:1.24
+    depends_on:
+      - build-gen-tag
+      - code-quality
+    volumes:
+      - name: deps
+        path: /go
+    commands:
+      - mkdir -p dist
+      - GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-X main.version=$DRONE_TAG" -o dist/servflow-linux-amd64 .
+
+  - name: build-linux-arm64
+    image: golang:1.24
+    depends_on:
+      - build-gen-tag
+      - code-quality
+    volumes:
+      - name: deps
+        path: /go
+    commands:
+      - mkdir -p dist
+      - GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags "-X main.version=$DRONE_TAG" -o dist/servflow-linux-arm64 .
+
+  - name: build-darwin-amd64
+    image: golang:1.24
+    depends_on:
+      - build-gen-tag
+      - code-quality
+    volumes:
+      - name: deps
+        path: /go
+    commands:
+      - mkdir -p dist
+      - GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-X main.version=$DRONE_TAG" -o dist/servflow-darwin-amd64 .
+
+  - name: build-darwin-arm64
+    image: golang:1.24
+    depends_on:
+      - build-gen-tag
+      - code-quality
+    volumes:
+      - name: deps
+        path: /go
+    commands:
+      - mkdir -p dist
+      - GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags "-X main.version=$DRONE_TAG" -o dist/servflow-darwin-arm64 .
+
+  - name: build-windows-amd64
+    image: golang:1.24
+    depends_on:
+      - build-gen-tag
+      - code-quality
+    volumes:
+      - name: deps
+        path: /go
+    commands:
+      - mkdir -p dist
+      - GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-X main.version=$DRONE_TAG" -o dist/servflow-windows-amd64.exe .
+
+  - name: create-archives
+    image: alpine:latest
+    depends_on:
+      - build-linux-amd64
+      - build-linux-arm64
+      - build-darwin-amd64
+      - build-darwin-arm64
+      - build-windows-amd64
+    commands:
+      - apk add --no-cache tar gzip zip
+      - mkdir -p releases
+      - cd dist
+      - tar -czf ../releases/servflow-$DRONE_TAG-linux-amd64.tar.gz servflow-linux-amd64
+      - tar -czf ../releases/servflow-$DRONE_TAG-linux-arm64.tar.gz servflow-linux-arm64
+      - tar -czf ../releases/servflow-$DRONE_TAG-darwin-amd64.tar.gz servflow-darwin-amd64
+      - tar -czf ../releases/servflow-$DRONE_TAG-darwin-arm64.tar.gz servflow-darwin-arm64
+      - zip ../releases/servflow-$DRONE_TAG-windows-amd64.zip servflow-windows-amd64.exe
+      - cd ..
+      - cd releases && sha256sum * > checksums.txt && cd ..
+      - ls -la releases/
+
+  - name: docker-build-arm64
+    image: docker:27.3.1
+    privileged: true
+    depends_on:
+      - build-linux-arm64
+    volumes:
+      - name: docker_cache
+        path: /var/lib/docker
+    environment:
+      DOCKER_BUILDKIT: 1
+      DOCKER_USERNAME:
+        from_secret: docker_username
+      DOCKER_PASSWORD:
+        from_secret: docker_password
+    commands:
+      - export IMAGE_TAG=$(cat .image-tag)
+      - cp dist/servflow-linux-arm64 servflow
+      - dockerd &
+      - sleep 5
+      - docker info
+      - docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
+      - docker buildx create --use
+      - docker buildx build --platform linux/arm64 -t $IMAGE_TAG -t servflow/servflow:latest --push .
+
+  - name: docker-build-amd64
+    image: docker:27.3.1
+    privileged: true
+    depends_on:
+      - build-linux-amd64
+      - docker-build-arm64
+    volumes:
+      - name: docker_cache
+        path: /var/lib/docker
+    environment:
+      DOCKER_BUILDKIT: 1
+      DOCKER_USERNAME:
+        from_secret: docker_username
+      DOCKER_PASSWORD:
+        from_secret: docker_password
+    commands:
+      - export IMAGE_TAG=$(cat .image-tag)
+      - cp dist/servflow-linux-amd64 servflow
+      - dockerd &
+      - sleep 5
+      - docker info
+      - docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
+      - docker buildx create --use
+      - docker buildx build --platform linux/amd64 -t $IMAGE_TAG -t servflow/servflow:latest --push .
+
+
+  - name: github-release
+    image: alpine:latest
+    depends_on:
+      - create-archives
+      - docker-build-amd64
+    environment:
+      GITHUB_TOKEN:
+        from_secret: github_token
+    commands:
+      - apk add --no-cache curl jq bash
+      - chmod +x scripts/create-github-release.sh
+      - bash scripts/create-github-release.sh
+    when:
+      event:
+        - tag
+
+volumes:
+  - name: deps
+    host:
+      path: /var/lib/cache/drone/go
+  - name: docker_cache
+    host:
+      path: /var/lib/cache/drone/docker

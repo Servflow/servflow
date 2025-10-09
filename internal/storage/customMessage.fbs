@@ -1,0 +1,6 @@
+table CustomMessageFormat {
+  name: string;
+  message: string;
+}
+
+root_type CustomMessageFormat;

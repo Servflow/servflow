@@ -1,0 +1,68 @@
+id: update
+http:
+  listenPath: /notes/{id}
+  method: PUT
+  next: $conditional.validate
+conditionals:
+  validate:
+    expression: |
+      {{ and
+      (notempty (urlparam "id") "ID")
+      (notempty (param "title") "Title")
+      (notempty (param "content") "Content")
+      }}
+    validPath: $action.authenticate
+    invalidPath: $response.400
+actions:
+  authenticate:
+    type: authenticate
+    config:
+      integration_id: mongo
+      database_field: email
+      jwt_key: "test"
+      token: '{{ header "Authorization" }}'
+      collection: "users"
+    next: $action.fetchItem
+    fail: $response.invalidAuth
+  fetchItem:
+    type: update
+    config:
+      integrationID: mongo
+      table: notes
+      single: true
+      shouldFail: true
+      filters:
+        - field: id
+          operation: "=="
+          comparator: '{{ urlparam "id" }}'
+        - field: owner
+          operation: "=="
+          comparator: "{{ .variable_actions_authenticate }}"
+      fields:
+        title: '{{ param "title" }}'
+        content: '{{ param "content" }}'
+    next: $response.success
+    fail: $response.404
+responses:
+  "400":
+    type: json
+    template: |
+      {"errors": {{ .error }}}
+    code: 400
+  invalidAuth:
+    type: json
+    template: |
+      { "error": "invalid auth token"}
+    code: 401
+  "404":
+    type: json
+    template: |
+      { "status" : "failed", "message": "not found" }
+    code: 404
+  success:
+    type: json
+    code: 200
+    template: |
+      {
+        "status" : "success"
+      }

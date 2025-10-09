@@ -1,0 +1,40 @@
+version: "2"
+
+networks:
+  servflow:
+
+volumes:
+  mongo_data:
+
+services:
+  servflow:
+    depends_on:
+      - mongo
+    build:
+      dockerfile: Dockerfile
+      context: ../..
+    command: ["start", "--integrations", "/integrations/mongo.yml", "/confs"]
+    environment:
+      - SERVFLOW_PORT=8080
+      - SERVFLOW_CONFIGFOLDERS_DATABASES=/integrations
+      - SERVFLOW_CONFIGFOLDERS_APIS=/confs
+      - SERVFLOW_APIKEY=test
+      - SERVFLOW_LOGLEVEL=debug
+      - SERVFLOW_ENV=development
+      - MONGODB_STRING=mongodb://mongo:27017/servflow
+    ports:
+      - "8181:8080"
+    volumes:
+      - ./confs:/confs
+      - ./integrations:/integrations
+    networks:
+      - servflow
+
+  mongo:
+    image: mongo:latest
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=servflow
+    networks:
+      - servflow

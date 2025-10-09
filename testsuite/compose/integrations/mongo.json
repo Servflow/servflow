@@ -1,0 +1,8 @@
+
+  {
+    "id": "mongo",
+    "type": "mongo",
+    "config": {
+      "uri": "mongodb://mongo:27017/servflow"
+    }
+  }

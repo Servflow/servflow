@@ -1,0 +1,53 @@
+id: list
+http:
+  listenPath: /notes/
+  method: GET
+  next: $action.authenticate
+conditionals:
+actions:
+  authenticate:
+    type: authenticate
+    config:
+      integration_id: mongo
+      database_field: email
+      jwt_key: "test"
+      token: '{{ header "Authorization" }}'
+      collection: "users"
+    next: $action.fetchItem
+    fail: $response.invalidAuth
+  fetchItem:
+    type: fetch
+    config:
+      integrationID: mongo
+      table: notes
+      shouldFail: true
+      filters:
+        - field: owner
+          operation: "=="
+          comparator: "{{ .variable_actions_authenticate }}"
+    next: $response.success
+    fail: $response.404
+responses:
+  "400":
+    type: json
+    template: |
+      {"errors": {{ .error }}}
+    code: 400
+  invalidAuth:
+    type: json
+    template: |
+      { "error": "invalid auth token"}
+    code: 401
+  "404":
+    type: json
+    template: |
+      { "status" : "failed", "message": "not found" }
+    code: 404
+  success:
+    code: 200
+    responseObject:
+      fields:
+        status:
+          value: "success"
+        data:
+          value: "{{ .variable_actions_fetchItem }}"

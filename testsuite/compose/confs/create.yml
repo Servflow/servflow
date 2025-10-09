@@ -1,0 +1,54 @@
+id: create
+http:
+  listenPath: /notes
+  method: POST
+  next: $conditional.validate
+conditionals:
+  validate:
+    expression: |
+      {{ and
+      (notempty (param "title") "Title")
+      (notempty (param "content") "Content")
+      }}
+    validPath: $action.authenticate
+    invalidPath: $response.400
+actions:
+  authenticate:
+    type: authenticate
+    config:
+      integration_id: mongo
+      database_field: email
+      jwt_key: "test"
+      token: '{{ header "Authorization" }}'
+      collection: "users"
+    next: $action.saveItem
+    fail: $response.invalidAuth
+  saveItem:
+    type: store
+    config:
+      integrationID: mongo
+      table: notes
+      fields:
+        title: '{{ param "title" }}'
+        content: '{{ param "content" }}'
+        owner: "{{ .variable_actions_authenticate }}"
+    next: $response.success
+responses:
+  "400":
+    type: json
+    template: |
+      {"errors": {{ .error }}}
+    code: 400
+  invalidAuth:
+    type: json
+    template: |
+      { "error": "invalid auth token"}
+    code: 401
+  success:
+    type: json
+    code: 200
+    template: |
+      {
+        "status" : "success",
+        "data" : {{ jsonout .variable_actions_saveItem}}
+      }

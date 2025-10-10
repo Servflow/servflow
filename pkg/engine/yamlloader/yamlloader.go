@@ -51,7 +51,6 @@ func (l *YAMLLoader) FetchAPIConfigs() ([]*apiconfig.APIConfig, error) {
 			continue
 		}
 
-		cfg.Normalize()
 		configs = append(configs, &cfg)
 	}
 

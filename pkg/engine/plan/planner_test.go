@@ -21,24 +21,24 @@ var sampleConfig = &apiconfig.APIConfig{
 		"action1": {
 			Type:   "action1",
 			Next:   "$action.action2",
-			Config: []byte(`{"key": "value"}`),
+			Config: map[string]interface{}{"key": "value"},
 		},
 		"action2": {
 			Next:   "$action.action3",
-			Config: []byte(`{"key": "value"}`),
+			Config: map[string]interface{}{"key": "value"},
 		},
 		"action3": {
 			Next:   "$conditional.cond1",
-			Config: []byte(`{"key": "value2"}`),
+			Config: map[string]interface{}{"key": "value2"},
 		},
 		"action4": {
 			Type:   "mock",
 			Next:   "end",
-			Config: []byte(`{"key": "value"}`),
+			Config: map[string]interface{}{"key": "value"},
 		},
 		"action5": {
 			Next:   "$action.action4",
-			Config: []byte(`{"key": "value"}`),
+			Config: map[string]interface{}{"key": "value"},
 		},
 	},
 	Conditionals: map[string]apiconfig.Conditional{
@@ -108,10 +108,10 @@ func TestPlannerV2_Generate(t *testing.T) {
 			Actions: map[string]apiconfig.Action{
 				"action1": {
 					Next:   "$conditional.cond1",
-					Config: []byte(`{"key": "value"}`),
+					Config: map[string]interface{}{"key": "value"},
 				},
 				"action2": {
-					Config: []byte(`{"key": "value2"}`),
+					Config: map[string]interface{}{"key": "value2"},
 					Fail:   "$response.failure",
 				},
 			},
@@ -396,52 +396,3 @@ func TestPlannerV2_generateResponseStep(t *testing.T) {
 	_, err = planner.generateResponseStep("nonexistent")
 	assert.Error(t, err)
 }
-
-//func TestPlannerV2_ValidateResponses(t *testing.T) {
-//	config := &apiconfig.APIConfig{
-//		Actions: map[string]apiconfig.Action{
-//			"action1": {
-//				Next:   "$conditional.cond1",
-//				Config: []byte(`{"key": "value"}`),
-//			},
-//			"action2": {
-//				Next:   "end",
-//				Config: []byte(`{"key": "value2"}`),
-//			},
-//		},
-//		Conditionals: map[string]apiconfig.Conditional{
-//			"cond1": {
-//				Expression:  "true",
-//				ValidPath:   "$response.success",
-//				InvalidPath: "$response.failure",
-//			},
-//		},
-//		Responses: map[string]apiconfig.ResponseConfig{
-//			"success": {
-//				Code:     200,
-//				Template: `{"status": "success"}`,
-//				Type:     "json",
-//			},
-//			"failure": {
-//				Code:     400,
-//				Template: `{"status": "failure"}`,
-//				Type:     "json",
-//			},
-//		},
-//	}
-//
-//	ctrl := gomock.NewController(t)
-//	defer ctrl.Finish()
-
-//planner := NewPlannerV2(PlannerConfig{
-//	Actions:      config.Actions,
-//	Conditions:   config.Conditionals,
-//	Responses:    config.Responses,
-//	TerminateTag: "end",
-//})
-
-//assert.True(t, planner.ValidateResponses("$action.action1"))
-
-// assert the path starting from second actions has no response
-//assert.False(t, planner.ValidateResponses("$action.action2"))
-//}

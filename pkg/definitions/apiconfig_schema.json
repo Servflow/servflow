@@ -1,0 +1,189 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "apiconfig.json",
+  "title": "API Configuration",
+  "description": "Schema for Servflow API configuration",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique identifier for the API configuration"
+    },
+    "actions": {
+      "type": ["object", "null"],
+      "description": "Map of action configurations",
+      "additionalProperties": {
+        "$ref": "#/definitions/Action"
+      }
+    },
+    "conditionals": {
+      "type": ["object", "null"],
+      "description": "Map of conditional configurations",
+      "additionalProperties": {
+        "$ref": "#/definitions/Conditional"
+      }
+    },
+    "responses": {
+      "type": ["object", "null"],
+      "description": "Map of response configurations",
+      "additionalProperties": {
+        "$ref": "#/definitions/ResponseConfig"
+      }
+    },
+    "http": {
+      "$ref": "#/definitions/HttpConfig",
+      "description": "HTTP configuration"
+    },
+    "mcpTool": {
+      "$ref": "#/definitions/MCPToolConfig",
+      "description": "MCP tool configuration"
+    }
+  },
+  "required": ["id"],
+  "additionalProperties": false,
+  "definitions": {
+    "HttpConfig": {
+      "type": "object",
+      "properties": {
+        "listenPath": {
+          "type": ["string", "null"]
+        },
+        "method": {
+          "type": "string",
+          "enum": [
+            "GET",
+            "POST",
+            "PUT",
+            "DELETE",
+            "PATCH",
+            "OPTIONS",
+            "HEAD",
+            ""
+          ]
+        },
+        "next": {
+          "type": ["string", "null"]
+        },
+        "corsAllowedOrigins": {
+          "type": ["array", "null"],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "MCPToolConfig": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": ["boolean", "null"]
+        },
+        "name": {
+          "type": ["string"]
+        },
+        "description": {
+          "type": ["string", "null"]
+        },
+        "args": {
+          "type": ["object", "null"],
+          "additionalProperties": {
+            "$ref": "#/definitions/ArgType"
+          }
+        },
+        "result": {
+          "type": ["string", "null"]
+        },
+        "start": {
+          "type": ["string"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "ArgType": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["string", "number"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Action": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "config": {
+          "type": ["object", "null"]
+        },
+        "next": {
+          "type": ["string", "null"]
+        },
+        "fail": {
+          "type": ["string", "null"]
+        }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    "Conditional": {
+      "type": "object",
+      "properties": {
+        "validPath": {
+          "type": ["string", "null"]
+        },
+        "invalidPath": {
+          "type": ["string", "null"]
+        },
+        "expression": {
+          "type": ["string", "null"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "ResponseConfig": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 599
+        },
+        "template": {
+          "type": ["string", "null"]
+        },
+        "type": {
+          "type": "string",
+          "enum": ["builder", "template"]
+        },
+        "responseObject": {
+          "$ref": "#/definitions/ResponseObject"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ResponseObject": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "type": ["string", "null"]
+        },
+        "fields": {
+          "type": ["object", "null"],
+          "additionalProperties": {
+            "$ref": "#/definitions/ResponseObject"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -20,9 +20,9 @@ func TestNewResponse(t *testing.T) {
 			name: "json",
 			id:   "id",
 			config: apiconfig.ResponseConfig{
-				BuilderType: builderTypeJSON,
-				Template:    "",
-				Code:        200,
+				Type:     builderTypeJSON,
+				Template: "",
+				Code:     200,
 			},
 			assertBuilder: func(t *testing.T, response *Response) {
 				_, ok := response.responseBuilder.(*responsebuilder2.JSONResponseBuilder)
@@ -35,9 +35,9 @@ func TestNewResponse(t *testing.T) {
 			name: "default object",
 			id:   "id",
 			config: apiconfig.ResponseConfig{
-				BuilderType: "",
-				Code:        200,
-				Template:    "",
+				Type:     "",
+				Code:     200,
+				Template: "",
 				Object: apiconfig.ResponseObject{
 					Fields: map[string]apiconfig.ResponseObject{
 						"status": {

@@ -131,10 +131,16 @@ func (p *PlannerV2) generateActionStep(id string) (*Action, error) {
 		exec actions.ActionExecutable
 		err  error
 	)
+
+	configJson, err := json.Marshal(a.Config)
+	if err != nil {
+		return nil, err
+	}
+
 	if p.registry != nil {
-		exec, err = p.registry.GetActionExecutable(a.Type, a.Config)
+		exec, err = p.registry.GetActionExecutable(a.Type, configJson)
 	} else {
-		exec, err = actions.GetActionExecutable(a.Type, a.Config)
+		exec, err = actions.GetActionExecutable(a.Type, configJson)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("error creating actions %s: %w", id, err)

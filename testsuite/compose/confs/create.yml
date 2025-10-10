@@ -35,17 +35,17 @@ actions:
     next: $response.success
 responses:
   "400":
-    type: json
+    type: template
     template: |
       {"errors": {{ .error }}}
     code: 400
   invalidAuth:
-    type: json
+    type: template
     template: |
       { "error": "invalid auth token"}
     code: 401
   success:
-    type: json
+    type: template
     code: 200
     template: |
       {

@@ -27,8 +27,8 @@ type ResponseBuilder interface {
 }
 
 const (
-	builderTypeJSON   = "json"
-	builderTypeObject = "template"
+	builderTypeTemplate = "template"
+	builderTypeObject   = "json_object"
 )
 
 func newResponse(id string, resp apiconfig.ResponseConfig) (*Response, error) {
@@ -40,13 +40,13 @@ func newResponse(id string, resp apiconfig.ResponseConfig) (*Response, error) {
 	if resp.Type == "" && (resp.Object.Value != "" || len(resp.Object.Fields) > 0) {
 		resp.Type = builderTypeObject
 	} else {
-		resp.Type = builderTypeJSON
+		resp.Type = builderTypeTemplate
 	}
 	logging.GetLogger().Debug("creating response", zap.String("builder_type", resp.Type), zap.String("id", id))
 
 	switch resp.Type {
-	case builderTypeJSON:
-		responseBuilder = responsebuilder.NewJsonResponseBuilder(resp.Code, resp.Template)
+	case builderTypeTemplate:
+		responseBuilder = responsebuilder.NewTemplateBuilder(resp.Code, resp.Template)
 	case builderTypeObject:
 		responseBuilder = responsebuilder.NewObjectBuilder(&resp.Object, resp.Code)
 	default:

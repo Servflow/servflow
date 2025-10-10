@@ -76,6 +76,7 @@
     },
     "MCPToolConfig": {
       "type": "object",
+      "required": ["name", "start"],
       "properties": {
         "enabled": {
           "type": ["boolean", "null"]
@@ -136,6 +137,7 @@
     },
     "Conditional": {
       "type": "object",
+      "required": ["expression"],
       "properties": {
         "validPath": {
           "type": ["string", "null"]
@@ -151,6 +153,7 @@
     },
     "ResponseConfig": {
       "type": "object",
+      "required": ["code"],
       "properties": {
         "code": {
           "type": "integer",
@@ -158,11 +161,11 @@
           "maximum": 599
         },
         "template": {
-          "type": ["string", "null"]
+          "type": ["string"]
         },
         "type": {
-          "type": "string",
-          "enum": ["builder", "template"]
+          "type": ["string"],
+          "enum": ["json_object", "template",""]
         },
         "responseObject": {
           "$ref": "#/definitions/ResponseObject"

@@ -51,7 +51,7 @@ actions:
 
 responses:
   "200":
-    type: json
+    type: template
     template: |
       {
         "success": true
@@ -59,7 +59,7 @@ responses:
     code: 200
 
   "400":
-    type: json
+    type: template
     template: |
       {
         "errors": {{ .error }}
@@ -67,7 +67,7 @@ responses:
     code: 400
 
   exists:
-    type: json
+    type: template
     template: |
       {
         "errors": ["user already exists"]

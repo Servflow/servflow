@@ -40,13 +40,13 @@ actions:
 responses:
   malformed:
     template: '{ "error": {{ .error }} }'
-    type: json
+    type: template
     code: 400
   invalidCreds:
     template: '{"error": "Invalid Credentials" }'
     code: 401
-    type: json
+    type: template
   success:
     template: '{ "token" : "{{ stringescape .variable_actions_gentoken }}" }'
     code: 200
-    type: json
+    type: template

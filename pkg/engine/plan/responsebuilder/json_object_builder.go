@@ -11,19 +11,19 @@ import (
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 )
 
-type ObjectBuilder struct {
+type JSONObjectBuilder struct {
 	object *apiconfig.ResponseObject
 	code   int
 }
 
-func NewObjectBuilder(object *apiconfig.ResponseObject, code int) *ObjectBuilder {
-	return &ObjectBuilder{
+func NewObjectBuilder(object *apiconfig.ResponseObject, code int) *JSONObjectBuilder {
+	return &JSONObjectBuilder{
 		object: object,
 		code:   code,
 	}
 }
 
-func (o *ObjectBuilder) BuildResponse(ctx context.Context) (*http.SfResponse, error) {
+func (o *JSONObjectBuilder) BuildResponse(ctx context.Context) (*http.SfResponse, error) {
 	logging.WithContext(ctx).Debug("running object builder response builder")
 
 	val, err := generateValue(ctx, o.object)

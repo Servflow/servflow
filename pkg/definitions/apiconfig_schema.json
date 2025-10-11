@@ -45,9 +45,10 @@
   "definitions": {
     "HttpConfig": {
       "type": "object",
+      "required": ["listenPath","method", "next"],
       "properties": {
         "listenPath": {
-          "type": ["string", "null"]
+          "type": "string"
         },
         "method": {
           "type": "string",
@@ -63,7 +64,7 @@
           ]
         },
         "next": {
-          "type": ["string", "null"]
+          "type": ["string"]
         },
         "corsAllowedOrigins": {
           "type": ["array", "null"],
@@ -79,13 +80,13 @@
       "required": ["name", "start"],
       "properties": {
         "enabled": {
-          "type": ["boolean", "null"]
+          "type": "boolean"
         },
         "name": {
-          "type": ["string"]
+          "type": "string"
         },
         "description": {
-          "type": ["string", "null"]
+          "type": "string"
         },
         "args": {
           "type": ["object", "null"],
@@ -94,10 +95,10 @@
           }
         },
         "result": {
-          "type": ["string", "null"]
+          "type": "string"
         },
         "start": {
-          "type": ["string"]
+          "type": "string"
         }
       },
       "additionalProperties": false
@@ -126,10 +127,10 @@
           "type": ["object", "null"]
         },
         "next": {
-          "type": ["string", "null"]
+          "type": "string"
         },
         "fail": {
-          "type": ["string", "null"]
+          "type": "string"
         }
       },
       "required": ["type"],
@@ -140,13 +141,13 @@
       "required": ["expression"],
       "properties": {
         "validPath": {
-          "type": ["string", "null"]
+          "type": "string"
         },
         "invalidPath": {
-          "type": ["string", "null"]
+          "type": "string"
         },
         "expression": {
-          "type": ["string", "null"]
+          "type": "string"
         }
       },
       "additionalProperties": false
@@ -161,11 +162,11 @@
           "maximum": 599
         },
         "template": {
-          "type": ["string"]
+          "type": "string"
         },
         "type": {
-          "type": ["string"],
-          "enum": ["json_object", "template",""]
+          "type": "string",
+          "enum": ["json_object", "template", ""]
         },
         "responseObject": {
           "$ref": "#/definitions/ResponseObject"

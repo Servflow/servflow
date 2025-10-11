@@ -1,10 +1,16 @@
 package apiconfig
 
 import (
+	_ "embed"
 	"encoding/json"
+	"fmt"
 
 	"git.servflow.io/servflow/definitions/proto"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 )
+
+//go:embed apiconfig_schema.json
+var apiConfigSchema string
 
 type RequestType string
 
@@ -20,13 +26,6 @@ type APIConfig struct {
 	Responses    map[string]ResponseConfig `json:"responses" yaml:"responses"`
 	HttpConfig   HttpConfig                `json:"http" yaml:"http"`
 	McpTool      MCPToolConfig             `json:"mcpTool" yaml:"mcpTool"`
-
-	// Deprecated: use HttpConfig.Listenpath
-	ListenPath string `json:"listenPath" yaml:"listenPath"`
-	// Deprecated: use HttpConfig.Method
-	Method string `json:"method" yaml:"method"`
-	// Deprecated: use HttpConfig
-	Request RequestConfig `json:"request" yaml:"request"`
 }
 
 type HttpConfig struct {
@@ -45,7 +44,7 @@ type MCPToolConfig struct {
 	Name        string             `json:"name" yaml:"name"`
 	Description string             `json:"description" yaml:"description"`
 	Args        map[string]ArgType `json:"args" yaml:"args"`
-	// Result represents the tag to get the result from
+	// Result is the expression to be used to get the result
 	Result string `json:"result" yaml:"result"`
 	Start  string `json:"start" yaml:"start"`
 }
@@ -64,33 +63,10 @@ type RequestConfig struct {
 }
 
 type Action struct {
-	Type      string                 `json:"type" yaml:"type"`
-	Config    json.RawMessage        `json:"config" yaml:"-"`
-	NewConfig map[string]interface{} `yaml:"config"`
-	Next      string                 `json:"next" yaml:"next"`
-	Fail      string                 `json:"fail" yaml:"fail"`
-}
-
-func (a *Action) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	var tmp struct {
-		Type      string                 `yaml:"type"`
-		NewConfig map[string]interface{} `yaml:"config"`
-		Next      string                 `yaml:"next"`
-		Fail      string                 `yaml:"fail"`
-	}
-	if err := unmarshal(&tmp); err != nil {
-		return err
-	}
-	config, err := json.Marshal(tmp.NewConfig)
-	if err != nil {
-		return err
-	}
-	a.Type = tmp.Type
-	a.Config = config
-	a.NewConfig = tmp.NewConfig
-	a.Next = tmp.Next
-	a.Fail = tmp.Fail
-	return nil
+	Type   string                 `json:"type" yaml:"type"`
+	Config map[string]interface{} `json:"config" yaml:"config"`
+	Next   string                 `json:"next" yaml:"next"`
+	Fail   string                 `json:"fail" yaml:"fail"`
 }
 
 type ConditionalExpressions struct {
@@ -105,19 +81,12 @@ type Conditional struct {
 	Expression  string `json:"expression" yaml:"expression"`
 }
 
-type ActionConfig struct {
-	ID            string `yaml:"id"`
-	Type          string `yaml:"type"`
-	Configuration string `yaml:"configuration"`
-}
-
 type ResponseConfig struct {
-	Code         int            `json:"code" yaml:"code"`
-	Template     string         `json:"template" yaml:"template"`
-	Type         string         `json:"type" yaml:"type"`
-	ShouldStream bool           `json:"shouldStream" yaml:"shouldStream"`
-	BuilderType  string         `json:"builderType" yaml:"builderType"`
-	Object       ResponseObject `json:"responseObject" yaml:"responseObject"`
+	Code     int    `json:"code" yaml:"code"`
+	Template string `json:"template" yaml:"template"`
+	Type     string `json:"type" yaml:"type"`
+	// Not yet implemented
+	Object ResponseObject `json:"responseObject" yaml:"responseObject"`
 }
 
 type ResponseObject struct {
@@ -166,18 +135,36 @@ func (d *DatasourceConfig) UnmarshalYAML(unmarshal func(interface{}) error) erro
 	d.NewConfig = tmp.NewConfig
 	return nil
 }
+func (a *APIConfig) SchemaValidation() error {
+	compiler := jsonschema.NewCompiler()
 
-func (a *APIConfig) Normalize() {
-	if a.HttpConfig.Method == "" {
-		a.HttpConfig.Method = a.Method
+	var schemaData interface{}
+	if err := json.Unmarshal(json.RawMessage(apiConfigSchema), &schemaData); err != nil {
+		return fmt.Errorf("failed to parse embedded schema: %w", err)
 	}
-	if a.HttpConfig.Next == "" {
-		a.HttpConfig.Next = a.Request.Next
+
+	if err := compiler.AddResource("apiconfig.json", schemaData); err != nil {
+		return fmt.Errorf("failed to add schema resource: %w", err)
 	}
-	if a.HttpConfig.ListenPath == "" {
-		a.HttpConfig.ListenPath = a.ListenPath
+
+	schema, err := compiler.Compile("apiconfig.json")
+	if err != nil {
+		return fmt.Errorf("failed to compile schema: %w", err)
 	}
-	if len(a.HttpConfig.CORSAllowedOrigins) < 1 {
-		a.HttpConfig.CORSAllowedOrigins = a.Request.CORSAllowedOrigins
+
+	configJSON, err := json.Marshal(a)
+	if err != nil {
+		return fmt.Errorf("failed to marshal APIConfig to JSON: %w", err)
 	}
+
+	var configData interface{}
+	if err := json.Unmarshal(configJSON, &configData); err != nil {
+		return fmt.Errorf("failed to unmarshal APIConfig JSON: %w", err)
+	}
+
+	if err := schema.Validate(configData); err != nil {
+		return fmt.Errorf("APIConfig validation failed: %w", err)
+	}
+
+	return nil
 }

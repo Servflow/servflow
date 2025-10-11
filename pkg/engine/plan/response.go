@@ -7,11 +7,11 @@ import (
 	"github.com/Servflow/servflow/internal/http"
 	"github.com/Servflow/servflow/internal/logging"
 	"github.com/Servflow/servflow/pkg/definitions"
-	responsebuilder2 "github.com/Servflow/servflow/pkg/engine/plan/responsebuilder"
+	"github.com/Servflow/servflow/pkg/engine/plan/responsebuilder"
 	"go.uber.org/zap"
 )
 
-// TODO support response type
+// TODO improve response handling
 
 type Response struct {
 	id              string
@@ -27,8 +27,8 @@ type ResponseBuilder interface {
 }
 
 const (
-	builderTypeJSON   = "json"
-	builderTypeObject = "object"
+	builderTypeTemplate = "template"
+	builderTypeObject   = "json_object"
 )
 
 func newResponse(id string, resp apiconfig.ResponseConfig) (*Response, error) {
@@ -37,20 +37,20 @@ func newResponse(id string, resp apiconfig.ResponseConfig) (*Response, error) {
 	}
 
 	var responseBuilder ResponseBuilder
-	if resp.BuilderType == "" && (resp.Object.Value != "" || len(resp.Object.Fields) > 0) {
-		resp.BuilderType = builderTypeObject
+	if resp.Type == "" && (resp.Object.Value != "" || len(resp.Object.Fields) > 0) {
+		resp.Type = builderTypeObject
 	} else {
-		resp.BuilderType = builderTypeJSON
+		resp.Type = builderTypeTemplate
 	}
-	logging.GetLogger().Debug("creating response", zap.String("builder_type", resp.BuilderType), zap.String("id", id))
+	logging.GetLogger().Debug("creating response", zap.String("builder_type", resp.Type), zap.String("id", id))
 
-	switch resp.BuilderType {
-	case builderTypeJSON:
-		responseBuilder = responsebuilder2.NewJsonResponseBuilder(resp.Code, resp.Template)
+	switch resp.Type {
+	case builderTypeTemplate:
+		responseBuilder = responsebuilder.NewTemplateBuilder(resp.Code, resp.Template)
 	case builderTypeObject:
-		responseBuilder = responsebuilder2.NewObjectBuilder(&resp.Object, resp.Code)
+		responseBuilder = responsebuilder.NewObjectBuilder(&resp.Object, resp.Code)
 	default:
-		return nil, fmt.Errorf("unknown builder type: %s", resp.BuilderType)
+		return nil, fmt.Errorf("unknown builder type: %s", resp.Type)
 	}
 
 	return &Response{

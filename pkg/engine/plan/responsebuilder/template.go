@@ -10,16 +10,16 @@ import (
 	"go.uber.org/zap"
 )
 
-type JSONResponseBuilder struct {
+type TemplateBuilder struct {
 	Code     int
 	template string
 }
 
-func NewJsonResponseBuilder(code int, template string) *JSONResponseBuilder {
-	return &JSONResponseBuilder{Code: code, template: template}
+func NewTemplateBuilder(code int, template string) *TemplateBuilder {
+	return &TemplateBuilder{Code: code, template: template}
 }
 
-func (J *JSONResponseBuilder) BuildResponse(ctx context.Context) (*http.SfResponse, error) {
+func (J *TemplateBuilder) BuildResponse(ctx context.Context) (*http.SfResponse, error) {
 	logging.WithContext(ctx).Debug("running json builder response builder")
 
 	logging.WithContext(ctx).Debug("build response body", zap.String("template", J.template))

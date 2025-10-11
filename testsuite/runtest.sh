@@ -5,6 +5,7 @@ set -ex
 # Build the Go binary
 pushd ..
 GOOS=linux go build -o servflow || true
+#./servflow validate testsuite/compose/confs
 popd
 
 # Install Python dependencies if not already installed

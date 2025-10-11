@@ -20,14 +20,14 @@ func TestNewResponse(t *testing.T) {
 			name: "json",
 			id:   "id",
 			config: apiconfig.ResponseConfig{
-				BuilderType: builderTypeJSON,
-				Template:    "",
-				Code:        200,
+				Type:     builderTypeTemplate,
+				Template: "",
+				Code:     200,
 			},
 			assertBuilder: func(t *testing.T, response *Response) {
-				_, ok := response.responseBuilder.(*responsebuilder2.JSONResponseBuilder)
+				_, ok := response.responseBuilder.(*responsebuilder2.TemplateBuilder)
 				if !ok {
-					t.Errorf("Response builder is not a JSONResponseBuilder")
+					t.Errorf("Response builder is not a TemplateBuilder")
 				}
 			},
 		},
@@ -35,9 +35,9 @@ func TestNewResponse(t *testing.T) {
 			name: "default object",
 			id:   "id",
 			config: apiconfig.ResponseConfig{
-				BuilderType: "",
-				Code:        200,
-				Template:    "",
+				Type:     "",
+				Code:     200,
+				Template: "",
 				Object: apiconfig.ResponseObject{
 					Fields: map[string]apiconfig.ResponseObject{
 						"status": {
@@ -47,9 +47,9 @@ func TestNewResponse(t *testing.T) {
 				},
 			},
 			assertBuilder: func(t *testing.T, response *Response) {
-				_, ok := response.responseBuilder.(*responsebuilder2.ObjectBuilder)
+				_, ok := response.responseBuilder.(*responsebuilder2.JSONObjectBuilder)
 				if !ok {
-					t.Errorf("Response builder is not a ObjectBuilder, it is %T", response.responseBuilder)
+					t.Errorf("Response builder is not a JSONObjectBuilder, it is %T", response.responseBuilder)
 				}
 			},
 		},

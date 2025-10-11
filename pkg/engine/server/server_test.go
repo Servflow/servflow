@@ -176,13 +176,17 @@ func TestCreateCustomMuxHandler(t *testing.T) {
 		},
 		Actions: map[string]apiconfig.Action{
 			"action2": {
-				Type:   "stub",
-				Config: []byte(`{"key": "value"}`),
+				Type: "stub",
+				Config: map[string]interface{}{
+					"key": "value",
+				},
 			},
 			"action1": {
-				Type:   "stub",
-				Next:   "$action.action2",
-				Config: []byte(`{"key": "value"}`),
+				Type: "stub",
+				Next: "$action.action2",
+				Config: map[string]interface{}{
+					"key": "value",
+				},
 			},
 		},
 	}
@@ -310,9 +314,11 @@ func TestExtractURLParam(t *testing.T) {
 		},
 		Actions: map[string]apiconfig.Action{
 			"action1": {
-				Type:   "stub",
-				Next:   "$response.finish",
-				Config: []byte(`{"key": "value"}`),
+				Type: "stub",
+				Next: "$response.finish",
+				Config: map[string]interface{}{
+					"key": "value",
+				},
 			},
 		},
 		Responses: map[string]apiconfig.ResponseConfig{

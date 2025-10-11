@@ -29,17 +29,17 @@ actions:
     fail: $response.404
 responses:
   "400":
-    type: json
+    type: template
     template: |
       {"errors": {{ .error }}}
     code: 400
   invalidAuth:
-    type: json
+    type: template
     template: |
       { "error": "invalid auth token"}
     code: 401
   "404":
-    type: json
+    type: template
     template: |
       { "status" : "failed", "message": "not found" }
     code: 404

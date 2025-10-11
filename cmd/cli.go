@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -9,12 +10,20 @@ import (
 	"github.com/Servflow/servflow/config"
 	"github.com/Servflow/servflow/internal/storage"
 	"github.com/Servflow/servflow/pkg/engine/server"
+	"github.com/Servflow/servflow/pkg/engine/yamlloader"
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/urfave/cli/v2"
+	"go.uber.org/zap"
 )
 
 const appName = "ServFlow"
+
+// ValidationError represents a validation error for a specific config
+type ValidationError struct {
+	ConfigID string
+	Error    error
+}
 
 func RunServer(cfg *config.Config) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -47,6 +56,58 @@ func RunServer(cfg *config.Config) error {
 		}
 		stop()
 	}
+	return nil
+}
+
+func ValidateConfigs(configFolder string, verbose bool) error {
+	var logger = zap.NewNop()
+	loader := yamlloader.NewYAMLLoader(configFolder, "", logger)
+	configs, err := loader.FetchAPIConfigs()
+	if err != nil {
+		return fmt.Errorf("failed to load API configs: %w", err)
+	}
+
+	if len(configs) == 0 {
+		return fmt.Errorf("no API configs found in %s", configFolder)
+	}
+
+	var validationErrors []ValidationError
+	validCount := 0
+
+	for _, cfg := range configs {
+		if err := cfg.SchemaValidation(); err != nil {
+			validationErrors = append(validationErrors, ValidationError{
+				ConfigID: cfg.ID,
+				Error:    err,
+			})
+		} else {
+			validCount++
+		}
+	}
+
+	fmt.Println("Validation Summary:")
+	fmt.Printf("   Total configs: %d\n", len(configs))
+	fmt.Printf("   Valid configs: %d\n", validCount)
+	fmt.Printf("   Invalid configs: %d\n", len(validationErrors))
+
+	if len(validationErrors) > 0 {
+		fmt.Printf("\n Validation Errors:\n")
+		for _, validationErr := range validationErrors {
+			if verbose {
+				fmt.Printf("   • Config '%s':\n     %v\n", validationErr.ConfigID, validationErr.Error)
+			} else {
+				fmt.Printf("   • Config '%s': Validation failed\n", validationErr.ConfigID)
+			}
+		}
+
+		if !verbose {
+			fmt.Printf("\nUse --verbose flag to see detailed error messages\n")
+		}
+
+		return fmt.Errorf("validation failed for %d configuration(s)", len(validationErrors))
+	}
+
+	fmt.Printf("\n🎉 All configurations are valid!\n")
 	return nil
 }
 
@@ -96,6 +157,32 @@ func CreateApp() *cli.App {
 						cfg.ConfigFolder, cfg.IntegrationsFile)
 
 					return RunServer(&cfg)
+				},
+			},
+			{
+				Name:        "validate",
+				Usage:       "Validate configuration files",
+				ArgsUsage:   "[CONFIG_FOLDER]",
+				Description: "Validates all YAML configuration files in the specified folder using JSON Schema validation",
+				Flags: []cli.Flag{
+					&cli.BoolFlag{
+						Name:    "verbose",
+						Aliases: []string{"v"},
+						Usage:   "Show detailed validation errors",
+						Value:   false,
+					},
+				},
+				Action: func(c *cli.Context) error {
+					configFolder := c.Args().First()
+					if configFolder == "" {
+						return cli.Exit("Config folder must be specified as the first argument", 1)
+					}
+
+					if _, err := os.Stat(configFolder); os.IsNotExist(err) {
+						return cli.Exit(fmt.Sprintf("Config folder '%s' does not exist", configFolder), 1)
+					}
+
+					return ValidateConfigs(configFolder, c.Bool("verbose"))
 				},
 			},
 		},

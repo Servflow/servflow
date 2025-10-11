@@ -16,10 +16,6 @@ import (
 )
 
 func (h *APIHandler) CreateChain(config *apiconfig.APIConfig) http.Handler {
-
-	// create a new middleware chain of the available middlewares, then add the handler
-	// as the final one
-	// wrap it around a handler that creates an aggregation context
 	chain := alice.New(
 		h.middlewareAdaptor(&middleware.Cors{AllowedOrigins: config.HttpConfig.CORSAllowedOrigins}),
 	).Then(h)

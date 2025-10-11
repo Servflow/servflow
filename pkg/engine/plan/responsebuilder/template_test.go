@@ -57,7 +57,7 @@ func TestJSONResponseBuilder_BuildResponse(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			builder := NewJsonResponseBuilder(tc.code, tc.template)
+			builder := NewTemplateBuilder(tc.code, tc.template)
 
 			ctx := requestctx.NewTestContext()
 			err := requestctx.AddRequestVariables(ctx, tc.variables, "")

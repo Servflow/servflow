@@ -13,10 +13,11 @@ import (
 )
 
 type Config struct {
-	ToolConfigs   []ToolConfig `json:"toolConfigs" yaml:"toolConfigs"`
-	SystemPrompt  string       `json:"systemPrompt" yaml:"systemPrompt"`
-	UserPrompt    string       `json:"userPrompt" yaml:"userPrompt"`
-	IntegrationID string       `json:"integrationID" yaml:"integrationID"`
+	ToolConfigs    []ToolConfig `json:"toolConfigs" yaml:"toolConfigs"`
+	SystemPrompt   string       `json:"systemPrompt" yaml:"systemPrompt"`
+	UserPrompt     string       `json:"userPrompt" yaml:"userPrompt"`
+	IntegrationID  string       `json:"integrationID" yaml:"integrationID"`
+	ConversationID string       `json:"conversationID" yaml:"conversationID"`
 }
 type MCPServerConfig struct {
 	Endpoint string   `json:"endpoint" yaml:"endpoint"`
@@ -56,7 +57,7 @@ func (a *Agent) Execute(ctx context.Context, modifiedConfig string) (interface{}
 	if err := json.Unmarshal([]byte(modifiedConfig), &newConfig); err != nil {
 		return nil, err
 	}
-	session, err := agent.NewOrchestrator(
+	session, err := agent.NewSession(
 		newConfig.SystemPrompt,
 		a.integration,
 		agent.WithToolManager(a.toolManager),

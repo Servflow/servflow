@@ -35,7 +35,7 @@ func TestNewOrchestrator(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockToolManager := NewMockToolManager(ctrl)
-	orchestrator, err := NewOrchestrator("You are an agent for a restaurant review system", nil, WithToolManager(mockToolManager))
+	orchestrator, err := NewSession("You are an agent for a restaurant review system", nil, WithToolManager(mockToolManager))
 	require.NoError(t, err)
 
 	expectedMessages := []any{
@@ -44,7 +44,7 @@ func TestNewOrchestrator(t *testing.T) {
 			Content: "You are an agent for a restaurant review system",
 		},
 	}
-	assert.Equal(t, expectedMessages, orchestrator.thoughtMessages)
+	assert.Equal(t, expectedMessages, orchestrator.messages)
 }
 
 func TestOrchestrator_TestQuery(t *testing.T) {
@@ -145,7 +145,7 @@ func TestOrchestrator_TestQuery(t *testing.T) {
 	)
 
 	// Create agent and run query
-	agent, err := NewOrchestrator(systemPrompt, mockLLmHandler, WithToolManager(mockToolManager))
+	agent, err := NewSession(systemPrompt, mockLLmHandler, WithToolManager(mockToolManager))
 	require.NoError(t, err)
 
 	result, err := agent.Query(context.Background(), testQuery)
@@ -177,7 +177,7 @@ func TestOrchestrator_ProviderError(t *testing.T) {
 		ProvideResponse(gomock.Any(), gomock.Any()).
 		Return(LLMResponse{}, providerError)
 
-	agent, err := NewOrchestrator(systemPrompt, mockLLmHandler, WithToolManager(mockToolManager))
+	agent, err := NewSession(systemPrompt, mockLLmHandler, WithToolManager(mockToolManager))
 	require.NoError(t, err)
 
 	result, err := agent.Query(context.Background(), testQuery)
@@ -262,7 +262,7 @@ func TestOrchestrator_ToolErrorWithRetry(t *testing.T) {
 			Return(finalResponse, nil),
 	)
 
-	agent, err := NewOrchestrator(systemPrompt, mockLLmHandler, WithToolManager(mockToolManager))
+	agent, err := NewSession(systemPrompt, mockLLmHandler, WithToolManager(mockToolManager))
 	require.NoError(t, err)
 
 	result, err := agent.Query(context.Background(), testQuery)
@@ -323,7 +323,7 @@ func TestOrchestrator_ToolErrorWithLLMWrapup(t *testing.T) {
 			Return(finalResponse, nil),
 	)
 
-	agent, err := NewOrchestrator(systemPrompt, mockLLmHandler, WithToolManager(mockToolManager))
+	agent, err := NewSession(systemPrompt, mockLLmHandler, WithToolManager(mockToolManager))
 	require.NoError(t, err)
 
 	result, err := agent.Query(context.Background(), testQuery)

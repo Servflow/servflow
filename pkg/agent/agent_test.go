@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -102,10 +103,12 @@ func TestOrchestrator_TestQuery(t *testing.T) {
 				SystemMessage: string(instructions),
 				Messages: []any{
 					ContentMessage{
+						Message: Message{Type: MessageTypeText},
 						Role:    RoleTypeDeveloper,
 						Content: "You are an agent for a restaurant review system",
 					},
 					ContentMessage{
+						Message: Message{Type: MessageTypeText},
 						Role:    RoleTypeUser,
 						Content: "What's the weather like in Lagos?",
 					},
@@ -119,25 +122,30 @@ func TestOrchestrator_TestQuery(t *testing.T) {
 				SystemMessage: string(instructions),
 				Messages: []any{
 					ContentMessage{
+						Message: Message{Type: MessageTypeText},
 						Role:    RoleTypeDeveloper,
 						Content: "You are an agent for a restaurant review system",
 					},
 					ContentMessage{
+						Message: Message{Type: MessageTypeText},
 						Role:    RoleTypeUser,
 						Content: "What's the weather like in Lagos?",
 					},
 					ContentMessage{
+						Message: Message{Type: MessageTypeText},
 						Role:    RoleTypeAssistant,
 						Content: "I'll check the weather for Lagos",
 					},
 					ToolCallMessage{
+						Message:   Message{Type: MessageTypeToolCall},
 						ID:        "test",
 						Name:      "get_weather",
 						Arguments: map[string]interface{}{"location": "lagos"},
 					},
 					ToolCallOutputMessage{
-						ID:     "test",
-						Output: "Temperature: 28°C, Condition: Sunny",
+						Message: Message{Type: MessageTypeToolResponse},
+						ID:      "test",
+						Output:  "Temperature: 28°C, Condition: Sunny",
 					},
 				},
 			}).

@@ -4,6 +4,7 @@ package agent
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -43,20 +44,50 @@ type Session struct {
 	conversationID string
 }
 
-type Option func(*Session)
+type Option func(*Session) error
 
 func WithToolManager(toolManager ToolManager) Option {
-	return func(a *Session) {
+	return func(a *Session) error {
 		a.toolManager = toolManager
+		return nil
 	}
 }
 
 func WithConversationID(id string) Option {
-	return func(a *Session) {
+	return func(a *Session) error {
+		if id == "" {
+			return fmt.Errorf("conversationID can not be empty")
+		}
 		a.conversationID = id
-		//messages, err := storage.GetLogEntriesByPrefix(conversationStoragePrefix+id, func(data []byte) (storage.Serializable, error) {
-		//	return &ContentMessage{}
-		//})
+		messages, err := storage.GetLogEntriesByPrefix(conversationStoragePrefix+id, func(data []byte) (any, error) {
+			var msg Message
+			err := json.Unmarshal(data, &msg)
+			if err != nil {
+				return nil, err
+			}
+			switch msg.Type {
+			case MessageTypeText:
+				var contentMessage ContentMessage
+				err = json.Unmarshal(data, &contentMessage)
+				return &contentMessage, err
+			case MessageTypeToolResponse:
+				var toolResponse ToolCallOutputMessage
+				err = json.Unmarshal(data, &toolResponse)
+				return &toolResponse, err
+			case MessageTypeToolCall:
+				var toolCall ToolCallMessage
+				err = json.Unmarshal(data, &toolCall)
+				return &toolCall, err
+			default:
+				logging.GetLogger().Warn("invalid type in log storage", zap.Int("type", int(msg.Type)))
+			}
+			return nil, nil
+		})
+		if err != nil {
+			return err
+		}
+		a.messages = append(a.messages, messages...)
+		return nil
 	}
 }
 
@@ -67,12 +98,15 @@ func NewSession(developerInstructions string, llm LLmProvider, options ...Option
 	}
 
 	agent.messages = append(agent.messages, ContentMessage{
+		Message: Message{Type: MessageTypeText},
 		Role:    RoleTypeDeveloper,
 		Content: developerInstructions,
 	})
 
 	for _, option := range options {
-		option(agent)
+		if err := option(agent); err != nil {
+			return nil, err
+		}
 	}
 
 	return agent, nil
@@ -85,6 +119,7 @@ type agentOutput struct {
 
 func (a *Session) Query(ctx context.Context, query string) (string, error) {
 	a.messages = append(a.messages, ContentMessage{
+		Message: Message{Type: MessageTypeText},
 		Role:    RoleTypeUser,
 		Content: query,
 	})
@@ -123,11 +158,11 @@ func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 
 			// process content output
 			for _, c := range r.Content {
-				a.messages = append(a.messages, ContentMessage{
+				a.addToMessages(logger, ContentMessage{
+					Message: Message{Type: MessageTypeText},
 					Role:    RoleTypeAssistant,
 					Content: c.Text,
-				})
-				out <- agentOutput{response: c.Text}
+				}, out)
 			}
 
 			if len(r.Tools) == 0 {
@@ -138,24 +173,26 @@ func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 			for _, tool := range r.Tools {
 				logger.Debug("attempting to execute tool", zap.String("tool", tool.Name))
 
-				a.messages = append(a.messages, ToolCallMessage{
+				a.addToMessages(logger, ToolCallMessage{
+					Message:   Message{Type: MessageTypeToolCall},
 					ID:        tool.ToolID,
 					Name:      tool.Name,
 					Arguments: tool.Input,
-				})
+				}, out)
 				toolResp, err := a.toolManager.CallTool(ctx, tool.Name, tool.Input)
 				if err != nil {
-					logger.Error("failed to execute tool", zap.String("tool", tool.Name), zap.Error(err))
-					a.messages = append(a.messages, ToolCallOutputMessage{
-						Output: "error running tool",
-						ID:     tool.ToolID,
-					})
+					a.addToMessages(logger, ToolCallOutputMessage{
+						Message: Message{Type: MessageTypeToolResponse},
+						Output:  "error running tool",
+						ID:      tool.ToolID,
+					}, out)
 					continue
 				}
-				a.messages = append(a.messages, ToolCallOutputMessage{
-					Output: toolResp,
-					ID:     tool.ToolID,
-				})
+				a.addToMessages(logger, ToolCallOutputMessage{
+					Message: Message{Type: MessageTypeToolResponse},
+					Output:  toolResp,
+					ID:      tool.ToolID,
+				}, out)
 				logger.Debug("successfully executed tool", zap.String("tool", tool.Name), zap.String("toolResp", toolResp))
 			}
 		}
@@ -165,38 +202,35 @@ func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 	return out
 }
 
-func (a *Session) addToMessages(message any) error {
+func (a *Session) addToMessages(logger *zap.Logger, message any, output chan agentOutput) {
 	storageKey := ""
 	if a.conversationID != "" {
 		storageKey = conversationStoragePrefix + a.conversationID
 	}
+
+	var (
+		serializable storage.Serializable
+	)
 	switch message := message.(type) {
 	case ContentMessage:
 		a.messages = append(a.messages, message)
-		if storageKey != "" {
-			if err := storage.WriteToLog(
-				storageKey,
-				[]storage.Serializable{&message},
-			); err != nil {
-				return err
-			}
+		output <- agentOutput{
+			response: message.Content,
 		}
+		serializable = &message
 	case ToolCallMessage:
 		a.messages = append(a.messages, message)
-		if storageKey != "" {
-			if err := storage.WriteToLog(storageKey, []storage.Serializable{&message}); err != nil {
-				return err
-			}
-		}
+		serializable = &message
 	case ToolCallOutputMessage:
 		a.messages = append(a.messages, message)
-		if storageKey != "" {
-			if err := storage.WriteToLog(storageKey, []storage.Serializable{&message}); err != nil {
-				return err
-			}
-		}
+		serializable = &message
 	default:
-		return fmt.Errorf("unknown type %T", message)
+		logger.Warn("received message of unknown type", zap.Any("message", message))
 	}
-	return nil
+
+	if storageKey != "" {
+		if err := storage.WriteToLog(storageKey, []storage.Serializable{serializable}); err != nil {
+			logger.Error("failed to write serializable message", zap.Error(err))
+		}
+	}
 }

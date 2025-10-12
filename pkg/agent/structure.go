@@ -49,6 +49,7 @@ type Message struct {
 }
 
 type ToolCallMessage struct {
+	Message
 	ID        string
 	Name      string
 	Arguments map[string]interface{}
@@ -63,6 +64,7 @@ func (t *ToolCallMessage) Deserialize(bytes []byte) error {
 }
 
 type ToolCallOutputMessage struct {
+	Message
 	ID     string
 	Output string
 }

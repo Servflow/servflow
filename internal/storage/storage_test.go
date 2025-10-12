@@ -45,14 +45,14 @@ func TestWriteAndGetEntries(t *testing.T) {
 		err := WriteToLog("conversations", entries)
 		require.NoError(t, err)
 
-		gotten, err := GetLogEntriesByPrefix("conversations", func(data []byte) (Serializable, error) {
+		gotten, err := GetLogEntriesByPrefix("conversations", func(data []byte) (any, error) {
 			var m jsonSerializable
 			err := m.Deserialize(data)
 			return &m, err
 		})
 		require.NoError(t, err)
 
-		expected := []Serializable{
+		expected := []any{
 			&jsonSerializable{Topic: "topic1", Message: "message1"},
 			&jsonSerializable{Topic: "topic1", Message: "message2"},
 			&jsonSerializable{Topic: "topic2", Message: "message3"},
@@ -61,7 +61,7 @@ func TestWriteAndGetEntries(t *testing.T) {
 	})
 
 	t.Run("empty prefix returns no entries", func(t *testing.T) {
-		_, err := GetLogEntriesByPrefix("", func(data []byte) (Serializable, error) {
+		_, err := GetLogEntriesByPrefix("", func(data []byte) (any, error) {
 			var m jsonSerializable
 			err := m.Deserialize(data)
 			return &m, err
@@ -132,7 +132,7 @@ func BenchmarkWriteAndGetEntriesJSON(b *testing.B) {
 		})
 
 		for n := 0; n < b.N; n++ {
-			gotten, err := GetLogEntriesByPrefix("benchmarkreadjson", func(data []byte) (Serializable, error) {
+			gotten, err := GetLogEntriesByPrefix("benchmarkreadjson", func(data []byte) (any, error) {
 				var m jsonSerializable
 				err := json.Unmarshal(data, &m)
 				return &m, err
@@ -177,7 +177,7 @@ func BenchmarkWriteAndGetEntriesFLB(b *testing.B) {
 		})
 
 		for n := 0; n < b.N; n++ {
-			gotten, err := GetLogEntriesByPrefix("benchmarkreadflb", func(data []byte) (Serializable, error) {
+			gotten, err := GetLogEntriesByPrefix("benchmarkreadflb", func(data []byte) (any, error) {
 				fb := flatBufferMessage{}
 				return &fb, fb.Deserialize(data)
 			})

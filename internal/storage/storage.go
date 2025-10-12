@@ -84,7 +84,7 @@ func WriteToLog(key string, value []Serializable) error {
 
 const maxSIze = 50
 
-func GetLogEntriesByPrefix(prefix string, deserializeFunc func([]byte) (Serializable, error)) ([]Serializable, error) {
+func GetLogEntriesByPrefix(prefix string, deserializeFunc func([]byte) (any, error)) ([]any, error) {
 	if prefix == "" {
 		return nil, errors.New("prefix cannot be empty")
 	}
@@ -95,7 +95,7 @@ func GetLogEntriesByPrefix(prefix string, deserializeFunc func([]byte) (Serializ
 		return nil, err
 	}
 
-	result := make([]Serializable, 0)
+	result := make([]any, 0)
 	err = c.db.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
 		opts.PrefetchSize = 10
@@ -106,14 +106,14 @@ func GetLogEntriesByPrefix(prefix string, deserializeFunc func([]byte) (Serializ
 				return nil
 			}
 
-			var serializable Serializable
+			var item interface{}
 			if err := it.Item().Value(func(val []byte) error {
-				serializable, err = deserializeFunc(val)
+				item, err = deserializeFunc(val)
 				return err
 			}); err != nil {
 				return err
 			}
-			result = append(result, serializable)
+			result = append(result, item)
 		}
 		return nil
 	})

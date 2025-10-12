@@ -37,10 +37,12 @@ func newResponse(id string, resp apiconfig.ResponseConfig) (*Response, error) {
 	}
 
 	var responseBuilder ResponseBuilder
-	if resp.Type == "" && (resp.Object.Value != "" || len(resp.Object.Fields) > 0) {
-		resp.Type = builderTypeObject
-	} else {
-		resp.Type = builderTypeTemplate
+	if resp.Type == "" {
+		if resp.Object.Value != "" || len(resp.Object.Fields) > 0 {
+			resp.Type = builderTypeObject
+		} else {
+			resp.Type = builderTypeTemplate
+		}
 	}
 	logging.GetLogger().Debug("creating response", zap.String("builder_type", resp.Type), zap.String("id", id))
 

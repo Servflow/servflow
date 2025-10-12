@@ -69,15 +69,15 @@ func WithConversationID(id string) Option {
 			case MessageTypeText:
 				var contentMessage ContentMessage
 				err = json.Unmarshal(data, &contentMessage)
-				return &contentMessage, err
+				return contentMessage, err
 			case MessageTypeToolResponse:
 				var toolResponse ToolCallOutputMessage
 				err = json.Unmarshal(data, &toolResponse)
-				return &toolResponse, err
+				return toolResponse, err
 			case MessageTypeToolCall:
 				var toolCall ToolCallMessage
 				err = json.Unmarshal(data, &toolCall)
-				return &toolCall, err
+				return toolCall, err
 			default:
 				logging.GetLogger().Warn("invalid type in log storage", zap.Int("type", int(msg.Type)))
 			}
@@ -118,11 +118,12 @@ type agentOutput struct {
 }
 
 func (a *Session) Query(ctx context.Context, query string) (string, error) {
-	a.messages = append(a.messages, ContentMessage{
+	logger := logging.GetRequestLogger(ctx).With(zap.String("module", "agent"))
+	a.addToMessages(logger, ContentMessage{
 		Message: Message{Type: MessageTypeText},
 		Role:    RoleTypeUser,
 		Content: query,
-	})
+	}, nil)
 
 	stringBuilder := strings.Builder{}
 	respChan := a.startLoop(ctx)
@@ -214,9 +215,12 @@ func (a *Session) addToMessages(logger *zap.Logger, message any, output chan age
 	switch message := message.(type) {
 	case ContentMessage:
 		a.messages = append(a.messages, message)
-		output <- agentOutput{
-			response: message.Content,
+		if output != nil {
+			output <- agentOutput{
+				response: message.Content,
+			}
 		}
+
 		serializable = &message
 	case ToolCallMessage:
 		a.messages = append(a.messages, message)

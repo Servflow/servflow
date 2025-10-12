@@ -57,10 +57,15 @@ func (a *Agent) Execute(ctx context.Context, modifiedConfig string) (interface{}
 	if err := json.Unmarshal([]byte(modifiedConfig), &newConfig); err != nil {
 		return nil, err
 	}
+
+	options := []agent.Option{agent.WithToolManager(a.toolManager)}
+	if newConfig.ConversationID != "" {
+		options = append(options, agent.WithConversationID(newConfig.ConversationID))
+	}
 	session, err := agent.NewSession(
 		newConfig.SystemPrompt,
 		a.integration,
-		agent.WithToolManager(a.toolManager),
+		options...,
 	)
 	if err != nil {
 		return nil, err

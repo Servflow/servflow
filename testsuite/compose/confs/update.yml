@@ -2,7 +2,7 @@ id: update
 http:
   listenPath: /notes/{id}
   method: PUT
-  next: $conditional.validate
+  next: conditional.validate
 conditionals:
   validate:
     expression: |
@@ -11,8 +11,8 @@ conditionals:
       (notempty (param "title") "Title")
       (notempty (param "content") "Content")
       }}
-    validPath: $action.authenticate
-    invalidPath: $response.400
+    validPath: action.authenticate
+    invalidPath: response.400
 actions:
   authenticate:
     type: authenticate
@@ -22,8 +22,8 @@ actions:
       jwt_key: "test"
       token: '{{ header "Authorization" }}'
       collection: "users"
-    next: $action.fetchItem
-    fail: $response.invalidAuth
+    next: action.fetchItem
+    fail: response.invalidAuth
   fetchItem:
     type: update
     config:
@@ -41,8 +41,8 @@ actions:
       fields:
         title: '{{ param "title" }}'
         content: '{{ param "content" }}'
-    next: $response.success
-    fail: $response.404
+    next: response.success
+    fail: response.404
 responses:
   "400":
     type: template

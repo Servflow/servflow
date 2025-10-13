@@ -2,15 +2,15 @@ id: read
 http:
   listenPath: /notes/{id}
   method: GET
-  next: $conditional.validate
+  next: conditional.validate
 conditionals:
   validate:
     expression: |
       {{ and
       (notempty (urlparam "id") "ID")
       }}
-    validPath: $action.authenticate
-    invalidPath: $response.400
+    validPath: action.authenticate
+    invalidPath: response.400
 actions:
   authenticate:
     type: authenticate
@@ -20,8 +20,8 @@ actions:
       jwt_key: "test"
       token: '{{ header "Authorization" }}'
       collection: "users"
-    next: $action.fetchItem
-    fail: $response.invalidAuth
+    next: action.fetchItem
+    fail: response.invalidAuth
   fetchItem:
     type: fetch
     config:
@@ -36,8 +36,8 @@ actions:
         - field: owner
           operation: "=="
           comparator: "{{ .variable_actions_authenticate }}"
-    next: $response.success
-    fail: $response.404
+    next: response.success
+    fail: response.404
 responses:
   "400":
     type: template

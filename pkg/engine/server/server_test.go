@@ -9,7 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/Servflow/servflow/pkg/definitions"
+	apiconfig "github.com/Servflow/servflow/pkg/definitions"
 	plan2 "github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/stretchr/testify/assert"
@@ -163,7 +163,7 @@ func TestCreateCustomMuxHandler(t *testing.T) {
 	config := &apiconfig.APIConfig{
 		McpTool: apiconfig.MCPToolConfig{
 			Name:   "mcptool",
-			Start:  "$action.action1",
+			Start:  "action.action1",
 			Result: fmt.Sprintf(`{{ .%saction2.key }}`, requestctx.VariableActionPrefix),
 			//Result:      dpl.VariableActionPrefix + "action2",
 			Description: "Test Endpoint",
@@ -183,7 +183,7 @@ func TestCreateCustomMuxHandler(t *testing.T) {
 			},
 			"action1": {
 				Type: "stub",
-				Next: "$action.action2",
+				Next: "action.action2",
 				Config: map[string]interface{}{
 					"key": "value",
 				},
@@ -310,12 +310,12 @@ func TestExtractURLParam(t *testing.T) {
 		HttpConfig: apiconfig.HttpConfig{
 			ListenPath: "/test/{id}",
 			Method:     "POST",
-			Next:       "$action.action1",
+			Next:       "action.action1",
 		},
 		Actions: map[string]apiconfig.Action{
 			"action1": {
 				Type: "stub",
-				Next: "$response.finish",
+				Next: "response.finish",
 				Config: map[string]interface{}{
 					"key": "value",
 				},

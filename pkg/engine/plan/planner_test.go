@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/Servflow/servflow/internal/logging"
-	"github.com/Servflow/servflow/pkg/definitions"
+	apiconfig "github.com/Servflow/servflow/pkg/definitions"
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/stretchr/testify/assert"
@@ -44,8 +44,8 @@ var sampleConfig = &apiconfig.APIConfig{
 	Conditionals: map[string]apiconfig.Conditional{
 		"cond1": {
 			Expression:  "true",
-			ValidPath:   "$response.success",
-			InvalidPath: "$response.failure",
+			ValidPath:   "response.success",
+			InvalidPath: "response.failure",
 		},
 	},
 	Responses: map[string]apiconfig.ResponseConfig{
@@ -107,19 +107,19 @@ func TestPlannerV2_Generate(t *testing.T) {
 		config := &apiconfig.APIConfig{
 			Actions: map[string]apiconfig.Action{
 				"action1": {
-					Next:   "$conditional.cond1",
+					Next:   "conditional.cond1",
 					Config: map[string]interface{}{"key": "value"},
 				},
 				"action2": {
 					Config: map[string]interface{}{"key": "value2"},
-					Fail:   "$response.failure",
+					Fail:   "response.failure",
 				},
 			},
 			Conditionals: map[string]apiconfig.Conditional{
 				"cond1": {
 					Expression:  "true",
-					ValidPath:   "$response.success",
-					InvalidPath: "$response.failure",
+					ValidPath:   "response.success",
+					InvalidPath: "response.failure",
 				},
 			},
 			Responses: map[string]apiconfig.ResponseConfig{
@@ -323,8 +323,8 @@ func TestPlannerV2_generateConditionalStep(t *testing.T) {
 		Conditionals: map[string]apiconfig.Conditional{
 			"cond1": {
 				Expression:  `{{  (and (email (printf "%s" .email) "email" false) (eq (printf "%s" .field1) (printf "hello" ))) }}`,
-				ValidPath:   "$response.success",
-				InvalidPath: "$response.failure",
+				ValidPath:   "response.success",
+				InvalidPath: "response.failure",
 			},
 		},
 		Responses: map[string]apiconfig.ResponseConfig{

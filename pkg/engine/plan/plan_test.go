@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/Servflow/servflow/internal/logging"
-	"github.com/Servflow/servflow/pkg/definitions"
+	apiconfig "github.com/Servflow/servflow/pkg/definitions"
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	requestctx2 "github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/stretchr/testify/assert"
@@ -20,7 +20,7 @@ func TestPlan_Execute(t *testing.T) {
 	cfg := apiconfig.APIConfig{
 		Actions: map[string]apiconfig.Action{
 			"action1": {
-				Next: "$response.success",
+				Next: "response.success",
 				Type: "action1",
 			},
 			"action2": {
@@ -28,7 +28,7 @@ func TestPlan_Execute(t *testing.T) {
 			},
 			"action3": {
 				Type: "action3",
-				Next: "$response.second",
+				Next: "response.second",
 			},
 		},
 		Responses: map[string]apiconfig.ResponseConfig{

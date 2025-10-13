@@ -2,7 +2,7 @@ id: register
 mcpTool:
   name: register
   description: Register a new user
-  start: $conditional.validate
+  start: conditional.validate
   result: '{{ pluck .variable_actions_fetchdone "email" }}'
   args:
     email:
@@ -23,14 +23,14 @@ conditionals:
                 (notempty (tool_param "password") "Password" true)
                 (notempty (tool_param "name") "Name" true)
                 }}
-    validPath: $action.fetchemail
-  #    invalidPath: $response.400
+    validPath: action.fetchemail
+  #    invalidPath: response.400
   userExists:
     expression: |
       {{  empty .variable_actions_fetchemail "User" false }}
-    validPath: $action.encryptpass
+    validPath: action.encryptpass
 request:
-  next: $conditional.validate
+  next: conditional.validate
 actions:
   fetchemail:
     type: fetch
@@ -41,14 +41,14 @@ actions:
         - field: email
           operation: "=="
           comparator: '{{ tool_param "email" }}'
-    next: $conditional.userExists
+    next: conditional.userExists
 
   encryptpass:
     type: hash
     config:
       value: '{{ tool_param "password" }}'
       algorithm: bcrypt
-    next: $action.storedb
+    next: action.storedb
 
   storedb:
     type: store
@@ -59,7 +59,7 @@ actions:
         email: '{{ tool_param "email" }}'
         password: "{{ .variable_actions_encryptpass }}"
         name: '{{ tool_param "name" }}'
-    next: $action.fetchdone
+    next: action.fetchdone
 
   fetchdone:
     type: fetch

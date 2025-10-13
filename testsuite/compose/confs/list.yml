@@ -2,7 +2,7 @@ id: list
 http:
   listenPath: /notes/
   method: GET
-  next: $action.authenticate
+  next: action.authenticate
 conditionals:
 actions:
   authenticate:
@@ -13,8 +13,8 @@ actions:
       jwt_key: "test"
       token: '{{ header "Authorization" }}'
       collection: "users"
-    next: $action.fetchItem
-    fail: $response.invalidAuth
+    next: action.fetchItem
+    fail: response.invalidAuth
   fetchItem:
     type: fetch
     config:
@@ -25,8 +25,8 @@ actions:
         - field: owner
           operation: "=="
           comparator: "{{ .variable_actions_authenticate }}"
-    next: $response.success
-    fail: $response.404
+    next: response.success
+    fail: response.404
 responses:
   "400":
     type: template

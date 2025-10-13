@@ -17,7 +17,7 @@ name: User Registration API
 http:
   listenPath: /register
   method: POST
-  next: $conditional.validateInput
+  next: conditional.validateInput
 
 conditionals:
   validateInput:
@@ -27,13 +27,13 @@ conditionals:
         (notempty (param "password") "Password" true)
         (notempty (param "name") "Name" true)
       }}
-    validPath: $action.checkExistingUser
-    invalidPath: $response.validationError
+    validPath: action.checkExistingUser
+    invalidPath: response.validationError
 
   userExists:
     expression: "{{ gt (len .variable_actions_checkExistingUser) 0 }}"
-    validPath: $response.userAlreadyExists
-    invalidPath: $action.hashPassword
+    validPath: response.userAlreadyExists
+    invalidPath: action.hashPassword
 
 actions:
   checkExistingUser:
@@ -45,16 +45,16 @@ actions:
         - field: email
           operator: eq
           value: '{{ param "email" }}'
-    next: $conditional.userExists
-    fail: $action.hashPassword
+    next: conditional.userExists
+    fail: action.hashPassword
 
   hashPassword:
     type: hash
     config:
       value: '{{ param "password" }}'
       algorithm: bcrypt
-    next: $action.createUser
-    fail: $response.serverError
+    next: action.createUser
+    fail: response.serverError
 
   createUser:
     type: store
@@ -68,8 +68,8 @@ actions:
         created_at: "{{ now }}"
         status: active
       mode: insert
-    next: $action.generateToken
-    fail: $response.serverError
+    next: action.generateToken
+    fail: response.serverError
 
   generateToken:
     type: jwt
@@ -77,8 +77,8 @@ actions:
       key: '{{ secret "JWT_SECRET" }}'
       field: '{{ param "email" }}'
       mode: encode
-    next: $response.registrationSuccess
-    fail: $response.serverError
+    next: response.registrationSuccess
+    fail: response.serverError
 
 responses:
   registrationSuccess:

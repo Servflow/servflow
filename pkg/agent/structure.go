@@ -1,6 +1,10 @@
 package agent
 
-import "github.com/mark3labs/mcp-go/mcp"
+import (
+	"encoding/json"
+
+	"github.com/mark3labs/mcp-go/mcp"
+)
 
 type RoleType int
 
@@ -12,18 +16,13 @@ const (
 	RoleTypeDeveloper
 )
 
-type ContentType int
+type MessageType int
 
 const (
-	ContentTypeText ContentType = iota
-	ContentTypeToolCall
-	ContentTypeToolResponse
+	MessageTypeText MessageType = iota
+	MessageTypeToolCall
+	MessageTypeToolResponse
 )
-
-type Content struct {
-	Type ContentType
-	Text string
-}
 
 type LLMRequest struct {
 	SystemMessage string
@@ -32,19 +31,50 @@ type LLMRequest struct {
 }
 
 type ContentMessage struct {
+	Message
 	Role    RoleType
 	Content string
 }
 
+func (c *ContentMessage) Serialize() ([]byte, error) {
+	return json.Marshal(c)
+}
+
+func (c *ContentMessage) Deserialize(bytes []byte) error {
+	return json.Unmarshal(bytes, c)
+}
+
+type Message struct {
+	Type MessageType `json:"type"`
+}
+
 type ToolCallMessage struct {
+	Message
 	ID        string
 	Name      string
 	Arguments map[string]interface{}
 }
 
+func (t *ToolCallMessage) Serialize() ([]byte, error) {
+	return json.Marshal(t)
+}
+
+func (t *ToolCallMessage) Deserialize(bytes []byte) error {
+	return json.Unmarshal(bytes, t)
+}
+
 type ToolCallOutputMessage struct {
+	Message
 	ID     string
 	Output string
+}
+
+func (t *ToolCallOutputMessage) Serialize() ([]byte, error) {
+	return json.Marshal(t)
+}
+
+func (t *ToolCallOutputMessage) Deserialize(bytes []byte) error {
+	return json.Unmarshal(bytes, t)
 }
 
 type ToolInfo struct {

@@ -52,12 +52,12 @@ var sampleConfig = &apiconfig.APIConfig{
 		"success": {
 			Code:     200,
 			Template: `{"status": "success"}`,
-			Type:     "json",
+			Type:     "template",
 		},
 		"failure": {
 			Code:     400,
 			Template: `{"status": "failure"}`,
-			Type:     "json",
+			Type:     "template",
 		},
 	},
 }
@@ -126,12 +126,12 @@ func TestPlannerV2_Generate(t *testing.T) {
 				"success": {
 					Code:     200,
 					Template: `{"status": "success"}`,
-					Type:     "json",
+					Type:     "template",
 				},
 				"failure": {
 					Code:     400,
 					Template: `{"status": "failure"}`,
-					Type:     "json",
+					Type:     "template",
 				},
 			},
 		}
@@ -208,12 +208,12 @@ func TestPlannerV2_Generate(t *testing.T) {
 				"success": {
 					Code:     200,
 					Template: `{"status": "success"}`,
-					Type:     "json",
+					Type:     "template",
 				},
 				"failure": {
 					Code:     400,
 					Template: `{"status": "failure"}`,
-					Type:     "json",
+					Type:     "template",
 				},
 			},
 		}
@@ -331,12 +331,12 @@ func TestPlannerV2_generateConditionalStep(t *testing.T) {
 			"success": {
 				Code:     200,
 				Template: `{"status": "success"}`,
-				Type:     "json",
+				Type:     "template",
 			},
 			"failure": {
 				Code:     400,
 				Template: `{"status": "failure"}`,
-				Type:     "json",
+				Type:     "template",
 			},
 		},
 	}
@@ -371,7 +371,7 @@ func TestPlannerV2_generateResponseStep(t *testing.T) {
 			"success": {
 				Code:     200,
 				Template: `{"status": "success"}`,
-				Type:     "json",
+				Type:     "template",
 			},
 		},
 	}

@@ -39,6 +39,7 @@ import (
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/engine/yamlloader"
 	"github.com/mark3labs/mcp-go/server"
+	"go.uber.org/zap"
 )
 
 type Engine struct {
@@ -75,7 +76,7 @@ func (e *Engine) Start() error {
 	e.yamlLoader = yamlLoader
 	requestctx.SetSecretStore(yamlLoader)
 
-	apiConfigs, err := yamlLoader.FetchAPIConfigs()
+	apiConfigs, err := yamlLoader.FetchAPIConfigs(false)
 	if err != nil {
 		return fmt.Errorf("error fetching actions: %w", err)
 	}
@@ -90,11 +91,11 @@ func (e *Engine) Start() error {
 		return err
 	}
 
-	server, err := e.createServer(apiConfigs, e.cfg.Port)
+	srv, err := e.createServer(apiConfigs, e.cfg.Port)
 	if err != nil {
 		return fmt.Errorf("error creating server: %w", err)
 	}
-	e.server = server
+	e.server = srv
 
 	logging.Info(e.ctx, "starting engine...")
 	e.startServer()
@@ -107,7 +108,11 @@ func (e *Engine) Start() error {
 func registerIntegrations(datasourcesConfig []apiconfig.DatasourceConfig) error {
 	wg := &sync.WaitGroup{}
 	wg.Add(len(datasourcesConfig))
-	errChan := make(chan error, len(datasourcesConfig))
+	type errorReport struct {
+		integrationID string
+		error         error
+	}
+	errChan := make(chan *errorReport, len(datasourcesConfig))
 	doneChan := make(chan struct{})
 
 	go func() {
@@ -122,7 +127,11 @@ func registerIntegrations(datasourcesConfig []apiconfig.DatasourceConfig) error 
 
 			if dsConfig.Config != nil {
 				if err := json.Unmarshal(dsConfig.Config, &conf); err != nil {
-					errChan <- fmt.Errorf("error parsing database config: %w", err)
+					errChan <- &errorReport{
+						integrationID: config.ID,
+						error:         fmt.Errorf("error parsing database config: %w", err),
+					}
+					return
 				}
 			} else {
 				conf = dsConfig.NewConfig
@@ -137,12 +146,20 @@ func registerIntegrations(datasourcesConfig []apiconfig.DatasourceConfig) error 
 						},
 					}).Parse(v)
 					if err != nil {
-						errChan <- fmt.Errorf("error parsing database config: %w", err)
+						errChan <- &errorReport{
+							integrationID: config.ID,
+							error:         fmt.Errorf("error parsing database config: %w", err),
+						}
+						return
 					}
 
 					var buf bytes.Buffer
 					if err := tmpl.Execute(&buf, k); err != nil {
-						errChan <- fmt.Errorf("error executing database config: %w", err)
+						errChan <- &errorReport{
+							integrationID: config.ID,
+							error:         fmt.Errorf("error executing database config: %w", err),
+						}
+						return
 					}
 					conf[k] = buf.String()
 				default:
@@ -151,20 +168,31 @@ func registerIntegrations(datasourcesConfig []apiconfig.DatasourceConfig) error 
 			}
 
 			if err := integration.InitializeIntegration(dsConfig.Type, dsConfig.ID, conf); err != nil {
-				errChan <- fmt.Errorf("error initializing integration with ID %s and type %s: %w", dsConfig.ID, dsConfig.Type, err)
+				errChan <- &errorReport{
+					integrationID: config.ID,
+					error:         fmt.Errorf("error initializing integration with ID %s and type %s: %w", dsConfig.ID, dsConfig.Type, err),
+				}
 				return
 			}
 		}(&dsConfig)
 	}
 
-	select {
-	case <-doneChan:
-		return nil
-	case err := <-errChan:
-		if err != nil {
-			return err
+	logger := logging.GetLogger()
+
+	var hasError bool
+	for {
+		select {
+		case errRp := <-errChan:
+			if errRp != nil {
+				hasError = true
+				logger.Error("error starting integration", zap.String("integrationID", errRp.integrationID), zap.Error(errRp.error))
+			}
+		case <-doneChan:
+			if hasError {
+				return errors.New("error starting integrations")
+			}
+			return nil
 		}
-		return nil
 	}
 }
 
@@ -175,7 +203,6 @@ func (e *Engine) startServer() {
 			logging.Error(e.ctx, "error starting server", err)
 			e.cancel()
 		}
-
 	}()
 }
 

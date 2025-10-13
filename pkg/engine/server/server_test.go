@@ -323,7 +323,7 @@ func TestExtractURLParam(t *testing.T) {
 		},
 		Responses: map[string]apiconfig.ResponseConfig{
 			"finish": {
-				Type:     "json",
+				Type:     "template",
 				Code:     200,
 				Template: `{{ urlparam "id" }}`,
 			},

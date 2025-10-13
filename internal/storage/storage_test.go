@@ -45,22 +45,26 @@ func TestWriteAndGetEntries(t *testing.T) {
 		err := WriteToLog("conversations", entries)
 		require.NoError(t, err)
 
-		gotten, err := GetEntriesByPrefix("conversations", func() *jsonSerializable {
-			return &jsonSerializable{}
+		gotten, err := GetLogEntriesByPrefix("conversations", func(data []byte) (any, error) {
+			var m jsonSerializable
+			err := m.Deserialize(data)
+			return &m, err
 		})
 		require.NoError(t, err)
 
-		expected := []*jsonSerializable{
-			{Topic: "topic1", Message: "message1"},
-			{Topic: "topic1", Message: "message2"},
-			{Topic: "topic2", Message: "message3"},
+		expected := []any{
+			&jsonSerializable{Topic: "topic1", Message: "message1"},
+			&jsonSerializable{Topic: "topic1", Message: "message2"},
+			&jsonSerializable{Topic: "topic2", Message: "message3"},
 		}
 		assert.Equal(t, expected, gotten)
 	})
 
 	t.Run("empty prefix returns no entries", func(t *testing.T) {
-		_, err := GetEntriesByPrefix("", func() *jsonSerializable {
-			return &jsonSerializable{}
+		_, err := GetLogEntriesByPrefix("", func(data []byte) (any, error) {
+			var m jsonSerializable
+			err := m.Deserialize(data)
+			return &m, err
 		})
 		require.Error(t, err)
 	})
@@ -128,8 +132,10 @@ func BenchmarkWriteAndGetEntriesJSON(b *testing.B) {
 		})
 
 		for n := 0; n < b.N; n++ {
-			gotten, err := GetEntriesByPrefix("benchmarkreadjson", func() *jsonSerializable {
-				return &jsonSerializable{}
+			gotten, err := GetLogEntriesByPrefix("benchmarkreadjson", func(data []byte) (any, error) {
+				var m jsonSerializable
+				err := json.Unmarshal(data, &m)
+				return &m, err
 			})
 			require.NoError(b, err)
 			assert.Equal(b, expected, gotten)
@@ -171,8 +177,9 @@ func BenchmarkWriteAndGetEntriesFLB(b *testing.B) {
 		})
 
 		for n := 0; n < b.N; n++ {
-			gotten, err := GetEntriesByPrefix("benchmarkreadflb", func() *flatBufferMessage {
-				return &flatBufferMessage{}
+			gotten, err := GetLogEntriesByPrefix("benchmarkreadflb", func(data []byte) (any, error) {
+				fb := flatBufferMessage{}
+				return &fb, fb.Deserialize(data)
 			})
 			require.NoError(b, err)
 			assert.Equal(b, expected, gotten)

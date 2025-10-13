@@ -9,14 +9,14 @@ name: Database Agent API
 http:
   listenPath: /db_agent
   method: POST
-  next: $conditional.validate
+  next: conditional.validate
 
 conditionals:
   validate:
     expression: |
       {{ notempty (param "query") "Query" true }}
-    validPath: $action.agent
-    invalidPath: $response.400
+    onTrue: action.agent
+    onFalse: response.400
 
 actions:
   agent:
@@ -34,12 +34,12 @@ actions:
           workflowConfig:
             name: mongodbquerier
             description: |
-                Accepts a filter query in the form of json and a projection in the form of json and performs queries on the collection "users"
+              Accepts a filter query in the form of json and a projection in the form of json and performs queries on the collection "users"
             params: ["filter", "projection"]
-            returnValue: '{{ jsonout .variable_actions_queryDB}}'
-            start: "$action.queryDB"
+            returnValue: "{{ jsonout .variable_actions_queryDB}}"
+            start: "action.queryDB"
       history: true
-    next: $response.200
+    next: response.200
 
   queryDB:
     type: mongoquery

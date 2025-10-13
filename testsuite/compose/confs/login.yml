@@ -2,7 +2,7 @@ id: login
 http:
   listenPath: login
   method: POST
-  next: $conditional.validate
+  next: conditional.validate
 conditionals:
   validate:
     expression: |
@@ -10,16 +10,16 @@ conditionals:
       (notempty (param "email") "Email")
       (notempty (param "password") "Password")
       }}
-    invalidPath: $response.malformed
-    validPath: $action.fetchemail
+    onFalse: response.malformed
+    onTrue: action.fetchemail
   passwordMatch:
     expression: |
       {{ bcrypt (param "password") (pluck .variable_actions_fetchemail "password") "Password" }}
-    invalidPath: $response.malformed
-    validPath: $action.gentoken
+    onFalse: response.malformed
+    onTrue: action.gentoken
 actions:
   fetchemail:
-    fail: $response.invalidCreds
+    fail: response.invalidCreds
     type: fetch
     config:
       single: true
@@ -30,13 +30,13 @@ actions:
         - field: email
           operation: "=="
           comparator: '{{ param "email" }}'
-    next: $conditional.passwordMatch
+    next: conditional.passwordMatch
   gentoken:
     type: jwt
     config:
       key: "test"
       field: '{{ pluck .variable_actions_fetchemail "email" }}'
-    next: $response.success
+    next: response.success
 responses:
   malformed:
     template: '{ "error": {{ .error }} }'

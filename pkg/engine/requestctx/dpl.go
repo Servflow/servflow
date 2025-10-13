@@ -24,11 +24,9 @@ type DataType int
 const noValue = "<no value>"
 
 const (
-	GroupTagPrefix              = "$grouptag_"
-	GroupTagFinish              = GroupTagPrefix + "finish"
-	ActionConfigPrefix          = "$action."
-	ConditionalConfigPrefix     = "$conditional."
-	ResponsesConfigPrefix       = "$response."
+	ActionConfigPrefix          = "action."
+	ConditionalConfigPrefix     = "conditional."
+	ResponsesConfigPrefix       = "response."
 	BareVariablesPrefixStripped = "variable_"
 	VariableActionPrefix        = BareVariablesPrefixStripped + "actions_"
 	ErrorTagStripped            = "error"

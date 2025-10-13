@@ -2,7 +2,7 @@ id: register
 http:
   listenPath: register
   method: POST
-  next: $conditional.validate
+  next: conditional.validate
 conditionals:
   validate:
     expression: |
@@ -12,13 +12,13 @@ conditionals:
                 (notempty (param "password") "Password")
                 (notempty (param "name") "Name")
                 }}
-    validPath: $action.fetchemail
-    invalidPath: $response.400
+    onTrue: action.fetchemail
+    onFalse: response.400
   userExists:
     expression: |
       {{  empty .variable_actions_fetchemail "User" }}
-    validPath: $action.encryptpass
-    invalidPath: $response.exists
+    onTrue: action.encryptpass
+    onFalse: response.exists
 actions:
   fetchemail:
     type: fetch
@@ -29,14 +29,14 @@ actions:
         - field: email
           operation: "=="
           comparator: '{{ param "email" }}'
-    next: $conditional.userExists
+    next: conditional.userExists
 
   encryptpass:
     type: hash
     config:
       value: '{{ param "password" }}'
       algorithm: bcrypt
-    next: $action.storedb
+    next: action.storedb
 
   storedb:
     type: store
@@ -47,7 +47,7 @@ actions:
         email: '{{ param "email" }}'
         password: "{{ .variable_actions_encryptpass }}"
         name: '{{ param "name" }}'
-    next: $response.200
+    next: response.200
 
 responses:
   "200":

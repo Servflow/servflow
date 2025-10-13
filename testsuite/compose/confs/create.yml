@@ -2,7 +2,7 @@ id: create
 http:
   listenPath: /notes
   method: POST
-  next: $conditional.validate
+  next: conditional.validate
 conditionals:
   validate:
     expression: |
@@ -10,8 +10,8 @@ conditionals:
       (notempty (param "title") "Title")
       (notempty (param "content") "Content")
       }}
-    validPath: $action.authenticate
-    invalidPath: $response.400
+    onTrue: action.authenticate
+    onFalse: response.400
 actions:
   authenticate:
     type: authenticate
@@ -21,8 +21,8 @@ actions:
       jwt_key: "test"
       token: '{{ header "Authorization" }}'
       collection: "users"
-    next: $action.saveItem
-    fail: $response.invalidAuth
+    next: action.saveItem
+    fail: response.invalidAuth
   saveItem:
     type: store
     config:
@@ -32,7 +32,7 @@ actions:
         title: '{{ param "title" }}'
         content: '{{ param "content" }}'
         owner: "{{ .variable_actions_authenticate }}"
-    next: $response.success
+    next: response.success
 responses:
   "400":
     type: template

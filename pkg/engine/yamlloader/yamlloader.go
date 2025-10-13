@@ -28,7 +28,7 @@ func NewYAMLLoader(apisFolder, integrationsFile string, logger *zap.Logger) *YAM
 }
 
 // FetchAPIConfigs loads API configurations from YAML files in the APIs folder
-func (l *YAMLLoader) FetchAPIConfigs() ([]*apiconfig.APIConfig, error) {
+func (l *YAMLLoader) FetchAPIConfigs(shouldFail bool) ([]*apiconfig.APIConfig, error) {
 	l.logger.Debug("Loading API configs from YAML files", zap.String("folder", l.apisFolder))
 
 	if l.apisFolder == "" {
@@ -47,6 +47,9 @@ func (l *YAMLLoader) FetchAPIConfigs() ([]*apiconfig.APIConfig, error) {
 
 		var cfg apiconfig.APIConfig
 		if err := yaml.Unmarshal(content, &cfg); err != nil {
+			if shouldFail {
+				return nil, fmt.Errorf("failed to unmarshal YAML file %s: %w", name, err)
+			}
 			l.logger.Warn("failed to unmarshal config file", zap.Error(err), zap.String("file", name))
 			continue
 		}

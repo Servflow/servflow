@@ -76,7 +76,7 @@ func (e *Engine) Start() error {
 	e.yamlLoader = yamlLoader
 	requestctx.SetSecretStore(yamlLoader)
 
-	apiConfigs, err := yamlLoader.FetchAPIConfigs()
+	apiConfigs, err := yamlLoader.FetchAPIConfigs(false)
 	if err != nil {
 		return fmt.Errorf("error fetching actions: %w", err)
 	}

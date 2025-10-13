@@ -20,15 +20,15 @@ var sampleConfig = &apiconfig.APIConfig{
 	Actions: map[string]apiconfig.Action{
 		"action1": {
 			Type:   "action1",
-			Next:   "$action.action2",
+			Next:   "action.action2",
 			Config: map[string]interface{}{"key": "value"},
 		},
 		"action2": {
-			Next:   "$action.action3",
+			Next:   "action.action3",
 			Config: map[string]interface{}{"key": "value"},
 		},
 		"action3": {
-			Next:   "$conditional.cond1",
+			Next:   "conditional.cond1",
 			Config: map[string]interface{}{"key": "value2"},
 		},
 		"action4": {
@@ -37,7 +37,7 @@ var sampleConfig = &apiconfig.APIConfig{
 			Config: map[string]interface{}{"key": "value"},
 		},
 		"action5": {
-			Next:   "$action.action4",
+			Next:   "action.action4",
 			Config: map[string]interface{}{"key": "value"},
 		},
 	},

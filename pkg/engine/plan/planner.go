@@ -96,6 +96,9 @@ func (p *PlannerV2) generateStep(id string) (Step, error) {
 	}
 	logging.GetLogger().Debug("Generating planner v2 step", zap.String("id", id))
 
+	// backwards compatibility
+	id = strings.TrimPrefix(id, "$")
+
 	if _, ok := p.finalSteps[id]; ok {
 		return p.finalSteps[id], nil
 	}

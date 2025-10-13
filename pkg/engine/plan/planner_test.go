@@ -43,9 +43,9 @@ var sampleConfig = &apiconfig.APIConfig{
 	},
 	Conditionals: map[string]apiconfig.Conditional{
 		"cond1": {
-			Expression:  "true",
-			ValidPath:   "response.success",
-			InvalidPath: "response.failure",
+			Expression: "true",
+			OnTrue:     "response.success",
+			OnFalse:    "response.failure",
 		},
 	},
 	Responses: map[string]apiconfig.ResponseConfig{
@@ -117,9 +117,9 @@ func TestPlannerV2_Generate(t *testing.T) {
 			},
 			Conditionals: map[string]apiconfig.Conditional{
 				"cond1": {
-					Expression:  "true",
-					ValidPath:   "response.success",
-					InvalidPath: "response.failure",
+					Expression: "true",
+					OnTrue:     "response.success",
+					OnFalse:    "response.failure",
 				},
 			},
 			Responses: map[string]apiconfig.ResponseConfig{
@@ -322,9 +322,9 @@ func TestPlannerV2_generateConditionalStep(t *testing.T) {
 	config := &apiconfig.APIConfig{
 		Conditionals: map[string]apiconfig.Conditional{
 			"cond1": {
-				Expression:  `{{  (and (email (printf "%s" .email) "email" false) (eq (printf "%s" .field1) (printf "hello" ))) }}`,
-				ValidPath:   "response.success",
-				InvalidPath: "response.failure",
+				Expression: `{{  (and (email (printf "%s" .email) "email" false) (eq (printf "%s" .field1) (printf "hello" ))) }}`,
+				OnTrue:     "response.success",
+				OnFalse:    "response.failure",
 			},
 		},
 		Responses: map[string]apiconfig.ResponseConfig{

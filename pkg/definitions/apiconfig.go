@@ -69,16 +69,10 @@ type Action struct {
 	Fail   string                 `json:"fail" yaml:"fail"`
 }
 
-type ConditionalExpressions struct {
-	Value   string `json:"value" yaml:"value"`
-	Type    string `json:"type" yaml:"type"`
-	Compare string `json:"compare,omitempty" yaml:"compare,omitempty"`
-}
-
 type Conditional struct {
-	ValidPath   string `json:"validPath" yaml:"validPath"`
-	InvalidPath string `json:"invalidPath" yaml:"invalidPath"`
-	Expression  string `json:"expression" yaml:"expression"`
+	OnTrue     string `json:"onTrue" yaml:"onTrue"`
+	OnFalse    string `json:"onFalse" yaml:"onFalse"`
+	Expression string `json:"expression" yaml:"expression"`
 }
 
 type ResponseConfig struct {

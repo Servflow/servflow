@@ -183,12 +183,12 @@ func (p *PlannerV2) generateConditionalStep(id string) (*ConditionStep, error) {
 		return nil, fmt.Errorf("condition not found: %s", id)
 	}
 
-	validStep, err := p.generateStep(condition.ValidPath)
+	validStep, err := p.generateStep(condition.OnTrue)
 	if err != nil {
 		return nil, err
 	}
 
-	invalidStep, err := p.generateStep(condition.InvalidPath)
+	invalidStep, err := p.generateStep(condition.OnFalse)
 	if err != nil {
 		return nil, err
 	}

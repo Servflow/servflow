@@ -17,9 +17,9 @@ func TestAPIConfig_SchemaValidate(t *testing.T) {
 		},
 		Conditionals: map[string]Conditional{
 			"cond1": {
-				ValidPath:   "action1",
-				InvalidPath: "action2",
-				Expression:  "request.id == 'test'",
+				OnTrue:     "action1",
+				OnFalse:    "action2",
+				Expression: "request.id == 'test'",
 			},
 		},
 		Responses: map[string]ResponseConfig{

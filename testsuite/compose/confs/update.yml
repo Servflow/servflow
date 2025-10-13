@@ -11,8 +11,8 @@ conditionals:
       (notempty (param "title") "Title")
       (notempty (param "content") "Content")
       }}
-    validPath: action.authenticate
-    invalidPath: response.400
+    onTrue: action.authenticate
+    onFalse: response.400
 actions:
   authenticate:
     type: authenticate

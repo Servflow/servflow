@@ -9,8 +9,8 @@ conditionals:
       {{ and
       (notempty (urlparam "id") "ID")
       }}
-    validPath: action.authenticate
-    invalidPath: response.400
+    onTrue: action.authenticate
+    onFalse: response.400
 actions:
   authenticate:
     type: authenticate

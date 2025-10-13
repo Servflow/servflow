@@ -10,13 +10,13 @@ conditionals:
       (notempty (param "email") "Email")
       (notempty (param "password") "Password")
       }}
-    invalidPath: response.malformed
-    validPath: action.fetchemail
+    onFalse: response.malformed
+    onTrue: action.fetchemail
   passwordMatch:
     expression: |
       {{ bcrypt (param "password") (pluck .variable_actions_fetchemail "password") "Password" }}
-    invalidPath: response.malformed
-    validPath: action.gentoken
+    onFalse: response.malformed
+    onTrue: action.gentoken
 actions:
   fetchemail:
     fail: response.invalidCreds

@@ -12,13 +12,13 @@ conditionals:
                 (notempty (param "password") "Password")
                 (notempty (param "name") "Name")
                 }}
-    validPath: action.fetchemail
-    invalidPath: response.400
+    onTrue: action.fetchemail
+    onFalse: response.400
   userExists:
     expression: |
       {{  empty .variable_actions_fetchemail "User" }}
-    validPath: action.encryptpass
-    invalidPath: response.exists
+    onTrue: action.encryptpass
+    onFalse: response.exists
 actions:
   fetchemail:
     type: fetch

@@ -15,8 +15,8 @@ conditionals:
   validate:
     expression: |
       {{ notempty (param "query") "Query" true }}
-    validPath: action.agent
-    invalidPath: response.400
+    onTrue: action.agent
+    onFalse: response.400
 
 actions:
   agent:

@@ -27,13 +27,13 @@ conditionals:
         (notempty (param "password") "Password" true)
         (notempty (param "name") "Name" true)
       }}
-    validPath: action.checkExistingUser
-    invalidPath: response.validationError
+    onTrue: action.checkExistingUser
+    onFalse: response.validationError
 
   userExists:
     expression: "{{ gt (len .variable_actions_checkExistingUser) 0 }}"
-    validPath: response.userAlreadyExists
-    invalidPath: action.hashPassword
+    onTrue: response.userAlreadyExists
+    onFalse: action.hashPassword
 
 actions:
   checkExistingUser:

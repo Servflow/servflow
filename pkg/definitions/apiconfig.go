@@ -82,11 +82,10 @@ type Conditional struct {
 }
 
 type ResponseConfig struct {
-	Code     int    `json:"code" yaml:"code"`
-	Template string `json:"template" yaml:"template"`
-	Type     string `json:"type" yaml:"type"`
-	// Not yet implemented
-	Object ResponseObject `json:"responseObject" yaml:"responseObject"`
+	Code     int            `json:"code" yaml:"code"`
+	Template string         `json:"template" yaml:"template"`
+	Type     string         `json:"type" yaml:"type"`
+	Object   ResponseObject `json:"responseObject" yaml:"responseObject"`
 }
 
 type ResponseObject struct {

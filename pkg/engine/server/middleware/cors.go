@@ -23,7 +23,7 @@ func (c *Cors) Handle(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization")
+	w.Header().Set("Access-Control-Allow-Headers", "*")
 
 	// Handle preflight request
 	if r.Method == http.MethodOptions {

@@ -2,13 +2,10 @@ package server
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/Servflow/servflow/internal/logging"
 	"github.com/Servflow/servflow/pkg/definitions"
-	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/engine/server/middleware"
 	"go.uber.org/zap"
 
@@ -20,9 +17,7 @@ func (h *APIHandler) CreateChain(config *apiconfig.APIConfig) http.Handler {
 		h.middlewareAdaptor(&middleware.Cors{AllowedOrigins: config.HttpConfig.CORSAllowedOrigins}),
 	).Then(h)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		aggCtx := requestctx.NewRequestContext(fmt.Sprintf("request_%d", time.Now().Unix()))
-		ctx := requestctx.WithAggregationContext(r.Context(), aggCtx)
-		chain.ServeHTTP(w, r.WithContext(ctx))
+		chain.ServeHTTP(w, r)
 	})
 }
 
@@ -39,6 +34,9 @@ func (h *APIHandler) middlewareAdaptor(m middleware.Middleware) func(http.Handle
 					logger.Error("middleware failed", zap.Error(err))
 					return
 				}
+			}
+			if req.Method == http.MethodOptions {
+				return
 			}
 			next.ServeHTTP(w, req)
 		})

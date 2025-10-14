@@ -50,7 +50,7 @@ func (e *Engine) createBasicHandler(config *apiconfig.APIConfig) (http.Handler, 
 		p:         p,
 	}
 
-	return a, nil
+	return a.CreateChain(config), nil
 }
 
 type APIHandler struct {

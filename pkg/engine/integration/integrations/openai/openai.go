@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-
 	"io"
 	"net/http"
 
@@ -228,9 +227,12 @@ func (c *Client) ProvideResponse(ctx context.Context, agentReq agent.LLMRequest)
 	if err != nil {
 		return
 	}
+	defer r.Body.Close()
 
 	if r.StatusCode != http.StatusOK {
 		err = fmt.Errorf("expected status OK, got %d", r.StatusCode)
+		body, _ := io.ReadAll(r.Body)
+		logger.Error("error from openai", zap.String("response", string(body)))
 		return
 	}
 	defer r.Body.Close()

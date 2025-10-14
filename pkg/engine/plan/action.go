@@ -79,6 +79,7 @@ func (a *Action) Execute(ctx context.Context) (Step, error) {
 			if err := requestctx2.AddRequestVariables(ctx, map[string]interface{}{requestctx2.ErrorTagStripped: err.Error()}, ""); err != nil {
 				return nil, err
 			}
+			logger.Debug("error executing action", zap.String("config", a.configStr), zap.Error(err))
 			return a.fail, nil
 		}
 		return nil, fmt.Errorf("error executing action: %s type: %s: %w", a.id, a.exec.Type(), err)

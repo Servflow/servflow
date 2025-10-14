@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
-	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 	"testing"
@@ -59,11 +58,11 @@ func generateRSAKeyPair() (string, string, error) {
 
 func TestJWT_Execute_Encode(t *testing.T) {
 	// HMAC-based tests
-	t.Run("EncodeWithPlainTextSecret", func(t *testing.T) {
+	t.Run("EncodeWithSecret", func(t *testing.T) {
 		config := Config{
 			Mode:  "encode",
 			Field: "testSubject",
-			Key:   base64.StdEncoding.EncodeToString([]byte("testSecret")),
+			Key:   "testSecret",
 		}
 		jwtAction := New(config)
 
@@ -87,7 +86,7 @@ func TestJWT_Execute_Encode(t *testing.T) {
 		config := Config{
 			Mode:  "encode",
 			Field: "testSubject",
-			Key:   base64.StdEncoding.EncodeToString([]byte("testSecret")),
+			Key:   "testSecret",
 			Claims: map[string]interface{}{
 				"role":       "admin",
 				"department": "engineering",
@@ -124,30 +123,6 @@ func TestJWT_Execute_Encode(t *testing.T) {
 		assert.Equal(t, "backend", metadataMap["team"])
 	})
 
-	t.Run("Encode wih unencrypted text", func(t *testing.T) {
-		config := Config{
-			Mode:  "encode",
-			Field: "testSubject",
-			Key:   "testSecret",
-		}
-		jwtAction := New(config)
-
-		result, err := jwtAction.Execute(context.Background(), "testSubject")
-		require.NoError(t, err)
-
-		// Verify token can be decoded
-		tokenString := result.(string)
-		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-			return []byte("testSecret"), nil
-		})
-		require.NoError(t, err)
-		require.True(t, token.Valid)
-
-		claims, ok := token.Claims.(jwt.MapClaims)
-		require.True(t, ok)
-		assert.Equal(t, "testSubject", claims["sub"])
-	})
-
 	t.Run("EncodeWithRSAPrivateKey", func(t *testing.T) {
 		privateKeyPEM, publicKeyPEM, err := generateRSAKeyPair()
 		require.NoError(t, err)
@@ -155,7 +130,7 @@ func TestJWT_Execute_Encode(t *testing.T) {
 		config := Config{
 			Mode:  "encode",
 			Field: "testSubject",
-			Key:   base64.StdEncoding.EncodeToString([]byte(privateKeyPEM)),
+			Key:   privateKeyPEM,
 		}
 		jwtAction := New(config)
 
@@ -204,20 +179,7 @@ func TestJWT_Execute_Decode(t *testing.T) {
 	tokenString, err := token.SignedString([]byte("testSecret"))
 	require.NoError(t, err)
 
-	t.Run("DecodeWithPlainTextSecret", func(t *testing.T) {
-		config := Config{
-			Mode:  "decode",
-			Field: tokenString,
-			Key:   base64.StdEncoding.EncodeToString([]byte("testSecret")),
-		}
-		jwtAction := New(config)
-
-		result, err := jwtAction.Execute(context.Background(), tokenString)
-		require.NoError(t, err)
-		assert.Equal(t, "decodedSubject", result)
-	})
-
-	t.Run("decode with unencrypted secret", func(t *testing.T) {
+	t.Run("DecodeWithSecret", func(t *testing.T) {
 		config := Config{
 			Mode:  "decode",
 			Field: tokenString,
@@ -234,7 +196,7 @@ func TestJWT_Execute_Decode(t *testing.T) {
 		config := Config{
 			Mode:  "decode",
 			Field: tokenString,
-			Key:   base64.StdEncoding.EncodeToString([]byte("wrongSecret")),
+			Key:   "wrongSecret",
 		}
 		jwtAction := New(config)
 
@@ -254,7 +216,7 @@ func TestJWT_Execute_Decode(t *testing.T) {
 		config := Config{
 			Mode:  "decode",
 			Field: expiredTokenString,
-			Key:   base64.StdEncoding.EncodeToString([]byte("testSecret")),
+			Key:   "testSecret",
 		}
 		jwtAction := New(config)
 
@@ -268,13 +230,11 @@ func TestJWT_Execute_Decode(t *testing.T) {
 		privateKeyPEM, publicKeyPEM, err := generateRSAKeyPair()
 		require.NoError(t, err)
 
-		// Base64 encode keys
-
 		// Test encode with private key
 		encodeConfig := Config{
 			Mode:  "encode",
 			Field: "testSubject",
-			Key:   base64.StdEncoding.EncodeToString([]byte(privateKeyPEM)),
+			Key:   privateKeyPEM,
 		}
 		encodeAction := New(encodeConfig)
 
@@ -286,7 +246,7 @@ func TestJWT_Execute_Decode(t *testing.T) {
 		decodeConfig := Config{
 			Mode:  "decode",
 			Field: tokenString,
-			Key:   base64.StdEncoding.EncodeToString([]byte(publicKeyPEM)),
+			Key:   publicKeyPEM,
 		}
 		decodeAction := New(decodeConfig)
 
@@ -303,7 +263,7 @@ func TestJWT_Execute_Decode(t *testing.T) {
 		encodeConfig := Config{
 			Mode:  "encode",
 			Field: "rsaSubject",
-			Key:   base64.StdEncoding.EncodeToString([]byte(privateKeyPEM)),
+			Key:   privateKeyPEM,
 		}
 		encodeAction := New(encodeConfig)
 
@@ -316,7 +276,7 @@ func TestJWT_Execute_Decode(t *testing.T) {
 		decodeConfig := Config{
 			Mode:  "decode",
 			Field: tokenString,
-			Key:   base64.StdEncoding.EncodeToString([]byte(publicKeyPEM)),
+			Key:   publicKeyPEM,
 		}
 		decodeAction := New(decodeConfig)
 
@@ -339,7 +299,7 @@ func TestJWT_Execute_Decode(t *testing.T) {
 		encodeConfig := Config{
 			Mode:  "encode",
 			Field: "rsaSubject",
-			Key:   base64.StdEncoding.EncodeToString([]byte(privateKeyPEM1)),
+			Key:   privateKeyPEM1,
 		}
 		encodeAction := New(encodeConfig)
 
@@ -351,7 +311,7 @@ func TestJWT_Execute_Decode(t *testing.T) {
 		decodeConfig := Config{
 			Mode:  "decode",
 			Field: tokenString,
-			Key:   base64.StdEncoding.EncodeToString([]byte(publicKeyPEM2)),
+			Key:   publicKeyPEM2,
 		}
 		decodeAction := New(decodeConfig)
 
@@ -369,7 +329,7 @@ func TestJWT_Execute_Decode(t *testing.T) {
 		encodeConfig := Config{
 			Mode:  "encode",
 			Field: "rsaSubject",
-			Key:   base64.StdEncoding.EncodeToString([]byte(privateKeyPEM)),
+			Key:   privateKeyPEM,
 			Claims: map[string]interface{}{
 				"tenant_id":    "tenant-123",
 				"user_type":    "service",
@@ -390,7 +350,7 @@ func TestJWT_Execute_Decode(t *testing.T) {
 		decodeConfig := Config{
 			Mode:  "decode",
 			Field: tokenString,
-			Key:   base64.StdEncoding.EncodeToString([]byte(publicKeyPEM)),
+			Key:   publicKeyPEM,
 		}
 		decodeAction := New(decodeConfig)
 

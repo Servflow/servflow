@@ -4,16 +4,13 @@ import (
 	"context"
 	"crypto/rsa"
 	"crypto/x509"
-	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"time"
 
-	"github.com/Servflow/servflow/internal/logging"
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/golang-jwt/jwt/v5"
-	"go.uber.org/zap"
 )
 
 type Config struct {
@@ -59,11 +56,7 @@ func (a *JWT) encode(ctx context.Context, payload string) (interface{}, error) {
 	var signingMethod jwt.SigningMethod
 	var key interface{}
 
-	secret, err := base64.StdEncoding.DecodeString(a.config.Key)
-	if err != nil {
-		logging.GetRequestLogger(ctx).Warn("could not decode secret", zap.Error(err))
-		secret = []byte(a.config.Key)
-	}
+	secret := []byte(a.config.Key)
 
 	if block, _ := pem.Decode(secret); block != nil {
 		privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
@@ -100,11 +93,7 @@ func (a *JWT) encode(ctx context.Context, payload string) (interface{}, error) {
 }
 
 func (a *JWT) decode(ctx context.Context, tokenString string) (interface{}, error) {
-	secret, err := base64.StdEncoding.DecodeString(a.config.Key)
-	if err != nil {
-		logging.GetRequestLogger(ctx).Warn("failed to decode secret", zap.Error(err))
-		secret = []byte(a.config.Key)
-	}
+	secret := []byte(a.config.Key)
 
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		alg := token.Header["alg"]

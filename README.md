@@ -28,7 +28,6 @@ ServFlow Engine is part of the ServFlow platform. Use it standalone (free foreve
 - **⚡ Zero Backend Code**: Build complete APIs using only YAML configurations
 - **🔗 Universal Integrations**: Connect to any database, AI service, or external API
 - **🧠 AI-Powered**: Built-in support for OpenAI, Claude, and other AI services
-- **🛡️ Production Ready**: Enterprise-grade security, validation, and error handling
 - **📈 Infinitely Scalable**: Designed for high-performance and horizontal scaling
 - **⚙️ Configuration-Driven**: Version control your entire API logic
 

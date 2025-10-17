@@ -102,7 +102,10 @@ func init() {
 func newWrapper(cfg Config) (*Mongo, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(cfg.ConnectionString))
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(cfg.ConnectionString).
+		SetMaxConnIdleTime(5*time.Minute).
+		SetSocketTimeout(30*time.Second).
+		SetServerSelectionTimeout(5*time.Second))
 	if err != nil {
 		return nil, fmt.Errorf("error with mongo config: %v", err)
 	}

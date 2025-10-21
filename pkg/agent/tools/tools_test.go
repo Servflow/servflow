@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/Servflow/servflow/pkg/definitions"
+	"net/http"
+	"net/http/httptest"
+
+	apiconfig "github.com/Servflow/servflow/pkg/definitions"
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	plan2 "github.com/Servflow/servflow/pkg/engine/plan"
 	requestctx2 "github.com/Servflow/servflow/pkg/engine/requestctx"
@@ -18,6 +21,9 @@ import (
 )
 
 func TestNewClient(t *testing.T) {
+	// Track headers received by the server
+	var receivedHeaders http.Header
+
 	serv := server.NewMCPServer(
 		"test-server",
 		"1.0",
@@ -162,6 +168,68 @@ func TestNewClient(t *testing.T) {
 		expected, err := json.Marshal(expectedDescription)
 		require.NoError(t, err)
 		assert.JSONEq(t, string(expected), description)
+	})
+
+	t.Run("server config with headers", func(t *testing.T) {
+		// Create a test server that captures headers
+		testHeaderServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			receivedHeaders = r.Header.Clone()
+			// Forward to actual MCP server
+			testServer.Config.Handler.ServeHTTP(w, r)
+		}))
+		defer testHeaderServer.Close()
+
+		// Test with custom headers
+		customHeaders := map[string]string{
+			"Authorization":   "Bearer test-token",
+			"X-Custom-Header": "test-value",
+			"User-Agent":      "ServflowTest/1.0",
+		}
+
+		manager, err := NewManager(WithServerConfig(ServerConfig{
+			Endpoint:  testHeaderServer.URL,
+			ToolsList: []string{"test-first"},
+			Headers:   customHeaders,
+		}))
+		require.NoError(t, err)
+		require.NotNil(t, manager)
+
+		// Verify headers were sent during initialization
+		assert.Equal(t, "Bearer test-token", receivedHeaders.Get("Authorization"))
+		assert.Equal(t, "test-value", receivedHeaders.Get("X-Custom-Header"))
+		assert.Equal(t, "ServflowTest/1.0", receivedHeaders.Get("User-Agent"))
+
+		// Test that tool calls also include headers
+		receivedHeaders = nil // Reset
+		resp, err := manager.CallTool(context.Background(), "test-first", map[string]interface{}{"param-1": "header-test"})
+		require.NoError(t, err)
+		assert.Equal(t, "header-test", resp)
+
+		// Verify headers were sent during tool call
+		assert.Equal(t, "Bearer test-token", receivedHeaders.Get("Authorization"))
+		assert.Equal(t, "test-value", receivedHeaders.Get("X-Custom-Header"))
+		assert.Equal(t, "ServflowTest/1.0", receivedHeaders.Get("User-Agent"))
+	})
+
+	t.Run("server config without headers (backward compatibility)", func(t *testing.T) {
+		// Test with no headers to ensure backward compatibility
+		manager, err := NewManager(WithServerConfig(ServerConfig{
+			Endpoint:  testServer.URL,
+			ToolsList: []string{"test-first"},
+			// Headers field is nil/empty
+		}))
+		require.NoError(t, err)
+		require.NotNil(t, manager)
+
+		// Should still work without headers
+		resp, err := manager.CallTool(context.Background(), "test-first", map[string]interface{}{"param-1": "no-headers-test"})
+		require.NoError(t, err)
+		assert.Equal(t, "no-headers-test", resp)
+
+		// Verify tool description still works
+		description, err := manager.ToolListDescription()
+		require.NoError(t, err)
+		assert.Contains(t, description, "test-first")
 	})
 
 	t.Run("workflow action tool", func(t *testing.T) {

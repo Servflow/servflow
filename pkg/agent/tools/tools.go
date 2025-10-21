@@ -12,6 +12,7 @@ import (
 	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/mark3labs/mcp-go/client"
+	"github.com/mark3labs/mcp-go/client/transport"
 	"github.com/mark3labs/mcp-go/mcp"
 	"go.uber.org/zap"
 )
@@ -30,8 +31,9 @@ type Manager struct {
 }
 
 type ServerConfig struct {
-	Endpoint  string   `json:"endpoint"`
-	ToolsList []string `json:"toolsList"`
+	Endpoint  string            `json:"endpoint"`
+	ToolsList []string          `json:"toolsList"`
+	Headers   map[string]string `json:"headers"`
 }
 
 type WorkflowToolConfig struct {
@@ -189,7 +191,7 @@ func (m *Manager) CallTool(ctx context.Context, toolName string, params map[stri
 }
 
 func (m *Manager) addServerConfig(config ServerConfig) error {
-	cl, err := client.NewStreamableHttpClient(config.Endpoint)
+	cl, err := client.NewStreamableHttpClient(config.Endpoint, transport.WithHTTPHeaders(config.Headers))
 	if err != nil {
 		return err
 	}

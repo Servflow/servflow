@@ -71,23 +71,12 @@ steps:
     commands:
       - go test ./...
 
-  - name: build
-    image: golang
-    depends_on:
-      - wait-for-redis
-      - code-quality
-    volumes:
-      - name: deps
-        path: /go
-    commands:
-      - CGO_ENABLED=0 GOOS=linux go build -o servflow
-
   - name: e2e-tests
     image: docker:27.3.1
     privileged: true
     depends_on:
       - wait-for-redis
-      - build
+      - code-quality
     commands:
       - apk add --no-cache bash curl jq python3
       - dockerd & # Start the Docker daemon
@@ -219,11 +208,12 @@ steps:
       - cd releases && sha256sum * > checksums.txt && cd ..
       - ls -la releases/
 
-  - name: docker-build-arm64
+  - name: docker-build-multiarch
     image: docker:27.3.1
     privileged: true
     depends_on:
-      - build-linux-arm64
+      - build-gen-tag
+      - code-quality
     volumes:
       - name: docker_cache
         path: /var/lib/docker
@@ -235,45 +225,26 @@ steps:
         from_secret: docker_password
     commands:
       - export IMAGE_TAG=$(cat .image-tag)
-      - cp dist/servflow-linux-arm64 servflow
+      - export VERSION=$(cat .version)
       - dockerd &
       - sleep 5
       - docker info
       - docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
       - docker buildx create --use
-      - docker buildx build --platform linux/arm64 -t $IMAGE_TAG -t servflow/servflow:latest --push .
-
-  - name: docker-build-amd64
-    image: docker:27.3.1
-    privileged: true
-    depends_on:
-      - build-linux-amd64
-      - docker-build-arm64
-    volumes:
-      - name: docker_cache
-        path: /var/lib/docker
-    environment:
-      DOCKER_BUILDKIT: 1
-      DOCKER_USERNAME:
-        from_secret: docker_username
-      DOCKER_PASSWORD:
-        from_secret: docker_password
-    commands:
-      - export IMAGE_TAG=$(cat .image-tag)
-      - cp dist/servflow-linux-amd64 servflow
-      - dockerd &
-      - sleep 5
-      - docker info
-      - docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
-      - docker buildx create --use
-      - docker buildx build --platform linux/amd64 -t $IMAGE_TAG -t servflow/servflow:latest --push .
-
+      - |
+        if echo "$DRONE_TAG" | grep -iqE '.*-rc[0-9]+$'; then
+          echo "Release candidate detected, skipping latest tag"
+          docker buildx build --platform linux/amd64,linux/arm64 --build-arg VERSION=$VERSION -t $IMAGE_TAG --push .
+        else
+          echo "Stable release detected, pushing to latest tag"
+          docker buildx build --platform linux/amd64,linux/arm64 --build-arg VERSION=$VERSION -t $IMAGE_TAG -t servflow/servflow:latest --push .
+        fi
 
   - name: github-release
     image: alpine:latest
     depends_on:
       - create-archives
-      - docker-build-amd64
+      - docker-build-multiarch
     environment:
       GITHUB_TOKEN:
         from_secret: github_token

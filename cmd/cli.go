@@ -75,7 +75,7 @@ func ValidateConfigs(configFolder string, verbose bool) error {
 	validCount := 0
 
 	for _, cfg := range configs {
-		if err := cfg.SchemaValidation(); err != nil {
+		if err := cfg.Validate(); err != nil {
 			validationErrors = append(validationErrors, ValidationError{
 				ConfigID: cfg.ID,
 				Error:    err,

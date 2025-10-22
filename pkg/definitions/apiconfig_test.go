@@ -1,12 +1,15 @@
 package apiconfig
 
 import (
+	"encoding/json"
 	"testing"
 
+	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestAPIConfig_SchemaValidate(t *testing.T) {
+func TestAPIConfig_Validate(t *testing.T) {
 	validConfig := APIConfig{
 		ID: "test-api",
 		Actions: map[string]Action{
@@ -72,6 +75,20 @@ func TestAPIConfig_SchemaValidate(t *testing.T) {
 			wantError: false,
 		},
 		{
+			name: "valid config with invalid action",
+			config: func() APIConfig {
+				newConfig := validConfig
+				newConfig.Actions = map[string]Action{
+					"action1": {
+						Type: "http2",
+						Next: "action2",
+					},
+				}
+				return newConfig
+			},
+			wantError: true,
+		},
+		{
 			name: "invalid config - empty ID",
 			config: func() APIConfig {
 				return APIConfig{
@@ -135,10 +152,15 @@ func TestAPIConfig_SchemaValidate(t *testing.T) {
 		},
 	}
 
+	err := actions.RegisterAction("http", func(config json.RawMessage) (actions.ActionExecutable, error) {
+		return nil, nil
+	})
+	require.NoError(t, err)
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := tt.config()
-			err := cfg.SchemaValidation()
+			err := cfg.Validate()
 			if tt.wantError {
 				assert.Error(t, err)
 			} else {

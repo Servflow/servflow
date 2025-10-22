@@ -28,6 +28,7 @@ func NewYAMLLoader(apisFolder, integrationsFile string, logger *zap.Logger) *YAM
 }
 
 // FetchAPIConfigs loads API configurations from YAML files in the APIs folder
+// if shouldFail is true the first yaml config failed will end the run
 func (l *YAMLLoader) FetchAPIConfigs(shouldFail bool) ([]*apiconfig.APIConfig, error) {
 	l.logger.Debug("Loading API configs from YAML files", zap.String("folder", l.apisFolder))
 

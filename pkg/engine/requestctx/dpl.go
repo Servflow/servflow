@@ -1,4 +1,4 @@
-//go:generate mockgen -source dpl.go -destination dpl_mocks.go -package dpl
+//go:generate mockgen -source dpl.go -destination dpl_mocks.go -package requestctx
 package requestctx
 
 import (

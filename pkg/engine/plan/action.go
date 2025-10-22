@@ -1,4 +1,3 @@
-//go:generate mockgen -source ../actions/factory/factory.go -destination factory_mock.go -package plan
 package plan
 
 import (
@@ -9,7 +8,7 @@ import (
 	"github.com/Servflow/servflow/internal/logging"
 	"github.com/Servflow/servflow/internal/tracing"
 	"github.com/Servflow/servflow/pkg/engine/actions"
-	requestctx2 "github.com/Servflow/servflow/pkg/engine/requestctx"
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"go.opentelemetry.io/otel/codes"
 	"go.uber.org/zap"
 
@@ -50,7 +49,7 @@ func (a *Action) Execute(ctx context.Context) (Step, error) {
 	)
 	if a.configStr != "" {
 		logger.Debug("generated template", zap.String("config", a.configStr))
-		tmpl, err = requestctx2.CreateTextTemplate(ctx, a.configStr, nil)
+		tmpl, err = requestctx.CreateTextTemplate(ctx, a.configStr, nil)
 		if err != nil {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, err.Error())
@@ -59,7 +58,7 @@ func (a *Action) Execute(ctx context.Context) (Step, error) {
 	}
 
 	if tmpl != nil {
-		cfg, err = requestctx2.ExecuteTemplateFromContext(ctx, tmpl)
+		cfg, err = requestctx.ExecuteTemplateFromContext(ctx, tmpl)
 		if err != nil {
 			logger.Error("error executing template for action", zap.String("config", a.configStr), zap.Error(err))
 			span.RecordError(err)
@@ -76,7 +75,7 @@ func (a *Action) Execute(ctx context.Context) (Step, error) {
 	if err != nil {
 		span.RecordError(err)
 		if a.fail != nil {
-			if err := requestctx2.AddRequestVariables(ctx, map[string]interface{}{requestctx2.ErrorTagStripped: err.Error()}, ""); err != nil {
+			if err := requestctx.AddRequestVariables(ctx, map[string]interface{}{requestctx.ErrorTagStripped: err.Error()}, ""); err != nil {
 				return nil, err
 			}
 			logger.Debug("error executing action", zap.String("config", a.configStr), zap.Error(err))
@@ -87,7 +86,7 @@ func (a *Action) Execute(ctx context.Context) (Step, error) {
 	logger.Debug("action executed successfully", zap.Any("resp", resp))
 
 	if !a.isGroup {
-		if err = requestctx2.AddRequestVariables(ctx, map[string]interface{}{a.out: resp}, ""); err != nil {
+		if err = requestctx.AddRequestVariables(ctx, map[string]interface{}{a.out: resp}, ""); err != nil {
 			return nil, err
 		}
 	}

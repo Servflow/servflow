@@ -120,3 +120,41 @@ func (mr *MockLLmProviderMockRecorder) ProvideResponse(ctx, req any) *gomock.Cal
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProvideResponse", reflect.TypeOf((*MockLLmProvider)(nil).ProvideResponse), ctx, req)
 }
+
+// MockOutputMessages is a mock of OutputMessages interface.
+type MockOutputMessages struct {
+	ctrl     *gomock.Controller
+	recorder *MockOutputMessagesMockRecorder
+}
+
+// MockOutputMessagesMockRecorder is the mock recorder for MockOutputMessages.
+type MockOutputMessagesMockRecorder struct {
+	mock *MockOutputMessages
+}
+
+// NewMockOutputMessages creates a new mock instance.
+func NewMockOutputMessages(ctrl *gomock.Controller) *MockOutputMessages {
+	mock := &MockOutputMessages{ctrl: ctrl}
+	mock.recorder = &MockOutputMessagesMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockOutputMessages) EXPECT() *MockOutputMessagesMockRecorder {
+	return m.recorder
+}
+
+// Serialize mocks base method.
+func (m *MockOutputMessages) Serialize() ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Serialize")
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Serialize indicates an expected call of Serialize.
+func (mr *MockOutputMessagesMockRecorder) Serialize() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Serialize", reflect.TypeOf((*MockOutputMessages)(nil).Serialize))
+}

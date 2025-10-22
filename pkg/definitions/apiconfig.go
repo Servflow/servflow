@@ -4,8 +4,10 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"git.servflow.io/servflow/definitions/proto"
+	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
@@ -128,7 +130,18 @@ func (d *DatasourceConfig) UnmarshalYAML(unmarshal func(interface{}) error) erro
 	d.NewConfig = tmp.NewConfig
 	return nil
 }
-func (a *APIConfig) SchemaValidation() error {
+
+func (a *APIConfig) Validate() error {
+	if err := a.schemaValidation(); err != nil {
+		return err
+	}
+	if err := a.validateActions(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (a *APIConfig) schemaValidation() error {
 	compiler := jsonschema.NewCompiler()
 
 	var schemaData interface{}
@@ -159,5 +172,20 @@ func (a *APIConfig) SchemaValidation() error {
 		return fmt.Errorf("APIConfig validation failed: %w", err)
 	}
 
+	return nil
+}
+
+func (a *APIConfig) validateActions() error {
+	var invalidActions []string
+	for i := range a.Actions {
+		action := a.Actions[i]
+		if !actions.HasRegisteredActionType(action.Type) {
+			invalidActions = append(invalidActions, action.Type)
+		}
+	}
+
+	if len(invalidActions) > 0 {
+		return fmt.Errorf("invalid actions: %s", strings.Join(invalidActions, ", "))
+	}
 	return nil
 }

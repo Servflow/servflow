@@ -10,3 +10,5 @@ servflow-debug
 *.out
 data/
 .DS_Store
+# Added by goreleaser init:
+dist/

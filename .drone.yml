@@ -127,139 +127,30 @@ steps:
       - if [ "$(gofmt -l .)" ]; then echo "Code not formatted properly"; exit 1; fi
       - staticcheck ./...
 
-  - name: build-linux-amd64
-    image: golang:1.24
-    depends_on:
-      - build-gen-tag
-      - code-quality
-    volumes:
-      - name: deps
-        path: /go
-    commands:
-      - mkdir -p dist
-      - GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-X main.version=$DRONE_TAG" -o dist/servflow-linux-amd64 .
-
-  - name: build-linux-arm64
-    image: golang:1.24
-    depends_on:
-      - build-gen-tag
-      - code-quality
-    volumes:
-      - name: deps
-        path: /go
-    commands:
-      - mkdir -p dist
-      - GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags "-X main.version=$DRONE_TAG" -o dist/servflow-linux-arm64 .
-
-  - name: build-darwin-amd64
-    image: golang:1.24
-    depends_on:
-      - build-gen-tag
-      - code-quality
-    volumes:
-      - name: deps
-        path: /go
-    commands:
-      - mkdir -p dist
-      - GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-X main.version=$DRONE_TAG" -o dist/servflow-darwin-amd64 .
-
-  - name: build-darwin-arm64
-    image: golang:1.24
-    depends_on:
-      - build-gen-tag
-      - code-quality
-    volumes:
-      - name: deps
-        path: /go
-    commands:
-      - mkdir -p dist
-      - GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags "-X main.version=$DRONE_TAG" -o dist/servflow-darwin-arm64 .
-
-  - name: build-windows-amd64
-    image: golang:1.24
-    depends_on:
-      - build-gen-tag
-      - code-quality
-    volumes:
-      - name: deps
-        path: /go
-    commands:
-      - mkdir -p dist
-      - GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-X main.version=$DRONE_TAG" -o dist/servflow-windows-amd64.exe .
-
-  - name: create-archives
-    image: alpine:latest
-    depends_on:
-      - build-linux-amd64
-      - build-linux-arm64
-      - build-darwin-amd64
-      - build-darwin-arm64
-      - build-windows-amd64
-    commands:
-      - apk add --no-cache tar gzip zip
-      - mkdir -p releases
-      - cd dist
-      - tar -czf ../releases/servflow-$DRONE_TAG-linux-amd64.tar.gz servflow-linux-amd64
-      - tar -czf ../releases/servflow-$DRONE_TAG-linux-arm64.tar.gz servflow-linux-arm64
-      - tar -czf ../releases/servflow-$DRONE_TAG-darwin-amd64.tar.gz servflow-darwin-amd64
-      - tar -czf ../releases/servflow-$DRONE_TAG-darwin-arm64.tar.gz servflow-darwin-arm64
-      - zip ../releases/servflow-$DRONE_TAG-windows-amd64.zip servflow-windows-amd64.exe
-      - cd ..
-      - cd releases && sha256sum * > checksums.txt && cd ..
-      - ls -la releases/
-
-  - name: docker-build-multiarch
-    image: docker:27.3.1
+  - name: goreleaser
+    image: goreleaser/goreleaser
     privileged: true
     depends_on:
       - build-gen-tag
       - code-quality
     volumes:
-      - name: docker_cache
-        path: /var/lib/docker
+      - name: docker-sock
+        path: /var/run/docker.sock
     environment:
-      DOCKER_BUILDKIT: 1
+      GITHUB_TOKEN:
+        from_secret: github_token
       DOCKER_USERNAME:
         from_secret: docker_username
       DOCKER_PASSWORD:
         from_secret: docker_password
+      DOCKER_REGISTRY: ""
     commands:
-      - export IMAGE_TAG=$(cat .image-tag)
-      - export VERSION=$(cat .version)
-      - dockerd &
-      - sleep 5
-      - docker info
-      - docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
-      - docker buildx create --use
-      - |
-        if echo "$DRONE_TAG" | grep -iqE '.*-rc[0-9]+$'; then
-          echo "Release candidate detected, skipping latest tag"
-          docker buildx build --platform linux/amd64,linux/arm64 --build-arg VERSION=$VERSION -t $IMAGE_TAG --push .
-        else
-          echo "Stable release detected, pushing to latest tag"
-          docker buildx build --platform linux/amd64,linux/arm64 --build-arg VERSION=$VERSION -t $IMAGE_TAG -t servflow/servflow:latest --push .
-        fi
-
-  - name: github-release
-    image: alpine:latest
-    depends_on:
-      - create-archives
-      - docker-build-multiarch
-    environment:
-      GITHUB_TOKEN:
-        from_secret: github_token
-    commands:
-      - apk add --no-cache curl jq bash
-      - chmod +x scripts/create-github-release.sh
-      - bash scripts/create-github-release.sh
-    when:
-      event:
-        - tag
+      - goreleaser release
 
 volumes:
   - name: deps
     host:
       path: /var/lib/cache/drone/go
-  - name: docker_cache
+  - name: docker-sock
     host:
-      path: /var/lib/cache/drone/docker
+      path: /var/run/docker.sock

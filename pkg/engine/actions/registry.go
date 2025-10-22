@@ -75,3 +75,8 @@ func GetActionExecutable(actionType string, config json.RawMessage) (ActionExecu
 func GetRegisteredActionTypes() []string {
 	return actionManager.GetRegisteredActionTypes()
 }
+
+func HasRegisteredActionType(actionType string) bool {
+	_, ok := actionManager.availableConstructors[actionType]
+	return ok
+}

@@ -84,7 +84,6 @@ func extractValue(ctx context.Context, value string) (any, error) {
 	var val interface{}
 	err = json.Unmarshal([]byte(tmp), &val)
 	if err != nil {
-		logging.WithContext(ctx).Warn("error unmarshalling template " + tmp)
 		return tmp, nil
 	}
 

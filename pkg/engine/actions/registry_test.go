@@ -104,6 +104,8 @@ func TestGetActionExecutable(t *testing.T) {
 		assert.NotNil(t, executable)
 		assert.Equal(t, "test-get-action-unique", executable.Type())
 		assert.Equal(t, string(testConfig), executable.Config())
+		assert.True(t, HasRegisteredActionType("test-get-action-unique"))
+		assert.False(t, HasRegisteredActionType("test-get-action-unique-second"))
 	})
 
 	t.Run("unregistered action type", func(t *testing.T) {

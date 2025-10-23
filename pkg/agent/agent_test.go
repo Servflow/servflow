@@ -586,3 +586,97 @@ func TestSession_ConversationIDMessageRetrieval(t *testing.T) {
 		assert.Contains(t, err.Error(), "conversationID can not be empty")
 	})
 }
+
+func TestSession_WithReturnOnlyLastMessage(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	systemPrompt := "You are a helpful assistant"
+	testQuery := "Tell me about the weather"
+
+	// First LLM response with tool call
+	firstResponse := LLMResponse{
+		Content: []ContentResponse{
+			{
+				Text: "I'll check the weather for you",
+			},
+		},
+		Tools: []ToolResponseObject{
+			{
+				Name: "get_weather",
+				Input: map[string]any{
+					"location": "default",
+				},
+				ToolID: "test",
+			},
+		},
+	}
+
+	// Final LLM response without tool call
+	finalResponse := LLMResponse{
+		Content: []ContentResponse{
+			{
+				Text: "The weather is sunny today",
+			},
+		},
+	}
+
+	mockToolManager := NewMockToolManager(ctrl)
+	mockLLmHandler := NewMockLLmProvider(ctrl)
+
+	// Setup expectations
+	var toolInfoList []ToolInfo
+	if err := json.Unmarshal([]byte(toolList), &toolInfoList); err != nil {
+		t.Fatal(err)
+	}
+	mockToolManager.EXPECT().ToolList().Return(toolInfoList)
+	mockToolManager.EXPECT().
+		CallTool(gomock.Any(), "get_weather", map[string]any{"location": "default"}).
+		Return("Weather: Sunny, 25°C", nil)
+
+	// We expect two LLM calls - one that returns a tool call, and one that gives the final response
+	gomock.InOrder(
+		mockLLmHandler.EXPECT().
+			ProvideResponse(gomock.Any(), gomock.Any()).
+			Return(firstResponse, nil),
+		mockLLmHandler.EXPECT().
+			ProvideResponse(gomock.Any(), gomock.Any()).
+			Return(finalResponse, nil),
+	)
+
+	// Test with returnOnlyLastMessage enabled
+	session, err := NewSession(systemPrompt, mockLLmHandler, WithToolManager(mockToolManager), WithReturnOnlyLastMessage())
+	require.NoError(t, err)
+
+	response, err := session.Query(context.Background(), testQuery)
+	require.NoError(t, err)
+
+	// Should only contain the final response, not the first one
+	assert.Equal(t, "The weather is sunny today", response)
+	assert.NotContains(t, response, "I'll check the weather for you")
+
+	// Test without returnOnlyLastMessage (default behavior)
+	session2, err := NewSession(systemPrompt, mockLLmHandler, WithToolManager(mockToolManager))
+	require.NoError(t, err)
+
+	mockToolManager.EXPECT().ToolList().Return(toolInfoList)
+	mockToolManager.EXPECT().
+		CallTool(gomock.Any(), "get_weather", map[string]any{"location": "default"}).
+		Return("Weather: Sunny, 25°C", nil)
+
+	gomock.InOrder(
+		mockLLmHandler.EXPECT().
+			ProvideResponse(gomock.Any(), gomock.Any()).
+			Return(firstResponse, nil),
+		mockLLmHandler.EXPECT().
+			ProvideResponse(gomock.Any(), gomock.Any()).
+			Return(finalResponse, nil),
+	)
+
+	response2, err := session2.Query(context.Background(), testQuery)
+	require.NoError(t, err)
+
+	// Should contain both responses concatenated with newlines
+	assert.Contains(t, response2, "I'll check the weather for you")
+	assert.Contains(t, response2, "The weather is sunny today")
+}

@@ -13,11 +13,12 @@ import (
 )
 
 type Config struct {
-	ToolConfigs    []ToolConfig `json:"toolConfigs" yaml:"toolConfigs"`
-	SystemPrompt   string       `json:"systemPrompt" yaml:"systemPrompt"`
-	UserPrompt     string       `json:"userPrompt" yaml:"userPrompt"`
-	IntegrationID  string       `json:"integrationID" yaml:"integrationID"`
-	ConversationID string       `json:"conversationID" yaml:"conversationID"`
+	ToolConfigs       []ToolConfig `json:"toolConfigs" yaml:"toolConfigs"`
+	SystemPrompt      string       `json:"systemPrompt" yaml:"systemPrompt"`
+	UserPrompt        string       `json:"userPrompt" yaml:"userPrompt"`
+	IntegrationID     string       `json:"integrationID" yaml:"integrationID"`
+	ConversationID    string       `json:"conversationID" yaml:"conversationID"`
+	ReturnLastMessage bool         `json:"returnLastMessage" yaml:"returnLastMessage"`
 }
 type MCPServerConfig struct {
 	Endpoint string   `json:"endpoint" yaml:"endpoint"`
@@ -61,6 +62,9 @@ func (a *Agent) Execute(ctx context.Context, modifiedConfig string) (interface{}
 	options := []agent.Option{agent.WithToolManager(a.toolManager)}
 	if newConfig.ConversationID != "" {
 		options = append(options, agent.WithConversationID(newConfig.ConversationID))
+	}
+	if newConfig.ReturnLastMessage {
+		options = append(options, agent.WithReturnOnlyLastMessage())
 	}
 	session, err := agent.NewSession(
 		newConfig.SystemPrompt,

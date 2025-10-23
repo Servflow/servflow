@@ -38,10 +38,11 @@ var (
 )
 
 type Session struct {
-	toolManager    ToolManager
-	llm            LLmProvider
-	messages       []any
-	conversationID string
+	toolManager           ToolManager
+	llm                   LLmProvider
+	messages              []any
+	conversationID        string
+	returnOnlyLastMessage bool
 }
 
 type Option func(*Session) error
@@ -91,6 +92,13 @@ func WithConversationID(id string) Option {
 	}
 }
 
+func WithReturnOnlyLastMessage() Option {
+	return func(a *Session) error {
+		a.returnOnlyLastMessage = true
+		return nil
+	}
+}
+
 func NewSession(developerInstructions string, llm LLmProvider, options ...Option) (*Session, error) {
 	agent := &Session{
 		llm:      llm,
@@ -125,18 +133,27 @@ func (a *Session) Query(ctx context.Context, query string) (string, error) {
 		Content: query,
 	}, nil)
 
-	stringBuilder := strings.Builder{}
+	var (
+		strBuilder  strings.Builder
+		lastMessage string
+	)
 	respChan := a.startLoop(ctx)
-
 	for r := range respChan {
 		if r.err != nil {
 			return "", r.err
 		}
-		stringBuilder.WriteString(r.response)
-		stringBuilder.WriteString("\n")
+		if a.returnOnlyLastMessage {
+			lastMessage = r.response
+		} else {
+			strBuilder.WriteString(r.response)
+			strBuilder.WriteString("\n")
+		}
 	}
-
-	return stringBuilder.String(), nil
+	if a.returnOnlyLastMessage {
+		return lastMessage, nil
+	} else {
+		return strBuilder.String(), nil
+	}
 }
 
 func (a *Session) startLoop(ctx context.Context) chan agentOutput {

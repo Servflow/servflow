@@ -13,20 +13,6 @@ import (
 	"github.com/Servflow/servflow/pkg/engine/secrets/secretmanager"
 )
 
-//var FunctionMap = template.FuncMap{
-//	"strip":        tmplStripText,
-//	"secretForKey": secretmanager.SecretForKey,
-//	"jsonout":      jsonOut,
-//	"pluck":        tmplPluck,
-//	"escape":       stringEscape, // more idiomatic name
-//	"stringescape": stringEscape, // keep for backward compatibility
-//	"jsonraw":      jsonRaw,
-//	"join":         tmplJoin,
-//	"hash":         tmplHash,
-//	"now":          now,
-//	"secret":       secret,
-//}
-
 func getFuncMap(funcMap template.FuncMap) template.FuncMap {
 	m := template.FuncMap{
 		"strip":        tmplStripText,

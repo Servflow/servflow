@@ -9,12 +9,12 @@ import (
 	"time"
 
 	"github.com/Servflow/servflow/internal/logging"
+	"github.com/Servflow/servflow/pkg/definitions"
+	"github.com/Servflow/servflow/pkg/engine/configmanager"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
+	"github.com/gorilla/mux"
 	"github.com/mark3labs/mcp-go/server"
 	"go.uber.org/zap"
-
-	"github.com/Servflow/servflow/pkg/definitions"
-	"github.com/gorilla/mux"
 )
 
 // TODO move stuff and test engine easily
@@ -64,13 +64,14 @@ func (e *Engine) createCustomMuxHandler(configs []*apiconfig.APIConfig) http.Han
 			continue
 		}
 
-		handler, err := e.createBasicHandler(conf)
-		if err != nil {
-			logger.Error("Error creating APIHandler", zap.Error(err), zap.String("api", conf.ID), zap.String("path", listenPath))
-			continue
+		// Create proxy handler instead of direct handler
+		// This allows hot reloading by looking up the current handler dynamically
+		proxyHandler := &ProxyHandler{
+			configID: conf.ID,
+			manager:  e.configManager,
 		}
 
-		h := wrapMiddleware(handler)
+		h := wrapMiddleware(proxyHandler)
 		logger.Info("registered handler for " + conf.ID)
 
 		r.Handle(listenPath, h).Methods(method, http.MethodOptions)
@@ -82,6 +83,22 @@ func (e *Engine) createCustomMuxHandler(configs []*apiconfig.APIConfig) http.Han
 	}
 
 	return r
+}
+
+type ProxyHandler struct {
+	configID string
+	manager  *configmanager.ConfigManager
+}
+
+func (p *ProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	handler := p.manager.GetHandler(p.configID)
+	if handler == nil {
+		logging.GetLogger().Error("Handler not found for config", zap.String("configID", p.configID))
+		http.Error(w, "Handler not found", http.StatusNotFound)
+		return
+	}
+
+	handler.ServeHTTP(w, r)
 }
 
 func wrapMiddleware(handler http.Handler) http.Handler {

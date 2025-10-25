@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	apiconfig "github.com/Servflow/servflow/pkg/definitions"
+	"github.com/Servflow/servflow/pkg/engine/configmanager"
 	plan2 "github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/stretchr/testify/assert"
@@ -72,6 +73,22 @@ func (r *TestRunner) WithDefaultMocks() *TestRunner {
 // Init initializes the test runner, creating the HTTP handler
 func (r *TestRunner) Init() *TestRunner {
 	eng := Engine{}
+
+	// Create a config manager with the engine as the handler creator
+	configManager := configmanager.New(nil, &eng)
+
+	// Set the config manager on the engine before creating handlers
+	eng.configManager = configManager
+
+	// Create the handler for the test config
+	handler, err := eng.createBasicHandler(r.apiConfig)
+	if err != nil {
+		r.t.Fatalf("failed to create handler: %v", err)
+	}
+
+	// Register the handler in the config manager for testing
+	configManager.RegisterHandlerForTest(r.apiConfig.ID, handler, r.apiConfig)
+
 	r.handler = eng.createCustomMuxHandler([]*apiconfig.APIConfig{r.apiConfig})
 	return r
 }

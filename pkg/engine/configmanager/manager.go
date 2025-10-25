@@ -223,3 +223,15 @@ func (cm *ConfigManager) loadAndValidateConfig(filePath string) (*apiconfig.APIC
 
 	return &config, nil
 }
+
+// RegisterHandlerForTest registers a handler for testing purposes
+// This is a test helper method that should only be used in tests
+func (cm *ConfigManager) RegisterHandlerForTest(configID string, handler http.Handler, config *apiconfig.APIConfig) {
+	cm.Lock()
+	defer cm.Unlock()
+
+	cm.handlers[configID] = handler
+	if config != nil {
+		cm.configs[configID] = config
+	}
+}

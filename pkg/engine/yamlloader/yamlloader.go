@@ -63,7 +63,7 @@ func (l *YAMLLoader) FetchAPIConfigs(shouldFail bool) ([]*apiconfig.APIConfig, e
 }
 
 // FetchIntegrationsConfig loads integrations configuration from YAML file
-func (l *YAMLLoader) FetchIntegrationsConfig() ([]apiconfig.DatasourceConfig, error) {
+func (l *YAMLLoader) FetchIntegrationsConfig() ([]apiconfig.IntegrationConfig, error) {
 	l.logger.Debug("Loading integrations config from YAML file", zap.String("file", l.integrationsFile))
 
 	if l.integrationsFile == "" {
@@ -77,7 +77,7 @@ func (l *YAMLLoader) FetchIntegrationsConfig() ([]apiconfig.DatasourceConfig, er
 	}
 
 	type confStruct struct {
-		Integrations map[string]apiconfig.DatasourceConfig `yaml:"integrations"`
+		Integrations map[string]apiconfig.IntegrationConfig `yaml:"integrations"`
 	}
 
 	var confs confStruct
@@ -85,7 +85,7 @@ func (l *YAMLLoader) FetchIntegrationsConfig() ([]apiconfig.DatasourceConfig, er
 		return nil, fmt.Errorf("failed to unmarshal integrations config: %w", err)
 	}
 
-	configs := make([]apiconfig.DatasourceConfig, 0, len(confs.Integrations))
+	configs := make([]apiconfig.IntegrationConfig, 0, len(confs.Integrations))
 	for id, conf := range confs.Integrations {
 		conf.ID = id
 		configs = append(configs, conf)

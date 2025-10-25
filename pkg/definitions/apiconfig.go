@@ -102,14 +102,14 @@ func (o *ResponseObject) ToProto() *proto.ResponseObject {
 	return &resp
 }
 
-type DatasourceConfig struct {
+type IntegrationConfig struct {
 	ID        string                 `json:"id" yaml:"id"`
 	Config    json.RawMessage        `json:"config" yaml:"-"`
 	NewConfig map[string]interface{} `yaml:"config"`
 	Type      string                 `json:"type" yaml:"type"`
 }
 
-func (d *DatasourceConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (d *IntegrationConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	var tmp struct {
 		Type      string                 `yaml:"type"`
 		NewConfig map[string]interface{} `yaml:"config"`

@@ -176,6 +176,7 @@ func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 
 			// process content output
 			for _, c := range r.Content {
+				logger.Debug("got response", zap.Any("response", c.Text))
 				a.addToMessages(logger, ContentMessage{
 					Message: Message{Type: MessageTypeText},
 					Role:    RoleTypeAssistant,

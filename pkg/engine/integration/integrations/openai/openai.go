@@ -252,7 +252,7 @@ func (c *Client) ProvideResponse(ctx context.Context, agentReq agent.LLMRequest)
 }
 
 func init() {
-	if err := integration.RegisterIntegration("openai", func(m map[string]any) (integration.Integration, error) {
+	if err := integration.RegisterFactory("openai", func(m map[string]any) (integration.Integration, error) {
 		apikey, ok := m["api_key"].(string)
 		if !ok {
 			return nil, errors.New("api_key required in config")

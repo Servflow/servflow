@@ -57,7 +57,7 @@ func (s *SQL) Type() string {
 }
 
 func init() {
-	if err := integration.RegisterIntegration("sql", func(m map[string]any) (integration.Integration, error) {
+	if err := integration.RegisterFactory("sql", func(m map[string]any) (integration.Integration, error) {
 		return newWrapper(Config{
 			Type:             m["type"].(string),
 			ConnectionString: m["connectionString"].(string),

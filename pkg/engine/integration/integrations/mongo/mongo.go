@@ -86,7 +86,7 @@ var (
 )
 
 func init() {
-	if err := integration.RegisterIntegration("mongo", func(m map[string]any) (integration.Integration, error) {
+	if err := integration.RegisterFactory("mongo", func(m map[string]any) (integration.Integration, error) {
 		return newWrapper(Config{
 			ConnectionString: m["connectionString"].(string),
 			DBName:           m["dbName"].(string),

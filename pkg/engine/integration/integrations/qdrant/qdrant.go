@@ -42,7 +42,7 @@ func parseHostPort(url string) (string, int) {
 }
 
 func init() {
-	if err := integration.RegisterIntegration("qdrant", func(m map[string]any) (integration.Integration, error) {
+	if err := integration.RegisterFactory("qdrant", func(m map[string]any) (integration.Integration, error) {
 		host, port := parseHostPort(m["url"].(string))
 		return New(&Config{
 			Host: host,

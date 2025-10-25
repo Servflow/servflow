@@ -14,10 +14,10 @@ func TestIntegrationManager(t *testing.T) {
 		return &mockIntegration{name: "MockIntegration"}, nil
 	}
 
-	err := RegisterIntegration("mock", mockConstructor)
+	err := RegisterFactory("mock", mockConstructor)
 	require.NoError(t, err, "registering mock integration")
 
-	err = RegisterIntegration("mock", mockConstructor)
+	err = RegisterFactory("mock", mockConstructor)
 	require.Error(t, err, "expected error registering mock integration")
 
 	t.Run("InitializeIntegration", func(t *testing.T) {

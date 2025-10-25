@@ -30,7 +30,7 @@ type Integration interface {
 
 type factoryFunc func(map[string]any) (Integration, error)
 
-func RegisterIntegration(integrationType string, constructor factoryFunc) error {
+func RegisterFactory(integrationType string, constructor factoryFunc) error {
 	_, ok := integrationManager.availableConstructors[integrationType]
 	if ok {
 		return fmt.Errorf("integration type %s already registered", integrationType)

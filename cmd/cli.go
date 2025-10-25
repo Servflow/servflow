@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"syscall"
 
 	"github.com/Servflow/servflow/config"
 	"github.com/Servflow/servflow/internal/storage"
@@ -25,8 +26,8 @@ type ValidationError struct {
 	Error    error
 }
 
-func RunServer(cfg *config.Config) error {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+func RunServer(cfg *config.Config, watch bool) error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGHUP)
 	defer stop()
 
 	storageClient, err := storage.GetClient()
@@ -39,9 +40,29 @@ func RunServer(cfg *config.Config) error {
 		return err
 	}
 
-	if err := eng.Start(); err != nil {
+	if err := eng.Start(watch); err != nil {
 		return err
 	}
+
+	// Handle SIGHUP for manual reload
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGHUP)
+
+	go func() {
+		for {
+			select {
+			case <-sigChan:
+				log.Println("SIGHUP received, reloading configs...")
+				if err := eng.Reload(); err != nil {
+					log.Printf("Reload failed: %v", err)
+				} else {
+					log.Println("Reload successful")
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 
 	select {
 	case <-eng.DoneChan():
@@ -127,6 +148,13 @@ func CreateApp() *cli.App {
 						Usage:    "Path to integrations configuration folder",
 						Required: false,
 					},
+					&cli.BoolFlag{
+						Name:     "watch",
+						Aliases:  []string{"w"},
+						Usage:    "Enable hot reload - watch for config file changes",
+						Value:    false,
+						Required: false,
+					},
 				},
 				Action: func(c *cli.Context) error {
 					if err := godotenv.Load(); err != nil {
@@ -153,10 +181,15 @@ func CreateApp() *cli.App {
 						return cli.Exit("Config folder for APIs must be specified either via environment variable SERVFLOW_CONFIGFOLDERS_APIS or as the first argument to 'run' command", 1)
 					}
 
+					watchEnabled := c.Bool("watch")
+
 					log.Printf("Starting ServFlow with config folders - APIs: %s, Integrations: %s",
 						cfg.ConfigFolder, cfg.IntegrationsFile)
+					if watchEnabled {
+						log.Printf("Hot reload enabled - watching for config changes")
+					}
 
-					return RunServer(&cfg)
+					return RunServer(&cfg, watchEnabled)
 				},
 			},
 			{

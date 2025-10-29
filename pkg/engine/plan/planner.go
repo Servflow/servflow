@@ -172,7 +172,6 @@ func (p *PlannerV2) generateActionStep(id string) (*Action, error) {
 		fail:      failStep,
 		out:       out,
 		exec:      exec,
-		isGroup:   a.Type == "group",
 	}, nil
 }
 

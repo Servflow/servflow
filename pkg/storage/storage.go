@@ -19,6 +19,7 @@ var client *Client
 
 const (
 	servflowPrefix = "servflow"
+	kvPrefix       = "kv"
 	envStorageKey  = "SERVFLOW_STORAGE_PATH"
 )
 
@@ -118,4 +119,62 @@ func GetLogEntriesByPrefix(prefix string, deserializeFunc func([]byte) (any, err
 		return nil
 	})
 	return result, err
+}
+
+// Set stores a key-value pair in the database
+func Set(key string, value string) error {
+	if key == "" {
+		return errors.New("key cannot be empty")
+	}
+
+	c, err := GetClient()
+	if err != nil {
+		return err
+	}
+
+	k := []byte(fmt.Sprintf("%s:%s:%s", servflowPrefix, kvPrefix, key))
+
+	return c.db.Update(func(txn *badger.Txn) error {
+		return txn.Set(k, []byte(value))
+	})
+}
+
+// Get retrieves a value by key from the database
+// Returns value and true if key exists, empty string and false if key doesn't exist
+func Get(key string) (string, bool, error) {
+	if key == "" {
+		return "", false, errors.New("key cannot be empty")
+	}
+
+	c, err := GetClient()
+	if err != nil {
+		return "", false, err
+	}
+
+	k := []byte(fmt.Sprintf("%s:%s:%s", servflowPrefix, kvPrefix, key))
+
+	var value []byte
+	var found bool
+	err = c.db.View(func(txn *badger.Txn) error {
+		item, err := txn.Get(k)
+		if err != nil {
+			if err == badger.ErrKeyNotFound {
+				found = false
+				return nil // Return no error, key just doesn't exist
+			}
+			return err
+		}
+
+		found = true
+		return item.Value(func(val []byte) error {
+			value = append([]byte(nil), val...)
+			return nil
+		})
+	})
+
+	if err != nil {
+		return "", false, err
+	}
+
+	return string(value), found, nil
 }

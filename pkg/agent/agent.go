@@ -127,11 +127,13 @@ type agentOutput struct {
 
 func (a *Session) Query(ctx context.Context, query string) (string, error) {
 	logger := logging.GetRequestLogger(ctx).With(zap.String("module", "agent"))
-	a.addToMessages(logger, ContentMessage{
-		Message: Message{Type: MessageTypeText},
-		Role:    RoleTypeUser,
-		Content: query,
-	}, nil)
+	if query != "" {
+		a.addToMessages(logger, ContentMessage{
+			Message: Message{Type: MessageTypeText},
+			Role:    RoleTypeUser,
+			Content: query,
+		}, nil)
+	}
 
 	var (
 		strBuilder  strings.Builder
@@ -205,6 +207,7 @@ func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 						Output:  "error running tool",
 						ID:      tool.ToolID,
 					}, out)
+					logger.Error("failed to execute tool", zap.String("tool", tool.Name), zap.Error(err))
 					continue
 				}
 				a.addToMessages(logger, ToolCallOutputMessage{

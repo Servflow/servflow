@@ -33,31 +33,35 @@ func (p *Plan) executeStep(ctx context.Context, step Step, endValue string) (*ht
 		next, err = s.Execute(ctx)
 	}
 	if err != nil {
+		if errors.Is(err, errExecutingAction) {
+			return p.generateEndValue(ctx, logger, endValue)
+		}
 		return nil, fmt.Errorf("error executing step: %w", err)
 	}
 
 	if next != nil {
 		return p.executeStep(ctx, next, endValue)
 	}
+	return p.generateEndValue(ctx, logger, endValue)
+}
 
-	if endValue != "" {
-		tmpl, err := requestctx.CreateTextTemplate(ctx, endValue, nil)
-		if err != nil {
-			return nil, err
-		}
-		val, err := requestctx.ExecuteTemplateFromContext(ctx, tmpl)
-		if err != nil {
-			return nil, err
-		}
-
-		logger.Debug("template generated", zap.String("template", val))
-
-		return &http.SfResponse{
-			Body: []byte(val),
-		}, nil
+func (p *Plan) generateEndValue(ctx context.Context, logger *zap.Logger, endValue string) (*http.SfResponse, error) {
+	if endValue == "" {
+		return nil, nil
 	}
+	tmpl, err := requestctx.CreateTextTemplate(ctx, endValue, nil)
+	if err != nil {
+		return nil, err
+	}
+	val, err := requestctx.ExecuteTemplateFromContext(ctx, tmpl)
+	if err != nil {
+		return nil, err
+	}
+	logger.Debug("template generated", zap.String("template", val))
 
-	return nil, nil
+	return &http.SfResponse{
+		Body: []byte(val),
+	}, nil
 }
 
 func (p *Plan) Execute(ctx context.Context, id, endValue string) (*http.SfResponse, error) {

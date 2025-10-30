@@ -178,7 +178,7 @@ func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 
 			// process content output
 			for _, c := range r.Content {
-				logger.Debug("got response", zap.Any("response", c.Text))
+				logger.Info("LLm response", zap.Any("response", c.Text))
 				a.addToMessages(logger, ContentMessage{
 					Message: Message{Type: MessageTypeText},
 					Role:    RoleTypeAssistant,
@@ -192,7 +192,7 @@ func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 
 			// TODO call tools in parallel
 			for _, tool := range r.Tools {
-				logger.Debug("attempting to execute tool", zap.String("tool", tool.Name))
+				logger.Info("attempting to execute tool", zap.String("tool", tool.Name))
 
 				a.addToMessages(logger, ToolCallMessage{
 					Message:   Message{Type: MessageTypeToolCall},
@@ -215,7 +215,7 @@ func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 					Output:  toolResp,
 					ID:      tool.ToolID,
 				}, out)
-				logger.Debug("successfully executed tool", zap.String("tool", tool.Name), zap.String("toolResp", toolResp))
+				logger.Info("successfully executed tool", zap.String("tool", tool.Name), zap.String("toolResp", toolResp))
 			}
 		}
 		close(out)

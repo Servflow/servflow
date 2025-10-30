@@ -8,9 +8,9 @@ import (
 	"os/signal"
 
 	"github.com/Servflow/servflow/config"
-	"github.com/Servflow/servflow/internal/storage"
 	"github.com/Servflow/servflow/pkg/engine/server"
 	"github.com/Servflow/servflow/pkg/engine/yamlloader"
+	"github.com/Servflow/servflow/pkg/storage"
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/urfave/cli/v2"

@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/Servflow/servflow/internal/logging"
-	"github.com/Servflow/servflow/internal/storage"
+	"github.com/Servflow/servflow/pkg/storage"
 	"go.uber.org/zap"
 )
 

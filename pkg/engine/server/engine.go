@@ -8,7 +8,6 @@ import (
 
 	"github.com/Servflow/servflow/config"
 	"github.com/Servflow/servflow/internal/logging"
-	"github.com/Servflow/servflow/internal/storage"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/agent"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/authenticate"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/delete_action"
@@ -32,6 +31,7 @@ import (
 	_ "github.com/Servflow/servflow/pkg/engine/integration/integrations/sql"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/engine/yamlloader"
+	"github.com/Servflow/servflow/pkg/storage"
 	"github.com/mark3labs/mcp-go/server"
 )
 

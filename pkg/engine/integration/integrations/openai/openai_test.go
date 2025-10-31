@@ -37,7 +37,7 @@ func TestNew(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client, err := New(tt.cfg.APIKey)
+			client, err := New(tt.cfg.APIKey, "")
 			if (err != nil) != tt.wantErr {
 				t.Errorf("New() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -303,7 +303,7 @@ func TestConvertAgentRequestToRequest(t *testing.T) {
 				Tools: []agent.ToolInfo{},
 			},
 			expected: RequestBody{
-				Model:        currentModel,
+				Model:        defaultModel,
 				Instructions: "You are a helpful assistant.",
 				Input: []interface{}{
 					MessageInput{
@@ -350,7 +350,7 @@ func TestConvertAgentRequestToRequest(t *testing.T) {
 				},
 			},
 			expected: RequestBody{
-				Model:        currentModel,
+				Model:        defaultModel,
 				Instructions: "You have access to weather tools.",
 				Input: []interface{}{
 					MessageInput{
@@ -421,7 +421,7 @@ func TestConvertAgentRequestToRequest(t *testing.T) {
 				Tools: []agent.ToolInfo{},
 			},
 			expected: RequestBody{
-				Model:        currentModel,
+				Model:        defaultModel,
 				Instructions: "Handle complete conversation flow.",
 				Input: []interface{}{
 					MessageInput{
@@ -483,7 +483,7 @@ func TestConvertAgentRequestToRequest(t *testing.T) {
 				Tools: []agent.ToolInfo{},
 			},
 			expected: RequestBody{
-				Model:        currentModel,
+				Model:        defaultModel,
 				Instructions: "You are a development assistant.",
 				Input: []interface{}{
 					MessageInput{
@@ -545,7 +545,7 @@ func TestConvertAgentRequestToRequest(t *testing.T) {
 				},
 			},
 			expected: RequestBody{
-				Model:        currentModel,
+				Model:        defaultModel,
 				Instructions: "You have access to multiple tools.",
 				Input: []interface{}{
 					MessageInput{
@@ -592,7 +592,7 @@ func TestConvertAgentRequestToRequest(t *testing.T) {
 				Tools:         []agent.ToolInfo{},
 			},
 			expected: RequestBody{
-				Model:        currentModel,
+				Model:        defaultModel,
 				Instructions: "",
 				Input:        []interface{}{},
 				Tools:        []ToolsRequestConfig{},
@@ -640,7 +640,7 @@ func TestConvertAgentRequestToRequest(t *testing.T) {
 				Tools: []agent.ToolInfo{},
 			},
 			expected: RequestBody{
-				Model:        currentModel,
+				Model:        defaultModel,
 				Instructions: "Handle various tool argument scenarios.",
 				Input: []interface{}{
 					MessageInput{
@@ -668,7 +668,7 @@ func TestConvertAgentRequestToRequest(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := convertAgentRequestToRequest(tt.request, logger)
+			result := convertAgentRequestToRequest(logger, tt.request, defaultModel)
 
 			assert.Equal(t, tt.expected, result)
 		})

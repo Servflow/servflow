@@ -192,7 +192,7 @@ func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 
 			// TODO call tools in parallel
 			for _, tool := range r.Tools {
-				logger.Info("attempting to execute tool", zap.String("tool", tool.Name))
+				logger.Info("attempting to execute tool", zap.String("tool", tool.Name), zap.Any("params", tool.Input))
 
 				a.addToMessages(logger, ToolCallMessage{
 					Message:   Message{Type: MessageTypeToolCall},

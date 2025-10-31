@@ -19,6 +19,7 @@ import (
 type Config struct {
 	APIKey         string `json:"api_key"`
 	OrganizationID string `json:"organization_id"`
+	ModelID        string `json:"model_id"`
 }
 
 type MessageInput struct {
@@ -122,9 +123,9 @@ func convertResponseToAgentResponse(resp *Response, logger *zap.Logger) agent.LL
 	return r
 }
 
-func convertAgentRequestToRequest(req *agent.LLMRequest, logger *zap.Logger) RequestBody {
+func convertAgentRequestToRequest(logger *zap.Logger, req *agent.LLMRequest, model string) RequestBody {
 	r := RequestBody{
-		Model:        currentModel,
+		Model:        model,
 		Instructions: req.SystemMessage,
 		Input:        make([]interface{}, 0),
 		Tools:        make([]ToolsRequestConfig, 0),
@@ -170,45 +171,40 @@ func convertAgentRequestToRequest(req *agent.LLMRequest, logger *zap.Logger) Req
 	return r
 }
 
-type OldResponse struct {
-	Output []struct {
-		Type    string `json:"type"`
-		Status  string `json:"status"`
-		Content []struct {
-			Type string `json:"type"`
-			Text string `json:"text"`
-		} `json:"content"`
-	} `json:"output"`
-}
-
 type Client struct {
 	client *http.Client
 	apiKey string
+	model  string
 }
 
 func (c *Client) Type() string {
 	return "openai"
 }
 
-func New(apiKey string) (*Client, error) {
+func New(apiKey string, model string) (*Client, error) {
 	if apiKey == "" {
 		return nil, errors.New("no API key provided")
+	}
+
+	if model == "" {
+		model = defaultModel
 	}
 
 	return &Client{
 		client: &http.Client{},
 		apiKey: apiKey,
+		model:  model,
 	}, nil
 }
 
 var (
 	endpoint     = "https://api.openai.com/v1/responses"
-	currentModel = "gpt-4.1"
+	defaultModel = "gpt-4.1"
 )
 
 func (c *Client) ProvideResponse(ctx context.Context, agentReq agent.LLMRequest) (resp agent.LLMResponse, err error) {
 	logger := logging.GetRequestLogger(ctx)
-	input := convertAgentRequestToRequest(&agentReq, logger)
+	input := convertAgentRequestToRequest(logger, &agentReq, c.model)
 
 	inputJson, err := json.Marshal(input)
 	if err != nil {
@@ -257,7 +253,11 @@ func init() {
 		if !ok {
 			return nil, errors.New("api_key required in config")
 		}
-		return New(apikey)
+		model, ok := m["model"].(string)
+		if !ok {
+			model = defaultModel
+		}
+		return New(apikey, model)
 	}); err != nil {
 		panic(err)
 	}

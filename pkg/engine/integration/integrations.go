@@ -9,8 +9,8 @@ import (
 	"sync"
 	"text/template"
 
-	"github.com/Servflow/servflow/internal/logging"
 	apiconfig "github.com/Servflow/servflow/pkg/definitions"
+	"github.com/Servflow/servflow/pkg/logging"
 	"go.uber.org/zap"
 )
 

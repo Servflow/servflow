@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"text/template"
 
-	"github.com/Servflow/servflow/internal/logging"
 	"github.com/Servflow/servflow/pkg/agent"
 	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
+	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/mark3labs/mcp-go/client"
 	"github.com/mark3labs/mcp-go/client/transport"
 	"github.com/mark3labs/mcp-go/mcp"

@@ -8,8 +8,8 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/Servflow/servflow/internal/logging"
 	"github.com/Servflow/servflow/pkg/engine/actions"
+	"github.com/Servflow/servflow/pkg/logging"
 	"go.uber.org/zap"
 
 	"github.com/tidwall/gjson"

@@ -9,9 +9,9 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/Servflow/servflow/internal/logging"
 	"github.com/Servflow/servflow/pkg/agent"
 	"github.com/Servflow/servflow/pkg/engine/integration"
+	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/mark3labs/mcp-go/mcp"
 	"go.uber.org/zap"
 )

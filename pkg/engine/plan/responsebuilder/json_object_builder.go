@@ -6,9 +6,9 @@ import (
 	"fmt"
 
 	"github.com/Servflow/servflow/internal/http"
-	"github.com/Servflow/servflow/internal/logging"
 	"github.com/Servflow/servflow/pkg/definitions"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
+	"github.com/Servflow/servflow/pkg/logging"
 )
 
 type JSONObjectBuilder struct {

@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Servflow/servflow/internal/logging"
 	requestctx2 "github.com/Servflow/servflow/pkg/engine/requestctx"
+	"github.com/Servflow/servflow/pkg/logging"
 	"go.uber.org/zap"
 )
 

@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/Servflow/servflow/internal/http"
-	"github.com/Servflow/servflow/internal/logging"
 	"github.com/Servflow/servflow/pkg/definitions"
 	"github.com/Servflow/servflow/pkg/engine/plan/responsebuilder"
+	"github.com/Servflow/servflow/pkg/logging"
 	"go.uber.org/zap"
 )
 

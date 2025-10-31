@@ -4,9 +4,9 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/Servflow/servflow/internal/logging"
 	"github.com/Servflow/servflow/pkg/definitions"
 	"github.com/Servflow/servflow/pkg/engine/server/middleware"
+	"github.com/Servflow/servflow/pkg/logging"
 	"go.uber.org/zap"
 
 	"github.com/justinas/alice"

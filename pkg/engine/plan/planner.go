@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Servflow/servflow/internal/logging"
 	"github.com/Servflow/servflow/pkg/definitions"
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
+	"github.com/Servflow/servflow/pkg/logging"
 	"go.uber.org/zap"
 )
 

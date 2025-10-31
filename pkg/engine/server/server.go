@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Servflow/servflow/internal/logging"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
+	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/mark3labs/mcp-go/server"
 	"go.uber.org/zap"
 

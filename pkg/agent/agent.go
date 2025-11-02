@@ -190,16 +190,18 @@ func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 				endTurn = true
 			}
 
-			// TODO call tools in parallel
 			for _, tool := range r.Tools {
-				logger.Info("attempting to execute tool", zap.String("tool", tool.Name), zap.Any("params", tool.Input))
-
 				a.addToMessages(logger, ToolCallMessage{
 					Message:   Message{Type: MessageTypeToolCall},
 					ID:        tool.ToolID,
 					Name:      tool.Name,
 					Arguments: tool.Input,
 				}, out)
+			}
+
+			// TODO call tools in parallel
+			for _, tool := range r.Tools {
+				logger.Info("attempting to execute tool", zap.String("tool", tool.Name), zap.Any("params", tool.Input))
 				toolResp, err := a.toolManager.CallTool(ctx, tool.Name, tool.Input)
 				if err != nil {
 					a.addToMessages(logger, ToolCallOutputMessage{

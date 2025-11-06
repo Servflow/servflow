@@ -64,6 +64,9 @@ func GetFieldsForAction(actionType string) (map[string]FieldInfo, error) {
 func (r *Registry) ReplaceActionType(actionType string, constructor factoryFunc) {
 	existing, ok := r.availableConstructors[actionType]
 	if !ok {
+		r.availableConstructors[actionType] = actionFactory{
+			constructor: constructor,
+		}
 		return
 	}
 	r.availableConstructors[actionType] = actionFactory{

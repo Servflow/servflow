@@ -84,13 +84,40 @@ func New(config Config) (*StoreVectors, error) {
 }
 
 func init() {
+	fields := map[string]actions.FieldInfo{
+		"integrationID": {
+			Type:        "string",
+			Label:       "Integration ID",
+			Placeholder: "Vector database integration identifier",
+			Required:    false,
+		},
+		"fields": {
+			Type:        "object",
+			Label:       "Fields",
+			Placeholder: "Data fields to store",
+			Required:    true,
+		},
+		"options": {
+			Type:        "object",
+			Label:       "Options",
+			Placeholder: "Additional storage options",
+			Required:    false,
+		},
+		"vectors": {
+			Type:        "string",
+			Label:       "Vectors",
+			Placeholder: "Vector data to store",
+			Required:    true,
+		},
+	}
+
 	if err := actions.RegisterAction("storevector", func(config json.RawMessage) (actions.ActionExecutable, error) {
 		var cfg Config
 		if err := json.Unmarshal(config, &cfg); err != nil {
 			return nil, fmt.Errorf("error creating storevector action: %v", err)
 		}
 		return New(cfg)
-	}); err != nil {
+	}, fields); err != nil {
 		panic(err)
 	}
 }

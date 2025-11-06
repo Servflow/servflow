@@ -78,13 +78,40 @@ func (d *Delete) Execute(ctx context.Context, modifiedConfig string) (interface{
 }
 
 func init() {
+	fields := map[string]actions.FieldInfo{
+		"integrationID": {
+			Type:        "string",
+			Label:       "Integration ID",
+			Placeholder: "Database integration identifier",
+			Required:    true,
+		},
+		"filters": {
+			Type:        "array",
+			Label:       "Filters",
+			Placeholder: "Query filters to identify records to delete",
+			Required:    true,
+		},
+		"table": {
+			Type:        "string",
+			Label:       "Table",
+			Placeholder: "Database table name",
+			Required:    true,
+		},
+		"datasourceOptions": {
+			Type:        "object",
+			Label:       "Datasource Options",
+			Placeholder: "Additional datasource options",
+			Required:    false,
+		},
+	}
+
 	if err := actions.RegisterAction("delete", func(config json.RawMessage) (actions.ActionExecutable, error) {
 		var cfg Config
 		if err := json.Unmarshal(config, &cfg); err != nil {
 			return nil, fmt.Errorf("error creating delete action: %v", err)
 		}
 		return New(cfg)
-	}); err != nil {
+	}, fields); err != nil {
 		panic(err)
 	}
 }

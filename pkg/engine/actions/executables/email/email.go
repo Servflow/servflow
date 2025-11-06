@@ -86,13 +86,52 @@ func (e *Email) Execute(ctx context.Context, filledInConfig string) (interface{}
 }
 
 func init() {
+	fields := map[string]actions.FieldInfo{
+		"senderEmail": {
+			Type:        "string",
+			Label:       "Sender Email",
+			Placeholder: "sender@example.com",
+			Required:    true,
+		},
+		"recipientEmail": {
+			Type:        "string",
+			Label:       "Recipient Email",
+			Placeholder: "recipient@example.com",
+			Required:    true,
+		},
+		"name": {
+			Type:        "string",
+			Label:       "Sender Name",
+			Placeholder: "John Doe",
+			Required:    true,
+		},
+		"subject": {
+			Type:        "string",
+			Label:       "Subject",
+			Placeholder: "Email subject",
+			Required:    false,
+		},
+		"auth": {
+			Type:        "object",
+			Label:       "Server Configuration",
+			Placeholder: "SMTP server authentication details",
+			Required:    true,
+		},
+		"content": {
+			Type:        "string",
+			Label:       "Content",
+			Placeholder: "Email content",
+			Required:    true,
+		},
+	}
+
 	if err := actions.RegisterAction("email", func(config json.RawMessage) (actions.ActionExecutable, error) {
 		var cfg Config
 		if err := json.Unmarshal(config, &cfg); err != nil {
 			return nil, fmt.Errorf("error creating email action: %v", err)
 		}
 		return New(cfg), nil
-	}); err != nil {
+	}, fields); err != nil {
 		panic(err)
 	}
 }

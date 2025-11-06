@@ -106,13 +106,47 @@ func (h *Http) Execute(ctx context.Context, filledInConfig string) (interface{},
 }
 
 func init() {
+	fields := map[string]actions.FieldInfo{
+		"url": {
+			Type:        "string",
+			Label:       "URL",
+			Placeholder: "https://api.example.com/endpoint",
+			Required:    true,
+		},
+		"method": {
+			Type:        "string",
+			Label:       "HTTP Method",
+			Placeholder: "GET, POST, PUT, DELETE",
+			Required:    true,
+			Default:     "GET",
+		},
+		"headers": {
+			Type:        "object",
+			Label:       "Headers",
+			Placeholder: "HTTP headers as key-value pairs",
+			Required:    false,
+		},
+		"body": {
+			Type:        "object",
+			Label:       "Request Body",
+			Placeholder: "Request body data",
+			Required:    false,
+		},
+		"response_path": {
+			Type:        "string",
+			Label:       "Response Path",
+			Placeholder: "JSONPath to extract from response (optional)",
+			Required:    false,
+		},
+	}
+
 	if err := actions.RegisterAction("http", func(config json.RawMessage) (actions.ActionExecutable, error) {
 		var cfg Config
 		if err := json.Unmarshal(config, &cfg); err != nil {
 			return nil, fmt.Errorf("error creating http action: %v", err)
 		}
 		return New(cfg), nil
-	}); err != nil {
+	}, fields); err != nil {
 		panic(err)
 	}
 }

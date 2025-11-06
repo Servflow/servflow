@@ -144,13 +144,40 @@ func (a *JWT) decode(ctx context.Context, tokenString string) (interface{}, erro
 }
 
 func init() {
+	fields := map[string]actions.FieldInfo{
+		"mode": {
+			Type:        "string",
+			Label:       "Mode",
+			Placeholder: "sign or verify",
+			Required:    true,
+		},
+		"field": {
+			Type:        "string",
+			Label:       "Field",
+			Placeholder: "Field name for token data",
+			Required:    true,
+		},
+		"key": {
+			Type:        "string",
+			Label:       "Key",
+			Placeholder: "JWT signing/verification key",
+			Required:    true,
+		},
+		"claims": {
+			Type:        "object",
+			Label:       "Claims",
+			Placeholder: "JWT claims as key-value pairs",
+			Required:    false,
+		},
+	}
+
 	if err := actions.RegisterAction("jwt", func(config json.RawMessage) (actions.ActionExecutable, error) {
 		var cfg Config
 		if err := json.Unmarshal(config, &cfg); err != nil {
 			return nil, fmt.Errorf("error creating jwt action: %v", err)
 		}
 		return New(cfg), nil
-	}); err != nil {
+	}, fields); err != nil {
 		panic(err)
 	}
 }

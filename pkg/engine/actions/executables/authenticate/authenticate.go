@@ -110,13 +110,46 @@ func (a *Action) Type() string {
 }
 
 func init() {
+	fields := map[string]actions.FieldInfo{
+		"integration_id": {
+			Type:        "string",
+			Label:       "Integration ID",
+			Placeholder: "Database integration identifier",
+			Required:    true,
+		},
+		"database_field": {
+			Type:        "string",
+			Label:       "Database Field",
+			Placeholder: "Field name in database",
+			Required:    true,
+		},
+		"jwt_key": {
+			Type:        "string",
+			Label:       "JWT Key",
+			Placeholder: "JWT signing key",
+			Required:    true,
+		},
+		"token": {
+			Type:        "string",
+			Label:       "Token",
+			Placeholder: "Authentication token",
+			Required:    true,
+		},
+		"collection": {
+			Type:        "string",
+			Label:       "Collection",
+			Placeholder: "Database collection name",
+			Required:    true,
+		},
+	}
+
 	if err := actions.RegisterAction("authenticate", func(config json.RawMessage) (actions.ActionExecutable, error) {
 		var cfg Config
 		if err := json.Unmarshal(config, &cfg); err != nil {
 			return nil, fmt.Errorf("error creating authenticate action: %v", err)
 		}
 		return New(cfg)
-	}); err != nil {
+	}, fields); err != nil {
 		panic(err)
 	}
 }

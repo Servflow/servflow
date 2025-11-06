@@ -83,13 +83,34 @@ func New(config Config) (*FetchVector, error) {
 }
 
 func init() {
+	fields := map[string]actions.FieldInfo{
+		"integrationID": {
+			Type:        "string",
+			Label:       "Integration ID",
+			Placeholder: "Vector database integration identifier",
+			Required:    false,
+		},
+		"vector": {
+			Type:        "string",
+			Label:       "Vector",
+			Placeholder: "Vector data or identifier",
+			Required:    false,
+		},
+		"options": {
+			Type:        "object",
+			Label:       "Options",
+			Placeholder: "Additional query options",
+			Required:    false,
+		},
+	}
+
 	if err := actions.RegisterAction("fetchvectors", func(config json.RawMessage) (actions.ActionExecutable, error) {
 		var cfg Config
 		if err := json.Unmarshal(config, &cfg); err != nil {
 			return nil, fmt.Errorf("error creating fetchvector action: %v", err)
 		}
 		return New(cfg)
-	}); err != nil {
+	}, fields); err != nil {
 		panic(err)
 	}
 }

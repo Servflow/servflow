@@ -38,13 +38,28 @@ func (s *Executable) Execute(ctx context.Context, modifiedConfig string) (interf
 }
 
 func init() {
+	fields := map[string]actions.FieldInfo{
+		"return": {
+			Type:        "string",
+			Label:       "Return Value",
+			Placeholder: "Value to return",
+			Required:    true,
+		},
+		"config": {
+			Type:        "string",
+			Label:       "Config",
+			Placeholder: "Configuration string",
+			Required:    false,
+		},
+	}
+
 	if err := actions.RegisterAction("static", func(config json.RawMessage) (actions.ActionExecutable, error) {
 		var cfg Config
 		if err := json.Unmarshal(config, &cfg); err != nil {
 			return nil, fmt.Errorf("error creating static action: %v", err)
 		}
 		return NewExecutable(cfg), nil
-	}); err != nil {
+	}, fields); err != nil {
 		panic(err)
 	}
 }

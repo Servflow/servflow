@@ -71,13 +71,40 @@ func (f *Firestore) Execute(ctx context.Context, modifiedConfig string) (interfa
 }
 
 func init() {
+	fields := map[string]actions.FieldInfo{
+		"serviceAccount": {
+			Type:        "string",
+			Label:       "Service Account",
+			Placeholder: "Firebase service account JSON",
+			Required:    true,
+		},
+		"projectID": {
+			Type:        "string",
+			Label:       "Project ID",
+			Placeholder: "Firebase project ID",
+			Required:    true,
+		},
+		"collectionID": {
+			Type:        "string",
+			Label:       "Collection ID",
+			Placeholder: "Firestore collection name",
+			Required:    true,
+		},
+		"documentTemplate": {
+			Type:        "string",
+			Label:       "Document Template",
+			Placeholder: "Document template JSON",
+			Required:    true,
+		},
+	}
+
 	if err := actions.RegisterAction("firestore", func(config json.RawMessage) (actions.ActionExecutable, error) {
 		var cfg Config
 		if err := json.Unmarshal(config, &cfg); err != nil {
 			return nil, fmt.Errorf("error creating firestore action: %v", err)
 		}
 		return NewFirestoreExecutable(cfg)
-	}); err != nil {
+	}, fields); err != nil {
 		panic(err)
 	}
 }

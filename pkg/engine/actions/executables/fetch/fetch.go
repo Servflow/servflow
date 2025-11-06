@@ -88,13 +88,54 @@ func (f *Fetch) Execute(ctx context.Context, modifiedConfig string) (interface{}
 }
 
 func init() {
+	fields := map[string]actions.FieldInfo{
+		"integrationID": {
+			Type:        "string",
+			Label:       "Integration ID",
+			Placeholder: "Database integration identifier",
+			Required:    true,
+		},
+		"filters": {
+			Type:        "array",
+			Label:       "Filters",
+			Placeholder: "Query filters",
+			Required:    false,
+		},
+		"table": {
+			Type:        "string",
+			Label:       "Table",
+			Placeholder: "Database table name",
+			Required:    true,
+		},
+		"datasourceOptions": {
+			Type:        "object",
+			Label:       "Datasource Options",
+			Placeholder: "Additional datasource options",
+			Required:    false,
+		},
+		"single": {
+			Type:        "boolean",
+			Label:       "Single Result",
+			Placeholder: "Return single result instead of array",
+			Required:    false,
+			Default:     false,
+		},
+		"shouldFail": {
+			Type:        "boolean",
+			Label:       "Should Fail",
+			Placeholder: "Whether the action should fail on error",
+			Required:    false,
+			Default:     false,
+		},
+	}
+
 	if err := actions.RegisterAction("fetch", func(config json.RawMessage) (actions.ActionExecutable, error) {
 		var cfg Config
 		if err := json.Unmarshal(config, &cfg); err != nil {
 			return nil, fmt.Errorf("error creating fetch action: %v", err)
 		}
 		return New(cfg)
-	}); err != nil {
+	}, fields); err != nil {
 		panic(err)
 	}
 }

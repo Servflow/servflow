@@ -13,12 +13,34 @@ func TestAPIConfig_Validate(t *testing.T) {
 	// Register all actions needed for the tests beforehand
 	err := actions.RegisterAction("http", func(config json.RawMessage) (actions.ActionExecutable, error) {
 		return nil, nil
-	}, map[string]bool{"url": true, "method": false})
+	}, map[string]actions.FieldInfo{
+		"url": {
+			Type:     "string",
+			Label:    "URL",
+			Required: true,
+		},
+		"method": {
+			Type:     "string",
+			Label:    "Method",
+			Required: false,
+		},
+	})
 	require.NoError(t, err)
 
 	err = actions.RegisterAction("database", func(config json.RawMessage) (actions.ActionExecutable, error) {
 		return nil, nil
-	}, map[string]bool{"query": true, "table": false})
+	}, map[string]actions.FieldInfo{
+		"query": {
+			Type:     "string",
+			Label:    "Query",
+			Required: true,
+		},
+		"table": {
+			Type:     "string",
+			Label:    "Table",
+			Required: false,
+		},
+	})
 	require.NoError(t, err)
 
 	validConfig := APIConfig{

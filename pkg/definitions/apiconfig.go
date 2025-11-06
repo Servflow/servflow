@@ -229,9 +229,9 @@ func (a *APIConfig) validateActions() error {
 	return nil
 }
 
-func validateFields(fieldsRequiredMap map[string]bool, fieldsValues map[string]interface{}) error {
+func validateFields(fieldsRequiredMap map[string]actions.FieldInfo, fieldsValues map[string]interface{}) error {
 	for k, v := range fieldsRequiredMap {
-		if !v {
+		if !v.Required {
 			continue
 		}
 		if val, ok := fieldsValues[k]; ok {

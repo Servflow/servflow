@@ -38,7 +38,7 @@ func TestRegisterAction(t *testing.T) {
 				actionType: "test-action-unique",
 				config:     string(config),
 			}, nil
-		}, map[string]bool{})
+		}, map[string]FieldInfo{})
 
 		require.NoError(t, err)
 
@@ -51,13 +51,13 @@ func TestRegisterAction(t *testing.T) {
 		// First registration should succeed
 		err1 := RegisterAction("duplicate-action-unique", func(config json.RawMessage) (ActionExecutable, error) {
 			return &mockActionExecutable{actionType: "duplicate-action-unique"}, nil
-		}, map[string]bool{})
+		}, map[string]FieldInfo{})
 		require.NoError(t, err1)
 
 		// Second registration should fail
 		err2 := RegisterAction("duplicate-action-unique", func(config json.RawMessage) (ActionExecutable, error) {
 			return &mockActionExecutable{actionType: "duplicate-action-unique"}, nil
-		}, map[string]bool{})
+		}, map[string]FieldInfo{})
 		require.Error(t, err2)
 		assert.Contains(t, err2.Error(), "already registered")
 	})
@@ -68,7 +68,7 @@ func TestReplaceActionType(t *testing.T) {
 	originalConstructor := func(config json.RawMessage) (ActionExecutable, error) {
 		return &mockActionExecutable{actionType: "replaceable-action-unique", config: "original"}, nil
 	}
-	err := RegisterAction("replaceable-action-unique", originalConstructor, map[string]bool{})
+	err := RegisterAction("replaceable-action-unique", originalConstructor, map[string]FieldInfo{})
 	require.NoError(t, err)
 
 	// Replace with new constructor
@@ -92,7 +92,7 @@ func TestGetActionExecutable(t *testing.T) {
 				actionType: "test-get-action-unique",
 				config:     string(config),
 			}, nil
-		}, map[string]bool{})
+		}, map[string]FieldInfo{})
 		require.NoError(t, err)
 
 		// Test config
@@ -119,7 +119,7 @@ func TestGetActionExecutable(t *testing.T) {
 		// Register action that returns an error
 		err := RegisterAction("error-action-unique", func(config json.RawMessage) (ActionExecutable, error) {
 			return nil, fmt.Errorf("constructor error")
-		}, map[string]bool{})
+		}, map[string]FieldInfo{})
 		require.NoError(t, err)
 
 		executable, err := GetActionExecutable("error-action-unique", json.RawMessage(`{}`))
@@ -143,7 +143,7 @@ func TestGetRegisteredActionTypes(t *testing.T) {
 
 		err := RegisterAction("additional-test-action", func(config json.RawMessage) (ActionExecutable, error) {
 			return &mockActionExecutable{actionType: "additional-test-action"}, nil
-		}, map[string]bool{})
+		}, map[string]FieldInfo{})
 		require.NoError(t, err)
 
 		types := GetRegisteredActionTypes()
@@ -157,7 +157,7 @@ func TestManagerThreadSafety(t *testing.T) {
 	// Register an action
 	err := RegisterAction("concurrent-action-unique", func(config json.RawMessage) (ActionExecutable, error) {
 		return &mockActionExecutable{actionType: "concurrent-action-unique"}, nil
-	}, map[string]bool{})
+	}, map[string]FieldInfo{})
 	require.NoError(t, err)
 
 	// Run multiple goroutines that try to get the action executable

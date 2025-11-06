@@ -15,7 +15,7 @@ type Registry struct {
 type actionFactory struct {
 	constructor factoryFunc
 	// fieldsMap is used to get the list of fields, the values represent if they are required
-	fieldsMap map[string]bool
+	fieldsMap map[string]FieldInfo
 }
 
 func NewRegistry() *Registry {
@@ -30,9 +30,17 @@ var actionManager = &Registry{
 	actions:               sync.Map{},
 }
 
+type FieldInfo struct {
+	Type        string `json:"type"`
+	Label       string `json:"label"`
+	Placeholder string `json:"placeholder"`
+	Required    bool   `json:"required"`
+	Default     any    `json:"default"`
+}
+
 type factoryFunc func(config json.RawMessage) (ActionExecutable, error)
 
-func (r *Registry) RegisterAction(actionType string, constructor factoryFunc, fields map[string]bool) error {
+func (r *Registry) RegisterAction(actionType string, constructor factoryFunc, fields map[string]FieldInfo) error {
 	_, ok := r.availableConstructors[actionType]
 	if ok {
 		return fmt.Errorf("action type %s already registered", actionType)
@@ -44,7 +52,7 @@ func (r *Registry) RegisterAction(actionType string, constructor factoryFunc, fi
 	return nil
 }
 
-func GetFieldsForAction(actionType string) (map[string]bool, error) {
+func GetFieldsForAction(actionType string) (map[string]FieldInfo, error) {
 	f, ok := actionManager.availableConstructors[actionType]
 	if !ok {
 		return nil, errors.New("action type " + actionType + " not registered")
@@ -86,7 +94,7 @@ func (r *Registry) GetRegisteredActionTypes() []string {
 	return types
 }
 
-func RegisterAction(actionType string, constructor factoryFunc, fields map[string]bool) error {
+func RegisterAction(actionType string, constructor factoryFunc, fields map[string]FieldInfo) error {
 	return actionManager.RegisterAction(actionType, constructor, fields)
 }
 

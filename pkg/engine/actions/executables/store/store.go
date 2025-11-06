@@ -84,13 +84,40 @@ func (s *Store) Execute(ctx context.Context, modifiedConfig string) (interface{}
 }
 
 func init() {
+	fields := map[string]actions.FieldInfo{
+		"integrationID": {
+			Type:        "string",
+			Label:       "Integration ID",
+			Placeholder: "Database integration identifier",
+			Required:    true,
+		},
+		"table": {
+			Type:        "string",
+			Label:       "Table",
+			Placeholder: "Database table name",
+			Required:    true,
+		},
+		"datasourceOptions": {
+			Type:        "object",
+			Label:       "Datasource Options",
+			Placeholder: "Additional datasource options",
+			Required:    false,
+		},
+		"fields": {
+			Type:        "object",
+			Label:       "Fields",
+			Placeholder: "Data fields to store",
+			Required:    true,
+		},
+	}
+
 	if err := actions.RegisterAction("store", func(config json.RawMessage) (actions.ActionExecutable, error) {
 		var cfg Config
 		if err := json.Unmarshal(config, &cfg); err != nil {
 			return nil, fmt.Errorf("error creating store action: %v", err)
 		}
 		return New(cfg)
-	}); err != nil {
+	}, fields); err != nil {
 		panic(err)
 	}
 }

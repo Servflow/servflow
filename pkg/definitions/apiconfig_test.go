@@ -10,11 +10,48 @@ import (
 )
 
 func TestAPIConfig_Validate(t *testing.T) {
+	// Register all actions needed for the tests beforehand
+	err := actions.RegisterAction("http", func(config json.RawMessage) (actions.ActionExecutable, error) {
+		return nil, nil
+	}, map[string]actions.FieldInfo{
+		"url": {
+			Type:     "string",
+			Label:    "URL",
+			Required: true,
+		},
+		"method": {
+			Type:     "string",
+			Label:    "Method",
+			Required: false,
+		},
+	})
+	require.NoError(t, err)
+
+	err = actions.RegisterAction("database", func(config json.RawMessage) (actions.ActionExecutable, error) {
+		return nil, nil
+	}, map[string]actions.FieldInfo{
+		"query": {
+			Type:     "string",
+			Label:    "Query",
+			Required: true,
+		},
+		"table": {
+			Type:     "string",
+			Label:    "Table",
+			Required: false,
+		},
+	})
+	require.NoError(t, err)
+
 	validConfig := APIConfig{
 		ID: "test-api",
 		Actions: map[string]Action{
 			"action1": {
 				Type: "http",
+				Config: map[string]interface{}{
+					"url":    "http://example.com",
+					"method": "GET",
+				},
 				Next: "action2",
 			},
 		},
@@ -75,18 +112,72 @@ func TestAPIConfig_Validate(t *testing.T) {
 			wantError: false,
 		},
 		{
-			name: "valid config with invalid action",
+			name: "valid config with invalid action type",
 			config: func() APIConfig {
 				newConfig := validConfig
 				newConfig.Actions = map[string]Action{
 					"action1": {
-						Type: "http2",
+						Type: "invalid-action-type",
 						Next: "action2",
 					},
 				}
 				return newConfig
 			},
 			wantError: true,
+		},
+		{
+			name: "invalid config - missing required field",
+			config: func() APIConfig {
+				cfg := validConfig
+				cfg.Actions = map[string]Action{
+					"action1": {
+						Type: "database",
+						Config: map[string]interface{}{
+							"table": "users",
+							// missing required "query" field
+						},
+						Next: "action2",
+					},
+				}
+				return cfg
+			},
+			wantError: true,
+		},
+		{
+			name: "invalid config - empty required field",
+			config: func() APIConfig {
+				cfg := validConfig
+				cfg.Actions = map[string]Action{
+					"action1": {
+						Type: "database",
+						Config: map[string]interface{}{
+							"query": "",
+							"table": "users",
+						},
+						Next: "action2",
+					},
+				}
+				return cfg
+			},
+			wantError: true,
+		},
+		{
+			name: "valid config - all required fields present",
+			config: func() APIConfig {
+				cfg := validConfig
+				cfg.Actions = map[string]Action{
+					"action1": {
+						Type: "database",
+						Config: map[string]interface{}{
+							"query": "SELECT * FROM users",
+							"table": "users",
+						},
+						Next: "action2",
+					},
+				}
+				return cfg
+			},
+			wantError: false,
 		},
 		{
 			name: "invalid config - empty ID",
@@ -96,6 +187,9 @@ func TestAPIConfig_Validate(t *testing.T) {
 					Actions: map[string]Action{
 						"action1": {
 							Type: "http",
+							Config: map[string]interface{}{
+								"url": "http://example.com",
+							},
 						},
 					},
 				}
@@ -151,11 +245,6 @@ func TestAPIConfig_Validate(t *testing.T) {
 			wantError: false,
 		},
 	}
-
-	err := actions.RegisterAction("http", func(config json.RawMessage) (actions.ActionExecutable, error) {
-		return nil, nil
-	})
-	require.NoError(t, err)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

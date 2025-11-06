@@ -125,13 +125,53 @@ func New(config Config) (*Agent, error) {
 }
 
 func init() {
+	fields := map[string]actions.FieldInfo{
+		"toolConfigs": {
+			Type:        "array",
+			Label:       "Tool Configurations",
+			Placeholder: "Array of tool configurations",
+			Required:    false,
+		},
+		"systemPrompt": {
+			Type:        "string",
+			Label:       "System Prompt",
+			Placeholder: "System instructions for the agent",
+			Required:    false,
+		},
+		"userPrompt": {
+			Type:        "string",
+			Label:       "User Prompt",
+			Placeholder: "User message or query",
+			Required:    true,
+		},
+		"integrationID": {
+			Type:        "string",
+			Label:       "Integration ID",
+			Placeholder: "AI integration identifier",
+			Required:    true,
+		},
+		"conversationID": {
+			Type:        "string",
+			Label:       "Conversation ID",
+			Placeholder: "Conversation identifier",
+			Required:    false,
+		},
+		"returnLastMessage": {
+			Type:        "boolean",
+			Label:       "Return Last Message",
+			Placeholder: "Whether to return only the last message",
+			Required:    false,
+			Default:     false,
+		},
+	}
+
 	if err := actions.RegisterAction("agent", func(config json.RawMessage) (actions.ActionExecutable, error) {
 		var cfg Config
 		if err := json.Unmarshal(config, &cfg); err != nil {
 			return nil, fmt.Errorf("error creating agent action: %v", err)
 		}
 		return New(cfg)
-	}); err != nil {
+	}, fields); err != nil {
 		panic(err)
 	}
 }

@@ -39,13 +39,15 @@ func (s *Executable) Execute(ctx context.Context, modifiedConfig string) (interf
 }
 
 func init() {
+	fields := map[string]actions.FieldInfo{}
+
 	if err := actions.RegisterAction("stub", func(config json.RawMessage) (actions.ActionExecutable, error) {
 		var fields map[string]interface{}
 		if err := json.Unmarshal(config, &fields); err != nil {
 			return nil, fmt.Errorf("error creating stub action: %v", err)
 		}
 		return NewExecutable(fields), nil
-	}); err != nil {
+	}, fields); err != nil {
 		panic(err)
 	}
 }

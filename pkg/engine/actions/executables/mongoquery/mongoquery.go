@@ -79,13 +79,40 @@ func (m *MGOQuery) Type() string {
 }
 
 func init() {
+	fields := map[string]actions.FieldInfo{
+		"collection": {
+			Type:        "string",
+			Label:       "Collection",
+			Placeholder: "MongoDB collection name",
+			Required:    true,
+		},
+		"filter": {
+			Type:        "string",
+			Label:       "Filter Query",
+			Placeholder: "MongoDB filter query",
+			Required:    true,
+		},
+		"projection": {
+			Type:        "string",
+			Label:       "Projection",
+			Placeholder: "MongoDB projection query",
+			Required:    false,
+		},
+		"integrationID": {
+			Type:        "string",
+			Label:       "Integration ID",
+			Placeholder: "MongoDB integration identifier",
+			Required:    true,
+		},
+	}
+
 	if err := actions.RegisterAction("mongoquery", func(config json.RawMessage) (actions.ActionExecutable, error) {
 		var cfg Config
 		if err := json.Unmarshal(config, &cfg); err != nil {
 			return nil, fmt.Errorf("error creating mongoquery action: %v", err)
 		}
 		return New(cfg)
-	}); err != nil {
+	}, fields); err != nil {
 		panic(err)
 	}
 }

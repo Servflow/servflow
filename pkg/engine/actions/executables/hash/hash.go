@@ -48,6 +48,22 @@ func (h *Hash) Execute(ctx context.Context, modifiedConfig string) (interface{},
 }
 
 func init() {
+	fields := map[string]actions.FieldInfo{
+		"value": {
+			Type:        "string",
+			Label:       "Value",
+			Placeholder: "Value to hash",
+			Required:    true,
+		},
+		"algorithm": {
+			Type:        "string",
+			Label:       "Algorithm",
+			Placeholder: "Hash algorithm (bcrypt)",
+			Required:    true,
+			Default:     "bcrypt",
+		},
+	}
+
 	if err := actions.RegisterAction("hash", func(config json.RawMessage) (actions.ActionExecutable, error) {
 		var cfg map[string]interface{}
 		if err := json.Unmarshal(config, &cfg); err != nil {
@@ -62,7 +78,7 @@ func init() {
 			}
 		}
 		return nil, errors.New("invalid hash config")
-	}); err != nil {
+	}, fields); err != nil {
 		panic(err)
 	}
 }

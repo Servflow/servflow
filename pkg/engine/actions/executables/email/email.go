@@ -125,13 +125,18 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("email", func(config json.RawMessage) (actions.ActionExecutable, error) {
-		var cfg Config
-		if err := json.Unmarshal(config, &cfg); err != nil {
-			return nil, fmt.Errorf("error creating email action: %v", err)
-		}
-		return New(cfg), nil
-	}, fields); err != nil {
+	if err := actions.RegisterAction("email", actions.ActionRegistration{
+		Name:        "Send Email",
+		Description: "Sends email messages via SMTP server",
+		Fields:      fields,
+		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
+			var cfg Config
+			if err := json.Unmarshal(config, &cfg); err != nil {
+				return nil, fmt.Errorf("error creating email action: %v", err)
+			}
+			return New(cfg), nil
+		},
+	}); err != nil {
 		panic(err)
 	}
 }

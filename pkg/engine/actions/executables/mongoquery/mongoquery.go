@@ -106,13 +106,18 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("mongoquery", func(config json.RawMessage) (actions.ActionExecutable, error) {
-		var cfg Config
-		if err := json.Unmarshal(config, &cfg); err != nil {
-			return nil, fmt.Errorf("error creating mongoquery action: %v", err)
-		}
-		return New(cfg)
-	}, fields); err != nil {
+	if err := actions.RegisterAction("mongoquery", actions.ActionRegistration{
+		Name:        "MongoDB Query",
+		Description: "Executes queries against MongoDB collections with filtering and projection",
+		Fields:      fields,
+		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
+			var cfg Config
+			if err := json.Unmarshal(config, &cfg); err != nil {
+				return nil, fmt.Errorf("error creating mongoquery action: %v", err)
+			}
+			return New(cfg)
+		},
+	}); err != nil {
 		panic(err)
 	}
 }

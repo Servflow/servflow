@@ -140,13 +140,18 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("http", func(config json.RawMessage) (actions.ActionExecutable, error) {
-		var cfg Config
-		if err := json.Unmarshal(config, &cfg); err != nil {
-			return nil, fmt.Errorf("error creating http action: %v", err)
-		}
-		return New(cfg), nil
-	}, fields); err != nil {
+	if err := actions.RegisterAction("http", actions.ActionRegistration{
+		Name:        "HTTP Request",
+		Description: "Makes HTTP requests to external APIs and returns the response",
+		Fields:      fields,
+		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
+			var cfg Config
+			if err := json.Unmarshal(config, &cfg); err != nil {
+				return nil, fmt.Errorf("error creating http action: %v", err)
+			}
+			return New(cfg), nil
+		},
+	}); err != nil {
 		panic(err)
 	}
 }

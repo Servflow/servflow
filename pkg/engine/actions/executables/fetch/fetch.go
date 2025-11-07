@@ -129,13 +129,18 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("fetch", func(config json.RawMessage) (actions.ActionExecutable, error) {
-		var cfg Config
-		if err := json.Unmarshal(config, &cfg); err != nil {
-			return nil, fmt.Errorf("error creating fetch action: %v", err)
-		}
-		return New(cfg)
-	}, fields); err != nil {
+	if err := actions.RegisterAction("fetch", actions.ActionRegistration{
+		Name:        "Fetch Data",
+		Description: "Retrieves data from database tables using filters and conditions",
+		Fields:      fields,
+		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
+			var cfg Config
+			if err := json.Unmarshal(config, &cfg); err != nil {
+				return nil, fmt.Errorf("error creating fetch action: %v", err)
+			}
+			return New(cfg)
+		},
+	}); err != nil {
 		panic(err)
 	}
 }

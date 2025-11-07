@@ -111,13 +111,18 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("update", func(config json.RawMessage) (actions.ActionExecutable, error) {
-		var cfg Config
-		if err := json.Unmarshal(config, &cfg); err != nil {
-			return nil, fmt.Errorf("error creating update action: %v", err)
-		}
-		return New(cfg)
-	}, fields); err != nil {
+	if err := actions.RegisterAction("update", actions.ActionRegistration{
+		Name:        "Update Data",
+		Description: "Updates existing records in database tables using filters and field mappings",
+		Fields:      fields,
+		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
+			var cfg Config
+			if err := json.Unmarshal(config, &cfg); err != nil {
+				return nil, fmt.Errorf("error creating update action: %v", err)
+			}
+			return New(cfg)
+		},
+	}); err != nil {
 		panic(err)
 	}
 }

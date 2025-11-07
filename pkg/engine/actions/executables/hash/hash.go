@@ -64,21 +64,26 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("hash", func(config json.RawMessage) (actions.ActionExecutable, error) {
-		var cfg map[string]interface{}
-		if err := json.Unmarshal(config, &cfg); err != nil {
-			return nil, fmt.Errorf("error creating hash action: %v", err)
-		}
-		if f, ok := cfg["value"]; ok {
-			if a, ok := cfg["algorithm"]; ok {
-				field, algo := f.(string), a.(string)
-				if field != "" && algo != "" {
-					return New(field, algo)
+	if err := actions.RegisterAction("hash", actions.ActionRegistration{
+		Name:        "Hash Value",
+		Description: "Generates cryptographic hashes using various algorithms like bcrypt",
+		Fields:      fields,
+		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
+			var cfg map[string]interface{}
+			if err := json.Unmarshal(config, &cfg); err != nil {
+				return nil, fmt.Errorf("error creating hash action: %v", err)
+			}
+			if f, ok := cfg["value"]; ok {
+				if a, ok := cfg["algorithm"]; ok {
+					field, algo := f.(string), a.(string)
+					if field != "" && algo != "" {
+						return New(field, algo)
+					}
 				}
 			}
-		}
-		return nil, errors.New("invalid hash config")
-	}, fields); err != nil {
+			return nil, errors.New("invalid hash config")
+		},
+	}); err != nil {
 		panic(err)
 	}
 }

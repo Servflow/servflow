@@ -171,13 +171,18 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("jwt", func(config json.RawMessage) (actions.ActionExecutable, error) {
-		var cfg Config
-		if err := json.Unmarshal(config, &cfg); err != nil {
-			return nil, fmt.Errorf("error creating jwt action: %v", err)
-		}
-		return New(cfg), nil
-	}, fields); err != nil {
+	if err := actions.RegisterAction("jwt", actions.ActionRegistration{
+		Name:        "JWT Token",
+		Description: "Creates and validates JSON Web Tokens for authentication",
+		Fields:      fields,
+		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
+			var cfg Config
+			if err := json.Unmarshal(config, &cfg); err != nil {
+				return nil, fmt.Errorf("error creating jwt action: %v", err)
+			}
+			return New(cfg), nil
+		},
+	}); err != nil {
 		panic(err)
 	}
 }

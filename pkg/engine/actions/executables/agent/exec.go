@@ -165,13 +165,18 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("agent", func(config json.RawMessage) (actions.ActionExecutable, error) {
-		var cfg Config
-		if err := json.Unmarshal(config, &cfg); err != nil {
-			return nil, fmt.Errorf("error creating agent action: %v", err)
-		}
-		return New(cfg)
-	}, fields); err != nil {
+	if err := actions.RegisterAction("agent", actions.ActionRegistration{
+		Name:        "AI Agent",
+		Description: "Interacts with AI models to process queries and execute tool functions",
+		Fields:      fields,
+		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
+			var cfg Config
+			if err := json.Unmarshal(config, &cfg); err != nil {
+				return nil, fmt.Errorf("error creating agent action: %v", err)
+			}
+			return New(cfg)
+		},
+	}); err != nil {
 		panic(err)
 	}
 }

@@ -53,13 +53,18 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("static", func(config json.RawMessage) (actions.ActionExecutable, error) {
-		var cfg Config
-		if err := json.Unmarshal(config, &cfg); err != nil {
-			return nil, fmt.Errorf("error creating static action: %v", err)
-		}
-		return NewExecutable(cfg), nil
-	}, fields); err != nil {
+	if err := actions.RegisterAction("static", actions.ActionRegistration{
+		Name:        "Static Value",
+		Description: "Returns a static value configured at setup time",
+		Fields:      fields,
+		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
+			var cfg Config
+			if err := json.Unmarshal(config, &cfg); err != nil {
+				return nil, fmt.Errorf("error creating static action: %v", err)
+			}
+			return NewExecutable(cfg), nil
+		},
+	}); err != nil {
 		panic(err)
 	}
 }

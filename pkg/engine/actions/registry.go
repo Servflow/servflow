@@ -12,10 +12,30 @@ type Registry struct {
 	availableConstructors map[string]actionFactory
 }
 
+type ActionRegistration struct {
+	Name        string
+	Description string
+	Fields      map[string]FieldInfo
+	Constructor factoryFunc
+}
+
+type ActionInfo struct {
+	Name        string               `json:"name"`
+	Description string               `json:"description"`
+	Fields      map[string]FieldInfo `json:"fields"`
+}
+
+type FieldInfo struct {
+	Type        string `json:"type"`
+	Label       string `json:"label"`
+	Placeholder string `json:"placeholder"`
+	Required    bool   `json:"required"`
+	Default     any    `json:"default"`
+}
+
 type actionFactory struct {
 	constructor factoryFunc
-	// fieldsMap is used to get the list of fields, the values represent if they are required
-	fieldsMap map[string]FieldInfo
+	info        ActionInfo
 }
 
 func NewRegistry() *Registry {
@@ -30,35 +50,42 @@ var actionManager = &Registry{
 	actions:               sync.Map{},
 }
 
-type FieldInfo struct {
-	Type        string `json:"type"`
-	Label       string `json:"label"`
-	Placeholder string `json:"placeholder"`
-	Required    bool   `json:"required"`
-	Default     any    `json:"default"`
-}
-
 type factoryFunc func(config json.RawMessage) (ActionExecutable, error)
 
-func (r *Registry) RegisterAction(actionType string, constructor factoryFunc, fields map[string]FieldInfo) error {
+func (r *Registry) RegisterAction(actionType string, registration ActionRegistration) error {
 	_, ok := r.availableConstructors[actionType]
 	if ok {
 		return fmt.Errorf("action type %s already registered", actionType)
 	}
 	r.availableConstructors[actionType] = actionFactory{
-		constructor: constructor,
-		fieldsMap:   fields,
+		constructor: registration.Constructor,
+		info: ActionInfo{
+			Name:        registration.Name,
+			Description: registration.Description,
+			Fields:      registration.Fields,
+		},
 	}
 	return nil
 }
 
+// GetInfoForAction replaces GetFieldsForAction and returns complete action info
+func GetInfoForAction(actionType string) (ActionInfo, error) {
+	f, ok := actionManager.availableConstructors[actionType]
+	if !ok {
+		return ActionInfo{}, errors.New("action type " + actionType + " not registered")
+	}
+
+	return f.info, nil
+}
+
+// GetFieldsForAction kept for backward compatibility
 func GetFieldsForAction(actionType string) (map[string]FieldInfo, error) {
 	f, ok := actionManager.availableConstructors[actionType]
 	if !ok {
 		return nil, errors.New("action type " + actionType + " not registered")
 	}
 
-	return f.fieldsMap, nil
+	return f.info.Fields, nil
 }
 
 func (r *Registry) ReplaceActionType(actionType string, constructor factoryFunc) {
@@ -71,7 +98,7 @@ func (r *Registry) ReplaceActionType(actionType string, constructor factoryFunc)
 	}
 	r.availableConstructors[actionType] = actionFactory{
 		constructor: constructor,
-		fieldsMap:   existing.fieldsMap,
+		info:        existing.info,
 	}
 }
 
@@ -97,8 +124,19 @@ func (r *Registry) GetRegisteredActionTypes() []string {
 	return types
 }
 
-func RegisterAction(actionType string, constructor factoryFunc, fields map[string]FieldInfo) error {
-	return actionManager.RegisterAction(actionType, constructor, fields)
+// New public functions using ActionRegistration
+func RegisterAction(actionType string, registration ActionRegistration) error {
+	return actionManager.RegisterAction(actionType, registration)
+}
+
+// Legacy function kept for backward compatibility with old signature
+func RegisterActionLegacy(actionType string, constructor factoryFunc, fields map[string]FieldInfo) error {
+	return actionManager.RegisterAction(actionType, ActionRegistration{
+		Name:        actionType, // Use actionType as default name
+		Description: "",         // Empty description for legacy
+		Fields:      fields,
+		Constructor: constructor,
+	})
 }
 
 func ReplaceActionType(actionType string, constructor factoryFunc) {

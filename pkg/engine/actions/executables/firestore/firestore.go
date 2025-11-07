@@ -98,13 +98,18 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("firestore", func(config json.RawMessage) (actions.ActionExecutable, error) {
-		var cfg Config
-		if err := json.Unmarshal(config, &cfg); err != nil {
-			return nil, fmt.Errorf("error creating firestore action: %v", err)
-		}
-		return NewFirestoreExecutable(cfg)
-	}, fields); err != nil {
+	if err := actions.RegisterAction("firestore", actions.ActionRegistration{
+		Name:        "Firestore",
+		Description: "Stores documents in Google Cloud Firestore database",
+		Fields:      fields,
+		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
+			var cfg Config
+			if err := json.Unmarshal(config, &cfg); err != nil {
+				return nil, fmt.Errorf("error creating firestore action: %v", err)
+			}
+			return NewFirestoreExecutable(cfg)
+		},
+	}); err != nil {
 		panic(err)
 	}
 }

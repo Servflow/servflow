@@ -143,13 +143,18 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("authenticate", func(config json.RawMessage) (actions.ActionExecutable, error) {
-		var cfg Config
-		if err := json.Unmarshal(config, &cfg); err != nil {
-			return nil, fmt.Errorf("error creating authenticate action: %v", err)
-		}
-		return New(cfg)
-	}, fields); err != nil {
+	if err := actions.RegisterAction("authenticate", actions.ActionRegistration{
+		Name:        "Authenticate",
+		Description: "Validates JWT tokens and authenticates users against database records",
+		Fields:      fields,
+		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
+			var cfg Config
+			if err := json.Unmarshal(config, &cfg); err != nil {
+				return nil, fmt.Errorf("error creating authenticate action: %v", err)
+			}
+			return New(cfg)
+		},
+	}); err != nil {
 		panic(err)
 	}
 }

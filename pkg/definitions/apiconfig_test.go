@@ -11,7 +11,7 @@ import (
 
 func TestAPIConfig_Validate(t *testing.T) {
 	// Register all actions needed for the tests beforehand
-	err := actions.RegisterAction("http", func(config json.RawMessage) (actions.ActionExecutable, error) {
+	err := actions.RegisterActionLegacy("http", func(config json.RawMessage) (actions.ActionExecutable, error) {
 		return nil, nil
 	}, map[string]actions.FieldInfo{
 		"url": {
@@ -27,7 +27,7 @@ func TestAPIConfig_Validate(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = actions.RegisterAction("database", func(config json.RawMessage) (actions.ActionExecutable, error) {
+	err = actions.RegisterActionLegacy("database", func(config json.RawMessage) (actions.ActionExecutable, error) {
 		return nil, nil
 	}, map[string]actions.FieldInfo{
 		"query": {

@@ -108,32 +108,32 @@ func (h *Http) Execute(ctx context.Context, filledInConfig string) (interface{},
 func init() {
 	fields := map[string]actions.FieldInfo{
 		"url": {
-			Type:        "string",
+			Type:        actions.FieldTypeString,
 			Label:       "URL",
 			Placeholder: "https://api.example.com/endpoint",
 			Required:    true,
 		},
 		"method": {
-			Type:        "string",
+			Type:        actions.FieldTypeString,
 			Label:       "HTTP Method",
 			Placeholder: "GET, POST, PUT, DELETE",
 			Required:    true,
 			Default:     "GET",
 		},
 		"headers": {
-			Type:        "object",
+			Type:        actions.FieldTypeMap,
 			Label:       "Headers",
 			Placeholder: "HTTP headers as key-value pairs",
 			Required:    false,
 		},
 		"body": {
-			Type:        "object",
+			Type:        actions.FieldTypeMap,
 			Label:       "Request Body",
 			Placeholder: "Request body data",
 			Required:    false,
 		},
 		"response_path": {
-			Type:        "string",
+			Type:        actions.FieldTypeString,
 			Label:       "Response Path",
 			Placeholder: "JSONPath to extract from response (optional)",
 			Required:    false,

@@ -81,25 +81,25 @@ func (m *MGOQuery) Type() string {
 func init() {
 	fields := map[string]actions.FieldInfo{
 		"collection": {
-			Type:        "string",
+			Type:        actions.FieldTypeString,
 			Label:       "Collection",
 			Placeholder: "MongoDB collection name",
 			Required:    true,
 		},
 		"filter": {
-			Type:        "string",
+			Type:        actions.FieldTypeString,
 			Label:       "Filter Query",
 			Placeholder: "MongoDB filter query",
 			Required:    true,
 		},
 		"projection": {
-			Type:        "string",
+			Type:        actions.FieldTypeString,
 			Label:       "Projection",
 			Placeholder: "MongoDB projection query",
 			Required:    false,
 		},
 		"integrationID": {
-			Type:        "string",
+			Type:        actions.FieldTypeIntegration,
 			Label:       "Integration ID",
 			Placeholder: "MongoDB integration identifier",
 			Required:    true,

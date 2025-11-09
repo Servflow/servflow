@@ -50,13 +50,13 @@ func (h *Hash) Execute(ctx context.Context, modifiedConfig string) (interface{},
 func init() {
 	fields := map[string]actions.FieldInfo{
 		"value": {
-			Type:        "string",
+			Type:        actions.FieldTypeString,
 			Label:       "Value",
 			Placeholder: "Value to hash",
 			Required:    true,
 		},
 		"algorithm": {
-			Type:        "string",
+			Type:        actions.FieldTypeString,
 			Label:       "Algorithm",
 			Placeholder: "Hash algorithm (bcrypt)",
 			Required:    true,

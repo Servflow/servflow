@@ -112,31 +112,31 @@ func (a *Action) Type() string {
 func init() {
 	fields := map[string]actions.FieldInfo{
 		"integration_id": {
-			Type:        "string",
+			Type:        actions.FieldTypeIntegration,
 			Label:       "Integration ID",
 			Placeholder: "Database integration identifier",
 			Required:    true,
 		},
 		"database_field": {
-			Type:        "string",
+			Type:        actions.FieldTypeString,
 			Label:       "Database Field",
 			Placeholder: "Field name in database",
 			Required:    true,
 		},
 		"jwt_key": {
-			Type:        "string",
+			Type:        actions.FieldTypeString,
 			Label:       "JWT Key",
 			Placeholder: "JWT signing key",
 			Required:    true,
 		},
 		"token": {
-			Type:        "string",
+			Type:        actions.FieldTypeString,
 			Label:       "Token",
 			Placeholder: "Authentication token",
 			Required:    true,
 		},
 		"collection": {
-			Type:        "string",
+			Type:        actions.FieldTypeString,
 			Label:       "Collection",
 			Placeholder: "Database collection name",
 			Required:    true,

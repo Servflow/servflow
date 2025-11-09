@@ -26,6 +26,7 @@ const (
 	FieldTypeIntegration FieldType = "integration"
 	FieldTypeMap         FieldType = "map"
 	FieldTypeBoolean     FieldType = "boolean"
+	FieldTypeTextArea    FieldType = "text_area"
 )
 
 type FieldInfo struct {
@@ -84,6 +85,15 @@ func (r *Registry) ReplaceActionType(actionType string, constructor factoryFunc)
 		Description: existing.Description,
 		Fields:      existing.Fields,
 	}
+}
+
+func GetInfoForAction(actionType string) (ActionRegistrationInfo, error) {
+	f, ok := actionManager.availableConstructors[actionType]
+	if !ok {
+		return ActionRegistrationInfo{}, errors.New("action type " + actionType + " not registered")
+	}
+
+	return f, nil
 }
 
 func (r *Registry) GetActionExecutable(actionType string, config json.RawMessage) (ActionExecutable, error) {

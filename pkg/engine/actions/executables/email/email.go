@@ -88,37 +88,37 @@ func (e *Email) Execute(ctx context.Context, filledInConfig string) (interface{}
 func init() {
 	fields := map[string]actions.FieldInfo{
 		"senderEmail": {
-			Type:        "string",
+			Type:        actions.FieldTypeString,
 			Label:       "Sender Email",
 			Placeholder: "sender@example.com",
 			Required:    true,
 		},
 		"recipientEmail": {
-			Type:        "string",
+			Type:        actions.FieldTypeString,
 			Label:       "Recipient Email",
 			Placeholder: "recipient@example.com",
 			Required:    true,
 		},
 		"name": {
-			Type:        "string",
+			Type:        actions.FieldTypeString,
 			Label:       "Sender Name",
 			Placeholder: "John Doe",
 			Required:    true,
 		},
 		"subject": {
-			Type:        "string",
+			Type:        actions.FieldTypeString,
 			Label:       "Subject",
 			Placeholder: "Email subject",
 			Required:    false,
 		},
 		"auth": {
-			Type:        "object",
+			Type:        actions.FieldTypeMap,
 			Label:       "Server Configuration",
 			Placeholder: "SMTP server authentication details",
 			Required:    true,
 		},
 		"content": {
-			Type:        "string",
+			Type:        actions.FieldTypeString,
 			Label:       "Content",
 			Placeholder: "Email content",
 			Required:    true,

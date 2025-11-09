@@ -19,17 +19,22 @@ type ActionRegistrationInfo struct {
 	Constructor factoryFunc          `json:"-"`
 }
 
-type FieldInfo struct {
-	Type        string `json:"type"`
-	Label       string `json:"label"`
-	Placeholder string `json:"placeholder"`
-	Required    bool   `json:"required"`
-	Default     any    `json:"default"`
-}
+type FieldType string
 
-type actionFactory struct {
-	constructor factoryFunc
-	info        ActionRegistrationInfo
+const (
+	FieldTypeString      FieldType = "string"
+	FieldTypeIntegration FieldType = "integration"
+	FieldTypeMap         FieldType = "map"
+	FieldTypeBoolean     FieldType = "boolean"
+)
+
+type FieldInfo struct {
+	Type        FieldType `json:"type"`
+	Label       string    `json:"label"`
+	Placeholder string    `json:"placeholder"`
+	Required    bool      `json:"required"`
+	Default     any       `json:"default"`
+	Values      []string  `json:"values"`
 }
 
 func NewRegistry() *Registry {

@@ -16,12 +16,12 @@ func TestAPIConfig_Validate(t *testing.T) {
 		Description: "HTTP action for testing",
 		Fields: map[string]actions.FieldInfo{
 			"url": {
-				Type:     "string",
+				Type:     actions.FieldTypeString,
 				Label:    "URL",
 				Required: true,
 			},
 			"method": {
-				Type:     "string",
+				Type:     actions.FieldTypeString,
 				Label:    "Method",
 				Required: false,
 			},
@@ -37,12 +37,12 @@ func TestAPIConfig_Validate(t *testing.T) {
 		Description: "Database action for testing",
 		Fields: map[string]actions.FieldInfo{
 			"query": {
-				Type:     "string",
+				Type:     actions.FieldTypeString,
 				Label:    "Query",
 				Required: true,
 			},
 			"table": {
-				Type:     "string",
+				Type:     actions.FieldTypeString,
 				Label:    "Table",
 				Required: false,
 			},

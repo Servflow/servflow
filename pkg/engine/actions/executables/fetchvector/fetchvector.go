@@ -104,7 +104,7 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("fetchvectors", actions.ActionRegistration{
+	if err := actions.RegisterAction("fetchvectors", actions.ActionRegistrationInfo{
 		Name:        "Fetch Vectors",
 		Description: "Retrieves vector embeddings from vector databases for similarity search",
 		Fields:      fields,

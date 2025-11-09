@@ -9,20 +9,14 @@ import (
 
 type Registry struct {
 	actions               sync.Map
-	availableConstructors map[string]actionFactory
+	availableConstructors map[string]ActionRegistrationInfo
 }
 
-type ActionRegistration struct {
-	Name        string
-	Description string
-	Fields      map[string]FieldInfo
-	Constructor factoryFunc
-}
-
-type ActionInfo struct {
+type ActionRegistrationInfo struct {
 	Name        string               `json:"name"`
 	Description string               `json:"description"`
 	Fields      map[string]FieldInfo `json:"fields"`
+	Constructor factoryFunc          `json:"-"`
 }
 
 type FieldInfo struct {
@@ -35,47 +29,30 @@ type FieldInfo struct {
 
 type actionFactory struct {
 	constructor factoryFunc
-	info        ActionInfo
+	info        ActionRegistrationInfo
 }
 
 func NewRegistry() *Registry {
 	return &Registry{
 		actions:               sync.Map{},
-		availableConstructors: make(map[string]actionFactory),
+		availableConstructors: make(map[string]ActionRegistrationInfo),
 	}
 }
 
 var actionManager = &Registry{
-	availableConstructors: make(map[string]actionFactory),
+	availableConstructors: make(map[string]ActionRegistrationInfo),
 	actions:               sync.Map{},
 }
 
 type factoryFunc func(config json.RawMessage) (ActionExecutable, error)
 
-func (r *Registry) RegisterAction(actionType string, registration ActionRegistration) error {
+func (r *Registry) RegisterAction(actionType string, registration ActionRegistrationInfo) error {
 	_, ok := r.availableConstructors[actionType]
 	if ok {
 		return fmt.Errorf("action type %s already registered", actionType)
 	}
-	r.availableConstructors[actionType] = actionFactory{
-		constructor: registration.Constructor,
-		info: ActionInfo{
-			Name:        registration.Name,
-			Description: registration.Description,
-			Fields:      registration.Fields,
-		},
-	}
+	r.availableConstructors[actionType] = registration
 	return nil
-}
-
-// GetInfoForAction replaces GetFieldsForAction and returns complete action info
-func GetInfoForAction(actionType string) (ActionInfo, error) {
-	f, ok := actionManager.availableConstructors[actionType]
-	if !ok {
-		return ActionInfo{}, errors.New("action type " + actionType + " not registered")
-	}
-
-	return f.info, nil
 }
 
 // GetFieldsForAction kept for backward compatibility
@@ -85,20 +62,22 @@ func GetFieldsForAction(actionType string) (map[string]FieldInfo, error) {
 		return nil, errors.New("action type " + actionType + " not registered")
 	}
 
-	return f.info.Fields, nil
+	return f.Fields, nil
 }
 
 func (r *Registry) ReplaceActionType(actionType string, constructor factoryFunc) {
 	existing, ok := r.availableConstructors[actionType]
 	if !ok {
-		r.availableConstructors[actionType] = actionFactory{
-			constructor: constructor,
+		r.availableConstructors[actionType] = ActionRegistrationInfo{
+			Constructor: constructor,
 		}
 		return
 	}
-	r.availableConstructors[actionType] = actionFactory{
-		constructor: constructor,
-		info:        existing.info,
+	r.availableConstructors[actionType] = ActionRegistrationInfo{
+		Constructor: constructor,
+		Name:        existing.Name,
+		Description: existing.Description,
+		Fields:      existing.Fields,
 	}
 }
 
@@ -108,7 +87,7 @@ func (r *Registry) GetActionExecutable(actionType string, config json.RawMessage
 		return nil, fmt.Errorf("action type %s not registered", actionType)
 	}
 
-	executable, err := constructor.constructor(config)
+	executable, err := constructor.Constructor(config)
 	if err != nil {
 		return nil, err
 	}
@@ -124,19 +103,8 @@ func (r *Registry) GetRegisteredActionTypes() []string {
 	return types
 }
 
-// New public functions using ActionRegistration
-func RegisterAction(actionType string, registration ActionRegistration) error {
+func RegisterAction(actionType string, registration ActionRegistrationInfo) error {
 	return actionManager.RegisterAction(actionType, registration)
-}
-
-// Legacy function kept for backward compatibility with old signature
-func RegisterActionLegacy(actionType string, constructor factoryFunc, fields map[string]FieldInfo) error {
-	return actionManager.RegisterAction(actionType, ActionRegistration{
-		Name:        actionType, // Use actionType as default name
-		Description: "",         // Empty description for legacy
-		Fields:      fields,
-		Constructor: constructor,
-	})
 }
 
 func ReplaceActionType(actionType string, constructor factoryFunc) {

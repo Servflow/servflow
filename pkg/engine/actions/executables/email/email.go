@@ -125,7 +125,7 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("email", actions.ActionRegistration{
+	if err := actions.RegisterAction("email", actions.ActionRegistrationInfo{
 		Name:        "Send Email",
 		Description: "Sends email messages via SMTP server",
 		Fields:      fields,

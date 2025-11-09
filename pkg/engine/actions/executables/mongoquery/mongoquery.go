@@ -106,7 +106,7 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("mongoquery", actions.ActionRegistration{
+	if err := actions.RegisterAction("mongoquery", actions.ActionRegistrationInfo{
 		Name:        "MongoDB Query",
 		Description: "Executes queries against MongoDB collections with filtering and projection",
 		Fields:      fields,

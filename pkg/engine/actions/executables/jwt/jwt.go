@@ -171,7 +171,7 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("jwt", actions.ActionRegistration{
+	if err := actions.RegisterAction("jwt", actions.ActionRegistrationInfo{
 		Name:        "JWT Token",
 		Description: "Creates and validates JSON Web Tokens for authentication",
 		Fields:      fields,

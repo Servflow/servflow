@@ -143,7 +143,7 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("authenticate", actions.ActionRegistration{
+	if err := actions.RegisterAction("authenticate", actions.ActionRegistrationInfo{
 		Name:        "Authenticate",
 		Description: "Validates JWT tokens and authenticates users against database records",
 		Fields:      fields,

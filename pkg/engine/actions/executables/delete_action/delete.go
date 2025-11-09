@@ -105,7 +105,7 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("delete", actions.ActionRegistration{
+	if err := actions.RegisterAction("delete", actions.ActionRegistrationInfo{
 		Name:        "Delete Data",
 		Description: "Deletes records from database tables based on specified filters",
 		Fields:      fields,

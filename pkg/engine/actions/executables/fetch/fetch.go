@@ -129,7 +129,7 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("fetch", actions.ActionRegistration{
+	if err := actions.RegisterAction("fetch", actions.ActionRegistrationInfo{
 		Name:        "Fetch Data",
 		Description: "Retrieves data from database tables using filters and conditions",
 		Fields:      fields,

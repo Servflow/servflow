@@ -64,7 +64,7 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("hash", actions.ActionRegistration{
+	if err := actions.RegisterAction("hash", actions.ActionRegistrationInfo{
 		Name:        "Hash Value",
 		Description: "Generates cryptographic hashes using various algorithms like bcrypt",
 		Fields:      fields,

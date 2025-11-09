@@ -111,7 +111,7 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("store", actions.ActionRegistration{
+	if err := actions.RegisterAction("store", actions.ActionRegistrationInfo{
 		Name:        "Store Data",
 		Description: "Stores data records into database tables with field mapping",
 		Fields:      fields,

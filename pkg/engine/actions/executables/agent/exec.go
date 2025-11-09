@@ -165,7 +165,7 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("agent", actions.ActionRegistration{
+	if err := actions.RegisterAction("agent", actions.ActionRegistrationInfo{
 		Name:        "AI Agent",
 		Description: "Interacts with AI models to process queries and execute tool functions",
 		Fields:      fields,

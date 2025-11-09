@@ -53,7 +53,7 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("static", actions.ActionRegistration{
+	if err := actions.RegisterAction("static", actions.ActionRegistrationInfo{
 		Name:        "Static Value",
 		Description: "Returns a static value configured at setup time",
 		Fields:      fields,

@@ -111,7 +111,7 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("update", actions.ActionRegistration{
+	if err := actions.RegisterAction("update", actions.ActionRegistrationInfo{
 		Name:        "Update Data",
 		Description: "Updates existing records in database tables using filters and field mappings",
 		Fields:      fields,

@@ -140,7 +140,7 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("http", actions.ActionRegistration{
+	if err := actions.RegisterAction("http", actions.ActionRegistrationInfo{
 		Name:        "HTTP Request",
 		Description: "Makes HTTP requests to external APIs and returns the response",
 		Fields:      fields,

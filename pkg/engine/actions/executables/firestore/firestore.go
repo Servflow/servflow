@@ -98,7 +98,7 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("firestore", actions.ActionRegistration{
+	if err := actions.RegisterAction("firestore", actions.ActionRegistrationInfo{
 		Name:        "Firestore",
 		Description: "Stores documents in Google Cloud Firestore database",
 		Fields:      fields,

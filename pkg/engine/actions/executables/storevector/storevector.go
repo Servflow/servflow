@@ -111,7 +111,7 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("storevector", actions.ActionRegistration{
+	if err := actions.RegisterAction("storevector", actions.ActionRegistrationInfo{
 		Name:        "Store Vectors",
 		Description: "Stores vector embeddings into vector databases for similarity search",
 		Fields:      fields,

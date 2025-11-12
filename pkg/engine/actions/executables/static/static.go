@@ -40,20 +40,20 @@ func (s *Executable) Execute(ctx context.Context, modifiedConfig string) (interf
 func init() {
 	fields := map[string]actions.FieldInfo{
 		"return": {
-			Type:        "string",
+			Type:        actions.FieldTypeString,
 			Label:       "Return Value",
 			Placeholder: "Value to return",
 			Required:    true,
 		},
 		"config": {
-			Type:        "string",
+			Type:        actions.FieldTypeString,
 			Label:       "Config",
 			Placeholder: "Configuration string",
 			Required:    false,
 		},
 	}
 
-	if err := actions.RegisterAction("static", actions.ActionRegistration{
+	if err := actions.RegisterAction("static", actions.ActionRegistrationInfo{
 		Name:        "Static Value",
 		Description: "Returns a static value configured at setup time",
 		Fields:      fields,

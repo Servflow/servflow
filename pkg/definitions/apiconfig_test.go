@@ -11,34 +11,44 @@ import (
 
 func TestAPIConfig_Validate(t *testing.T) {
 	// Register all actions needed for the tests beforehand
-	err := actions.RegisterActionLegacy("http", func(config json.RawMessage) (actions.ActionExecutable, error) {
-		return nil, nil
-	}, map[string]actions.FieldInfo{
-		"url": {
-			Type:     "string",
-			Label:    "URL",
-			Required: true,
+	err := actions.RegisterAction("http", actions.ActionRegistrationInfo{
+		Name:        "HTTP Action",
+		Description: "HTTP action for testing",
+		Fields: map[string]actions.FieldInfo{
+			"url": {
+				Type:     actions.FieldTypeString,
+				Label:    "URL",
+				Required: true,
+			},
+			"method": {
+				Type:     actions.FieldTypeString,
+				Label:    "Method",
+				Required: false,
+			},
 		},
-		"method": {
-			Type:     "string",
-			Label:    "Method",
-			Required: false,
+		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
+			return nil, nil
 		},
 	})
 	require.NoError(t, err)
 
-	err = actions.RegisterActionLegacy("database", func(config json.RawMessage) (actions.ActionExecutable, error) {
-		return nil, nil
-	}, map[string]actions.FieldInfo{
-		"query": {
-			Type:     "string",
-			Label:    "Query",
-			Required: true,
+	err = actions.RegisterAction("database", actions.ActionRegistrationInfo{
+		Name:        "Database Action",
+		Description: "Database action for testing",
+		Fields: map[string]actions.FieldInfo{
+			"query": {
+				Type:     actions.FieldTypeString,
+				Label:    "Query",
+				Required: true,
+			},
+			"table": {
+				Type:     actions.FieldTypeString,
+				Label:    "Table",
+				Required: false,
+			},
 		},
-		"table": {
-			Type:     "string",
-			Label:    "Table",
-			Required: false,
+		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
+			return nil, nil
 		},
 	})
 	require.NoError(t, err)

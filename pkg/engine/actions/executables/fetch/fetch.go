@@ -90,7 +90,7 @@ func (f *Fetch) Execute(ctx context.Context, modifiedConfig string) (interface{}
 func init() {
 	fields := map[string]actions.FieldInfo{
 		"integrationID": {
-			Type:        "string",
+			Type:        actions.FieldTypeIntegration,
 			Label:       "Integration ID",
 			Placeholder: "Database integration identifier",
 			Required:    true,
@@ -102,26 +102,26 @@ func init() {
 			Required:    false,
 		},
 		"table": {
-			Type:        "string",
+			Type:        actions.FieldTypeString,
 			Label:       "Table",
 			Placeholder: "Database table name",
 			Required:    true,
 		},
 		"datasourceOptions": {
-			Type:        "object",
+			Type:        actions.FieldTypeMap,
 			Label:       "Datasource Options",
 			Placeholder: "Additional datasource options",
 			Required:    false,
 		},
 		"single": {
-			Type:        "boolean",
+			Type:        actions.FieldTypeBoolean,
 			Label:       "Single Result",
 			Placeholder: "Return single result instead of array",
 			Required:    false,
 			Default:     false,
 		},
 		"shouldFail": {
-			Type:        "boolean",
+			Type:        actions.FieldTypeBoolean,
 			Label:       "Should Fail",
 			Placeholder: "Whether the action should fail on error",
 			Required:    false,
@@ -129,7 +129,7 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("fetch", actions.ActionRegistration{
+	if err := actions.RegisterAction("fetch", actions.ActionRegistrationInfo{
 		Name:        "Fetch Data",
 		Description: "Retrieves data from database tables using filters and conditions",
 		Fields:      fields,

@@ -80,7 +80,7 @@ func (d *Delete) Execute(ctx context.Context, modifiedConfig string) (interface{
 func init() {
 	fields := map[string]actions.FieldInfo{
 		"integrationID": {
-			Type:        "string",
+			Type:        actions.FieldTypeIntegration,
 			Label:       "Integration ID",
 			Placeholder: "Database integration identifier",
 			Required:    true,
@@ -92,20 +92,20 @@ func init() {
 			Required:    true,
 		},
 		"table": {
-			Type:        "string",
+			Type:        actions.FieldTypeString,
 			Label:       "Table",
 			Placeholder: "Database table name",
 			Required:    true,
 		},
 		"datasourceOptions": {
-			Type:        "object",
+			Type:        actions.FieldTypeMap,
 			Label:       "Datasource Options",
 			Placeholder: "Additional datasource options",
 			Required:    false,
 		},
 	}
 
-	if err := actions.RegisterAction("delete", actions.ActionRegistration{
+	if err := actions.RegisterAction("delete", actions.ActionRegistrationInfo{
 		Name:        "Delete Data",
 		Description: "Deletes records from database tables based on specified filters",
 		Fields:      fields,

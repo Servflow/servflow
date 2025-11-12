@@ -85,26 +85,26 @@ func New(config Config) (*FetchVector, error) {
 func init() {
 	fields := map[string]actions.FieldInfo{
 		"integrationID": {
-			Type:        "string",
+			Type:        actions.FieldTypeIntegration,
 			Label:       "Integration ID",
 			Placeholder: "Vector database integration identifier",
 			Required:    false,
 		},
 		"vector": {
-			Type:        "string",
+			Type:        actions.FieldTypeString,
 			Label:       "Vector",
 			Placeholder: "Vector data or identifier",
 			Required:    false,
 		},
 		"options": {
-			Type:        "object",
+			Type:        actions.FieldTypeMap,
 			Label:       "Options",
 			Placeholder: "Additional query options",
 			Required:    false,
 		},
 	}
 
-	if err := actions.RegisterAction("fetchvectors", actions.ActionRegistration{
+	if err := actions.RegisterAction("fetchvectors", actions.ActionRegistrationInfo{
 		Name:        "Fetch Vectors",
 		Description: "Retrieves vector embeddings from vector databases for similarity search",
 		Fields:      fields,

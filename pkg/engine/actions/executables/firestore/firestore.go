@@ -73,32 +73,32 @@ func (f *Firestore) Execute(ctx context.Context, modifiedConfig string) (interfa
 func init() {
 	fields := map[string]actions.FieldInfo{
 		"serviceAccount": {
-			Type:        "string",
+			Type:        actions.FieldTypeString,
 			Label:       "Service Account",
 			Placeholder: "Firebase service account JSON",
 			Required:    true,
 		},
 		"projectID": {
-			Type:        "string",
+			Type:        actions.FieldTypeString,
 			Label:       "Project ID",
 			Placeholder: "Firebase project ID",
 			Required:    true,
 		},
 		"collectionID": {
-			Type:        "string",
+			Type:        actions.FieldTypeString,
 			Label:       "Collection ID",
 			Placeholder: "Firestore collection name",
 			Required:    true,
 		},
 		"documentTemplate": {
-			Type:        "string",
+			Type:        actions.FieldTypeString,
 			Label:       "Document Template",
 			Placeholder: "Document template JSON",
 			Required:    true,
 		},
 	}
 
-	if err := actions.RegisterAction("firestore", actions.ActionRegistration{
+	if err := actions.RegisterAction("firestore", actions.ActionRegistrationInfo{
 		Name:        "Firestore",
 		Description: "Stores documents in Google Cloud Firestore database",
 		Fields:      fields,

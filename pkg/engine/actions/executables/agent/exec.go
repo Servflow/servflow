@@ -133,31 +133,31 @@ func init() {
 			Required:    false,
 		},
 		"systemPrompt": {
-			Type:        "string",
+			Type:        actions.FieldTypeString,
 			Label:       "System Prompt",
 			Placeholder: "System instructions for the agent",
 			Required:    false,
 		},
 		"userPrompt": {
-			Type:        "string",
+			Type:        actions.FieldTypeString,
 			Label:       "User Prompt",
 			Placeholder: "User message or query",
 			Required:    true,
 		},
 		"integrationID": {
-			Type:        "string",
+			Type:        actions.FieldTypeIntegration,
 			Label:       "Integration ID",
 			Placeholder: "AI integration identifier",
 			Required:    true,
 		},
 		"conversationID": {
-			Type:        "string",
+			Type:        actions.FieldTypeString,
 			Label:       "Conversation ID",
 			Placeholder: "Conversation identifier",
 			Required:    false,
 		},
 		"returnLastMessage": {
-			Type:        "boolean",
+			Type:        actions.FieldTypeBoolean,
 			Label:       "Return Last Message",
 			Placeholder: "Whether to return only the last message",
 			Required:    false,
@@ -165,7 +165,7 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("agent", actions.ActionRegistration{
+	if err := actions.RegisterAction("agent", actions.ActionRegistrationInfo{
 		Name:        "AI Agent",
 		Description: "Interacts with AI models to process queries and execute tool functions",
 		Fields:      fields,

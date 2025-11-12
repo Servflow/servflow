@@ -41,7 +41,7 @@ func (s *Executable) Execute(ctx context.Context, modifiedConfig string) (interf
 func init() {
 	fields := map[string]actions.FieldInfo{}
 
-	if err := actions.RegisterAction("stub", actions.ActionRegistration{
+	if err := actions.RegisterAction("stub", actions.ActionRegistrationInfo{
 		Name:        "Stub Action",
 		Description: "A placeholder action that accepts any configuration for testing purposes",
 		Fields:      fields,

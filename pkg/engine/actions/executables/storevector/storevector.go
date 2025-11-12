@@ -86,32 +86,32 @@ func New(config Config) (*StoreVectors, error) {
 func init() {
 	fields := map[string]actions.FieldInfo{
 		"integrationID": {
-			Type:        "string",
+			Type:        actions.FieldTypeIntegration,
 			Label:       "Integration ID",
 			Placeholder: "Vector database integration identifier",
 			Required:    false,
 		},
 		"fields": {
-			Type:        "object",
+			Type:        actions.FieldTypeMap,
 			Label:       "Fields",
 			Placeholder: "Data fields to store",
 			Required:    true,
 		},
 		"options": {
-			Type:        "object",
+			Type:        actions.FieldTypeMap,
 			Label:       "Options",
 			Placeholder: "Additional storage options",
 			Required:    false,
 		},
 		"vectors": {
-			Type:        "string",
+			Type:        actions.FieldTypeString,
 			Label:       "Vectors",
 			Placeholder: "Vector data to store",
 			Required:    true,
 		},
 	}
 
-	if err := actions.RegisterAction("storevector", actions.ActionRegistration{
+	if err := actions.RegisterAction("storevector", actions.ActionRegistrationInfo{
 		Name:        "Store Vectors",
 		Description: "Stores vector embeddings into vector databases for similarity search",
 		Fields:      fields,

@@ -326,6 +326,17 @@ func TestPlannerV2_generateConditionalStep(t *testing.T) {
 				OnTrue:     "response.success",
 				OnFalse:    "response.failure",
 			},
+			"cond2": {
+				Type: ConditionalTypeStructured,
+				Structure: [][]apiconfig.ConditionItem{
+					{
+						{Content: ".status", Comparison: "\"active\"", Function: FunctionEq},
+						{Content: ".age", Comparison: "18", Function: FunctionGt},
+					},
+				},
+				OnTrue:  "response.success",
+				OnFalse: "response.failure",
+			},
 		},
 		Responses: map[string]apiconfig.ResponseConfig{
 			"success": {
@@ -360,6 +371,14 @@ func TestPlannerV2_generateConditionalStep(t *testing.T) {
 	assert.Equal(t, "cond1", condition.id)
 	assert.IsType(t, &Response{}, condition.OnValid)
 	assert.IsType(t, &Response{}, condition.OnInvalid)
+
+	structuredCondition, err := planner.generateConditionalStep("cond2")
+	require.NoError(t, err)
+	assert.NotNil(t, structuredCondition)
+	assert.Equal(t, "cond2", structuredCondition.id)
+	assert.Contains(t, structuredCondition.exprString, "and")
+	assert.Contains(t, structuredCondition.exprString, "eq")
+	assert.Contains(t, structuredCondition.exprString, "gt")
 
 	_, err = planner.generateConditionalStep("nonexistent")
 	assert.Error(t, err)

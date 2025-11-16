@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Servflow/servflow/pkg/definitions"
+	apiconfig "github.com/Servflow/servflow/pkg/definitions"
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
@@ -192,11 +192,30 @@ func (p *PlannerV2) generateConditionalStep(id string) (*ConditionStep, error) {
 		return nil, err
 	}
 
+	var exprString string
+	switch condition.Type {
+	case ConditionalTypeStructured:
+		if len(condition.Structure) == 0 {
+			return nil, fmt.Errorf("structured condition %s has empty structure", id)
+		}
+		exprString, err = ConvertStructureToTemplate(condition.Structure)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert structure to template for condition %s: %w", id, err)
+		}
+	case ConditionalTypeTemplate, "":
+		if condition.Expression == "" {
+			return nil, fmt.Errorf("template condition %s has empty expression", id)
+		}
+		exprString = condition.Expression
+	default:
+		return nil, fmt.Errorf("unsupported condition type: %s", condition.Type)
+	}
+
 	return &ConditionStep{
 		id:         id,
 		OnValid:    validStep,
 		OnInvalid:  invalidStep,
-		exprString: condition.Expression,
+		exprString: exprString,
 	}, nil
 }
 

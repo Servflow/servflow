@@ -72,9 +72,18 @@ type Action struct {
 }
 
 type Conditional struct {
-	OnTrue     string `json:"onTrue" yaml:"onTrue"`
-	OnFalse    string `json:"onFalse" yaml:"onFalse"`
-	Expression string `json:"expression" yaml:"expression"`
+	OnTrue     string            `json:"onTrue" yaml:"onTrue"`
+	OnFalse    string            `json:"onFalse" yaml:"onFalse"`
+	Expression string            `json:"expression" yaml:"expression"`
+	Type       string            `json:"type,omitempty" yaml:"type,omitempty"`
+	Structure  [][]ConditionItem `json:"structure,omitempty" yaml:"structure,omitempty"`
+}
+
+type ConditionItem struct {
+	Content    string `json:"content" yaml:"content"`
+	Comparison string `json:"comparison,omitempty" yaml:"comparison,omitempty"`
+	Function   string `json:"function" yaml:"function"`
+	Title      string `json:"title" yaml:"title"`
 }
 
 type ResponseConfig struct {

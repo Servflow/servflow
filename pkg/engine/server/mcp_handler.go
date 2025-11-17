@@ -22,7 +22,7 @@ func (e *Engine) createMCPHandler(config *apiconfig.APIConfig) error {
 	planner := plan.NewPlannerV2(plan.PlannerConfig{
 		Actions:    config.Actions,
 		Conditions: config.Conditionals,
-	})
+	}, logger)
 
 	p, err := planner.Plan()
 	if err != nil {

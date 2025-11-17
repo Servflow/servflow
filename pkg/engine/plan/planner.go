@@ -10,7 +10,6 @@ import (
 	apiconfig "github.com/Servflow/servflow/pkg/definitions"
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
-	"github.com/Servflow/servflow/pkg/logging"
 	"go.uber.org/zap"
 )
 
@@ -96,7 +95,7 @@ func (p *PlannerV2) generateStep(id string) (Step, error) {
 		return nil, nil
 	}
 	// Note: This is called during plan generation, not execution, so no context available
-	logging.GetNewLogger().Debug("Generating planner v2 step", zap.String("id", id))
+	p.logger.Debug("Generating planner v2 step", zap.String("id", id))
 
 	// backwards compatibility
 	id = strings.TrimPrefix(id, "$")

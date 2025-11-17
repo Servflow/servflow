@@ -35,7 +35,7 @@ func (e *Engine) createBasicHandler(config *apiconfig.APIConfig) (http.Handler, 
 		Actions:    config.Actions,
 		Conditions: config.Conditionals,
 		Responses:  config.Responses,
-	})
+	}, logger)
 	p, err := planner.Plan()
 	if err != nil {
 		return nil, err

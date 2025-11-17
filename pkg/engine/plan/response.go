@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/Servflow/servflow/internal/http"
-	"github.com/Servflow/servflow/pkg/definitions"
+	apiconfig "github.com/Servflow/servflow/pkg/definitions"
 	"github.com/Servflow/servflow/pkg/engine/plan/responsebuilder"
 	"github.com/Servflow/servflow/pkg/logging"
 	"go.uber.org/zap"
@@ -44,7 +44,8 @@ func newResponse(id string, resp apiconfig.ResponseConfig) (*Response, error) {
 			resp.Type = builderTypeTemplate
 		}
 	}
-	logging.GetLogger().Debug("creating response", zap.String("builder_type", resp.Type), zap.String("id", id))
+	// Note: This is called during plan generation, not execution, so no context available
+	logging.GetNewLogger().Debug("creating response", zap.String("builder_type", resp.Type), zap.String("id", id))
 
 	switch resp.Type {
 	case builderTypeTemplate:

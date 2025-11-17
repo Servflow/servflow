@@ -43,7 +43,7 @@ func (a *Action) Execute(ctx context.Context) (Step, error) {
 	ctx, span = tracing.SpanCtxFromContext(ctx, "actions.StartAction."+a.id)
 	defer span.End()
 
-	logger := logging.GetRequestLogger(ctx).With(zap.String("id", a.id))
+	logger := logging.WithContextEnriched(ctx).With(zap.String("id", a.id))
 
 	var (
 		tmpl *template.Template

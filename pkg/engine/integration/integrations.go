@@ -2,6 +2,7 @@ package integration
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -140,7 +141,7 @@ func RegisterIntegrationsFromConfig(integrationsConfig []apiconfig.IntegrationCo
 		}(&dsConfig)
 	}
 
-	logger := logging.GetLogger()
+	logger := logging.FromContext(context.Background())
 
 	var hasError bool
 	for {

@@ -80,7 +80,7 @@ func WithConversationID(id string) Option {
 				err = json.Unmarshal(data, &toolCall)
 				return toolCall, err
 			default:
-				logging.GetLogger().Warn("invalid type in log storage", zap.Int("type", int(msg.Type)))
+				logging.GetNewLogger().Warn("invalid type in log storage", zap.Int("type", int(msg.Type)))
 			}
 			return nil, nil
 		})
@@ -126,7 +126,7 @@ type agentOutput struct {
 }
 
 func (a *Session) Query(ctx context.Context, query string) (string, error) {
-	logger := logging.GetRequestLogger(ctx).With(zap.String("module", "agent"))
+	logger := logging.WithContextEnriched(ctx).With(zap.String("module", "agent"))
 	if query != "" {
 		a.addToMessages(logger, ContentMessage{
 			Message: Message{Type: MessageTypeText},
@@ -159,7 +159,7 @@ func (a *Session) Query(ctx context.Context, query string) (string, error) {
 }
 
 func (a *Session) startLoop(ctx context.Context) chan agentOutput {
-	logger := logging.GetRequestLogger(ctx).With(zap.String("module", "agent"))
+	logger := logging.WithContextEnriched(ctx).With(zap.String("module", "agent"))
 	out := make(chan agentOutput)
 
 	toolList := a.toolManager.ToolList()

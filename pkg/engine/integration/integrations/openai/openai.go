@@ -203,7 +203,7 @@ var (
 )
 
 func (c *Client) ProvideResponse(ctx context.Context, agentReq agent.LLMRequest) (resp agent.LLMResponse, err error) {
-	logger := logging.GetRequestLogger(ctx)
+	logger := logging.WithContextEnriched(ctx)
 	input := convertAgentRequestToRequest(logger, &agentReq, c.model)
 
 	inputJson, err := json.Marshal(input)

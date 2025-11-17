@@ -27,7 +27,7 @@ func (e *EndStep) Execute(ctx context.Context) (Step, error) {
 		return nil, nil
 	}
 
-	logger := logging.GetLogger()
+	logger := logging.FromContext(ctx)
 	if e.lookupKey != "" {
 		val, err := requestctx2.GetRequestVariable(ctx, e.lookupKey)
 		if err != nil {

@@ -11,23 +11,33 @@ import (
 	"go.uber.org/zap/zaptest/observer"
 )
 
-func TestGetLogger(t *testing.T) {
-	logger := GetLogger()
-	assert.NotNil(t, logger, "system logger should not be nil")
+func TestWithLogger(t *testing.T) {
+	// Create a test logger
+	core, _ := observer.New(zap.InfoLevel)
+	testLogger := zap.New(core)
+
+	// Test adding logger to context
+	ctx := context.Background()
+	ctxWithLogger := WithLogger(ctx, testLogger)
+
+	// Verify logger can be retrieved
+	retrievedLogger := FromContext(ctxWithLogger)
+	assert.Equal(t, testLogger, retrievedLogger, "Retrieved logger should match the one added to context")
 }
 
-func TestWithContext(t *testing.T) {
+func TestWithContextEnriched(t *testing.T) {
 	// Create an observable logger for testing
-	core, recorded := observer.New(zap.DebugLevel)
-	SetLogger(zap.New(core))
+	core, recorded := observer.New(zap.InfoLevel)
+	testLogger := zap.New(core)
 
 	// Create a request context
 	reqCtx := requestctx.NewRequestContext("test-request-123")
 	ctx := requestctx.WithAggregationContext(context.Background(), reqCtx)
+	ctxWithLogger := WithLogger(ctx, testLogger)
 
-	// Get logger with context and log a message
-	logger := WithContext(ctx)
-	logger.Info("test message")
+	// Get enriched logger and log a message
+	enrichedLogger := WithContextEnriched(ctxWithLogger)
+	enrichedLogger.Info("test message")
 
 	// Verify the logged entry contains the request ID
 	logs := recorded.All()
@@ -37,69 +47,118 @@ func TestWithContext(t *testing.T) {
 	assert.Equal(t, "test-request-123", fields["request_id"], "request_id should match")
 }
 
-func TestHelperFunctions(t *testing.T) {
+func TestInfoContext(t *testing.T) {
+	// Create an observable logger for testing
+	core, recorded := observer.New(zap.InfoLevel)
+	testLogger := zap.New(core)
+
+	// Create context with logger
+	ctx := WithLogger(context.Background(), testLogger)
+
+	// Test InfoContext
+	InfoContext(ctx, "test info message", zap.String("key", "value"))
+
+	// Verify log entry
+	logs := recorded.All()
+	assert.Equal(t, 1, len(logs), "expected one log entry")
+	assert.Equal(t, zap.InfoLevel, logs[0].Level)
+	assert.Equal(t, "test info message", logs[0].Message)
+	assert.Equal(t, "value", logs[0].ContextMap()["key"])
+}
+
+func TestDebugContext(t *testing.T) {
 	// Create an observable logger for testing
 	core, recorded := observer.New(zap.DebugLevel)
-	SetLogger(zap.New(core))
+	testLogger := zap.New(core)
+
+	// Create context with logger
+	ctx := WithLogger(context.Background(), testLogger)
+
+	// Test DebugContext
+	DebugContext(ctx, "test debug message", zap.String("debug", "info"))
+
+	// Verify log entry
+	logs := recorded.All()
+	assert.Equal(t, 1, len(logs), "expected one log entry")
+	assert.Equal(t, zap.DebugLevel, logs[0].Level)
+	assert.Equal(t, "test debug message", logs[0].Message)
+	assert.Equal(t, "info", logs[0].ContextMap()["debug"])
+}
+
+func TestWarnContext(t *testing.T) {
+	// Create an observable logger for testing
+	core, recorded := observer.New(zap.WarnLevel)
+	testLogger := zap.New(core)
+
+	// Create context with logger
+	ctx := WithLogger(context.Background(), testLogger)
+
+	// Test WarnContext
+	WarnContext(ctx, "test warning message", zap.String("warning", "details"))
+
+	// Verify log entry
+	logs := recorded.All()
+	assert.Equal(t, 1, len(logs), "expected one log entry")
+	assert.Equal(t, zap.WarnLevel, logs[0].Level)
+	assert.Equal(t, "test warning message", logs[0].Message)
+	assert.Equal(t, "details", logs[0].ContextMap()["warning"])
+}
+
+func TestErrorContext(t *testing.T) {
+	// Create an observable logger for testing
+	core, recorded := observer.New(zap.ErrorLevel)
+	testLogger := zap.New(core)
+
+	// Create context with logger
+	ctx := WithLogger(context.Background(), testLogger)
+
+	// Test ErrorContext with error
+	testErr := errors.New("test error")
+	ErrorContext(ctx, "test error message", testErr, zap.String("extra", "field"))
+
+	// Verify log entry
+	logs := recorded.All()
+	assert.Equal(t, 1, len(logs), "expected one log entry")
+	assert.Equal(t, zap.ErrorLevel, logs[0].Level)
+	assert.Equal(t, "test error message", logs[0].Message)
+	assert.Equal(t, testErr.Error(), logs[0].ContextMap()["error"])
+	assert.Equal(t, "field", logs[0].ContextMap()["extra"])
+
+	// Test ErrorContext without error
+	recorded.TakeAll() // Clear previous logs
+	ErrorContext(ctx, "test message without error", nil, zap.String("key", "value"))
+
+	logs = recorded.All()
+	assert.Equal(t, 1, len(logs), "expected one log entry")
+	assert.Equal(t, zap.ErrorLevel, logs[0].Level)
+	assert.Equal(t, "test message without error", logs[0].Message)
+	assert.Equal(t, "value", logs[0].ContextMap()["key"])
+	_, hasError := logs[0].ContextMap()["error"]
+	assert.False(t, hasError, "should not have error field when error is nil")
+}
+
+func TestContextLoggingWithRequestContext(t *testing.T) {
+	// Create an observable logger for testing with debug level
+	core, recorded := observer.New(zap.DebugLevel)
+	testLogger := zap.New(core)
 
 	// Create a request context
-	reqCtx := requestctx.NewRequestContext("test-request-123")
+	reqCtx := requestctx.NewRequestContext("test-request-456")
 	ctx := requestctx.WithAggregationContext(context.Background(), reqCtx)
+	ctxWithLogger := WithLogger(ctx, testLogger)
 
-	// Test all helper functions
-	testErr := errors.New("test error")
+	// Test all context logging functions with request context
+	InfoContext(ctxWithLogger, "info with request context")
+	DebugContext(ctxWithLogger, "debug with request context")
+	WarnContext(ctxWithLogger, "warn with request context")
+	ErrorContext(ctxWithLogger, "error with request context", nil)
 
-	Info(ctx, "info message", zap.String("test", "value"))
-	Debug(ctx, "debug message")
-	Warn(ctx, "warn message")
-	Error(ctx, "error message", testErr)
-
-	// Verify logs
+	// Verify all entries have request ID
 	logs := recorded.All()
 	assert.Equal(t, 4, len(logs), "expected four log entries")
 
-	// Verify log levels and messages
-	assert.Equal(t, zap.InfoLevel, logs[0].Level)
-	assert.Equal(t, "info message", logs[0].Message)
-	assert.Equal(t, "value", logs[0].ContextMap()["test"])
-
-	assert.Equal(t, zap.DebugLevel, logs[1].Level)
-	assert.Equal(t, "debug message", logs[1].Message)
-
-	assert.Equal(t, zap.WarnLevel, logs[2].Level)
-	assert.Equal(t, "warn message", logs[2].Message)
-
-	assert.Equal(t, zap.ErrorLevel, logs[3].Level)
-	assert.Equal(t, "error message", logs[3].Message)
-	assert.Equal(t, testErr.Error(), logs[3].ContextMap()["error"])
-}
-
-func TestWithError(t *testing.T) {
-	// Create an observable logger for testing
-	core, recorded := observer.New(zap.InfoLevel)
-	logger := zap.New(core)
-
-	testErr := errors.New("test error")
-	loggerWithError := WithError(logger, testErr)
-	loggerWithError.Info("message with error")
-
-	logs := recorded.All()
-	assert.Equal(t, 1, len(logs))
-	assert.Equal(t, testErr.Error(), logs[0].ContextMap()["error"])
-
-	// Test with nil error
-	loggerWithNilError := WithError(logger, nil)
-	assert.Equal(t, logger, loggerWithNilError, "logger should be unchanged when error is nil")
-}
-
-func TestSetLoggerAndSync(t *testing.T) {
-	// Test SetLogger
-	originalLogger := GetLogger()
-
-	// Test Sync
-	SetLogger(nil)
-	assert.NoError(t, Sync(), "Sync should not return error when logger is nil")
-
-	// Restore original logger
-	SetLogger(originalLogger)
+	for i, log := range logs {
+		fields := log.ContextMap()
+		assert.Equal(t, "test-request-456", fields["request_id"], "request_id should be present in log %d", i)
+	}
 }

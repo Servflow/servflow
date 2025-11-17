@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/Servflow/servflow/pkg/definitions"
+	apiconfig "github.com/Servflow/servflow/pkg/definitions"
 	"github.com/Servflow/servflow/pkg/engine/server/middleware"
 	"github.com/Servflow/servflow/pkg/logging"
 	"go.uber.org/zap"
@@ -24,7 +24,7 @@ func (h *APIHandler) CreateChain(config *apiconfig.APIConfig) http.Handler {
 func (h *APIHandler) middlewareAdaptor(m middleware.Middleware) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			logger := logging.GetRequestLogger(req.Context())
+			logger := logging.WithContextEnriched(req.Context())
 			err := m.Handle(w, req)
 			if err != nil {
 				if errors.Is(err, middleware.ErrMiddlewareFailed) {

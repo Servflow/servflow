@@ -79,7 +79,7 @@ func WithServerConfig(config ServerConfig) ClientOption {
 		err := manager.addServerConfig(config)
 		if err != nil {
 			if errors.Is(err, errInitializingClient) {
-				logging.GetLogger().Warn("Failed to add server config", zap.Error(err))
+				logging.FromContext(context.Background()).Warn("Failed to add server config", zap.Error(err))
 				manager.failedConfig = append(manager.failedConfig, config)
 				return nil
 			}
@@ -108,7 +108,7 @@ func WithWorkflowToolConfig(config WorkflowToolConfig) ClientOption {
 		}
 
 		manager.toolsExec[config.Name] = func(ctx context.Context, params map[string]any) (string, error) {
-			logging.GetRequestLogger(ctx).Debug(
+			logging.DebugContext(ctx,
 				"Executing workflow",
 				zap.Any("params", params),
 				zap.String("tool", config.Name),
@@ -170,7 +170,7 @@ func (m *Manager) addFailedConfigs() {
 	for i, config := range m.failedConfig {
 		err := m.addServerConfig(config)
 		if err != nil {
-			logging.GetLogger().Error("Failed to add server config", zap.Error(err))
+			logging.FromContext(context.Background()).Error("Failed to add server config", zap.Error(err))
 			continue
 		}
 		m.failedConfig = append(m.failedConfig[:i], m.failedConfig[i+1:]...)

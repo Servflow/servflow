@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
+	apiconfig "github.com/Servflow/servflow/pkg/definitions"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/mark3labs/mcp-go/server"
 	"go.uber.org/zap"
 
-	"github.com/Servflow/servflow/pkg/definitions"
 	"github.com/gorilla/mux"
 )
 
@@ -25,7 +25,7 @@ func (e *Engine) createServer(apiConfigs []*apiconfig.APIConfig, port string) (*
 		return nil, errors.New("no configuration files found")
 	}
 
-	logging.GetLogger().Info("starting engine on " + port)
+	logging.FromContext(e.ctx).Info("starting engine on " + port)
 	httpServer := &http.Server{
 		Addr:    ":" + port,
 		Handler: e.createCustomMuxHandler(apiConfigs),
@@ -35,7 +35,7 @@ func (e *Engine) createServer(apiConfigs []*apiconfig.APIConfig, port string) (*
 }
 
 func (e *Engine) createCustomMuxHandler(configs []*apiconfig.APIConfig) http.Handler {
-	logger := logging.GetLogger()
+	logger := logging.FromContext(e.ctx)
 	r := mux.NewRouter()
 
 	// Add pprof routes

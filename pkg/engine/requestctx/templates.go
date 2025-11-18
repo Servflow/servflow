@@ -10,13 +10,11 @@ import (
 	"time"
 
 	"github.com/Servflow/servflow/pkg/engine/secrets"
-	"github.com/Servflow/servflow/pkg/engine/secrets/secretmanager"
 )
 
 func getFuncMap(funcMap template.FuncMap) template.FuncMap {
 	m := template.FuncMap{
 		"strip":        tmplStripText,
-		"secretForKey": secretmanager.SecretForKey,
 		"jsonout":      jsonOut,
 		"pluck":        tmplPluck,
 		"escape":       stringEscape, // more idiomatic name

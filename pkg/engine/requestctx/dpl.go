@@ -109,6 +109,7 @@ func ReplaceVariableValues(in string, values map[string]interface{}) (string, er
 }
 
 func createTemplate(in string, funcMap template.FuncMap, wrapJSON bool) (*template.Template, error) {
+	funcMap = getFuncMap(funcMap)
 	replaced := replaceEscapedQuotes(in)
 	if wrapJSON {
 		replaced = wrapWithJSON(replaced)
@@ -149,7 +150,6 @@ func WrapWithFunction(template, funcWrap string) string {
 func CreateTextTemplate(reqCtx context.Context, config string, funcMap template.FuncMap) (*template.Template, error) {
 	rCtx, ok := FromContext(reqCtx)
 
-	funcMap = getFuncMap(funcMap)
 	if ok && rCtx != nil {
 		rcFunc := rCtx.TemplateFunctions()
 		for k, v := range rcFunc {

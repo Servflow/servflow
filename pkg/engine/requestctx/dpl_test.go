@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/Servflow/servflow/pkg/engine/secrets"
 	"go.uber.org/mock/gomock"
 
 	"github.com/stretchr/testify/assert"
@@ -257,9 +258,7 @@ func TestBaseParseTextTemplate(t *testing.T) {
 
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	mockSecretStore := NewMockSecretStore(ctrl)
-	mockSecretStore.EXPECT().GetSecret("mysecret").Return([]byte("test"), nil)
-	SetSecretStore(mockSecretStore)
+	secrets.GetStorage().AddSecret("mysecret", "test")
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

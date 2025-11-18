@@ -10,7 +10,6 @@ import (
 	apiconfig "github.com/Servflow/servflow/pkg/definitions"
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
-	"github.com/Servflow/servflow/pkg/logging"
 	"go.uber.org/zap"
 )
 
@@ -44,10 +43,11 @@ type PlannerV2 struct {
 	config     PlannerConfig
 	finalSteps map[string]Step
 	registry   *actions.Registry
+	logger     *zap.Logger
 }
 
-func NewPlannerV2(config PlannerConfig) *PlannerV2 {
-	return &PlannerV2{config: config, finalSteps: make(map[string]Step), registry: config.CustomRegistry}
+func NewPlannerV2(config PlannerConfig, logger *zap.Logger) *PlannerV2 {
+	return &PlannerV2{config: config, finalSteps: make(map[string]Step), registry: config.CustomRegistry, logger: logger}
 }
 
 func (p *PlannerV2) Plan() (*Plan, error) {
@@ -94,7 +94,8 @@ func (p *PlannerV2) generateStep(id string) (Step, error) {
 	if id == "" || id == p.config.TerminateTag {
 		return nil, nil
 	}
-	logging.GetLogger().Debug("Generating planner v2 step", zap.String("id", id))
+	// Note: This is called during plan generation, not execution, so no context available
+	p.logger.Debug("Generating planner v2 step", zap.String("id", id))
 
 	// backwards compatibility
 	id = strings.TrimPrefix(id, "$")

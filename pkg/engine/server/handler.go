@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/Servflow/servflow/internal/tracing"
-	"github.com/Servflow/servflow/pkg/definitions"
-	plan2 "github.com/Servflow/servflow/pkg/engine/plan"
+	apiconfig "github.com/Servflow/servflow/pkg/definitions"
+	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/gorilla/mux"
@@ -28,20 +28,20 @@ import (
 // NewAPIHandlerForConfig takes an apiconfig and a logger and returns an APIHandler with the appropriate
 // actions and datasource managers
 func (e *Engine) createBasicHandler(config *apiconfig.APIConfig) (http.Handler, error) {
-	logger := logging.GetLogger()
+	logger := logging.FromContext(e.ctx)
 	logger.Info("Loading API configuration", zap.String("api", config.ID), zap.String("path", config.HttpConfig.ListenPath), zap.String("method", config.HttpConfig.Method))
 
-	planner := plan2.NewPlannerV2(plan2.PlannerConfig{
+	planner := plan.NewPlannerV2(plan.PlannerConfig{
 		Actions:    config.Actions,
 		Conditions: config.Conditionals,
 		Responses:  config.Responses,
-	})
+	}, logger)
 	p, err := planner.Plan()
 	if err != nil {
 		return nil, err
 	}
 
-	logging.GetLogger().Debug("Starting plan generation from", zap.String("start", config.HttpConfig.Next))
+	logging.FromContext(e.ctx).Debug("Starting plan generation from", zap.String("start", config.HttpConfig.Next))
 
 	a := &APIHandler{
 		apiPath:   config.HttpConfig.ListenPath,
@@ -56,7 +56,7 @@ func (e *Engine) createBasicHandler(config *apiconfig.APIConfig) (http.Handler, 
 type APIHandler struct {
 	apiPath   string
 	apiName   string
-	p         *plan2.Plan
+	p         *plan.Plan
 	planStart string
 }
 
@@ -101,7 +101,7 @@ func (h *APIHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	start := time.Now()
 	ctx := req.Context()
 
-	logger := logging.GetLogger().With(zap.String("path", req.URL.Path), zap.String("method", req.Method))
+	logger := logging.FromContext(ctx).With(zap.String("path", req.URL.Path), zap.String("method", req.Method))
 	logger.Debug("Handling request")
 	if tracing.OTELEnabled() {
 		var span trace.Span
@@ -137,7 +137,7 @@ func (h *APIHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 }
 
 func (h *APIHandler) logAndWriteInternalServerError(w http.ResponseWriter, err error) {
-	logging.Error(context.Background(), "error handling request", err)
+	logging.ErrorContext(context.Background(), "error handling request", err)
 	w.WriteHeader(http.StatusInternalServerError)
 	w.Write([]byte("error completing request, please reach out to admin"))
 }

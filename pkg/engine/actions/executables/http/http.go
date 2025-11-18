@@ -49,7 +49,7 @@ func (h *Http) Config() string {
 
 // TODO sanitize response if string or query
 func (h *Http) Execute(ctx context.Context, filledInConfig string) (interface{}, error) {
-	logger := logging.WithContext(ctx).With(zap.String("action", h.Type()))
+	logger := logging.WithContextEnriched(ctx).With(zap.String("action", h.Type()))
 	var cfg Config
 
 	if err := json.Unmarshal([]byte(filledInConfig), &cfg); err != nil {

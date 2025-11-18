@@ -5,10 +5,8 @@ import (
 	"fmt"
 
 	"github.com/Servflow/servflow/internal/http"
-	"github.com/Servflow/servflow/pkg/definitions"
+	apiconfig "github.com/Servflow/servflow/pkg/definitions"
 	"github.com/Servflow/servflow/pkg/engine/plan/responsebuilder"
-	"github.com/Servflow/servflow/pkg/logging"
-	"go.uber.org/zap"
 )
 
 // TODO improve response handling
@@ -44,7 +42,6 @@ func newResponse(id string, resp apiconfig.ResponseConfig) (*Response, error) {
 			resp.Type = builderTypeTemplate
 		}
 	}
-	logging.GetLogger().Debug("creating response", zap.String("builder_type", resp.Type), zap.String("id", id))
 
 	switch resp.Type {
 	case builderTypeTemplate:

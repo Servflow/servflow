@@ -16,7 +16,6 @@ import (
 )
 
 func TestPlan_Execute(t *testing.T) {
-	logging.SetLogger(silentLogger())
 	cfg := apiconfig.APIConfig{
 		Actions: map[string]apiconfig.Action{
 			"action1": {
@@ -164,7 +163,7 @@ func TestPlan_Execute(t *testing.T) {
 				Actions:        cfg.Actions,
 				Responses:      cfg.Responses,
 				CustomRegistry: registry,
-			})
+			}, logging.GetNewLogger())
 
 			plan, err := planner.Plan()
 			require.NoError(t, err)

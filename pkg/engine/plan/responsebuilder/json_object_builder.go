@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/Servflow/servflow/internal/http"
-	"github.com/Servflow/servflow/pkg/definitions"
+	apiconfig "github.com/Servflow/servflow/pkg/definitions"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
 )
@@ -24,7 +24,7 @@ func NewObjectBuilder(object *apiconfig.ResponseObject, code int) *JSONObjectBui
 }
 
 func (o *JSONObjectBuilder) BuildResponse(ctx context.Context) (*http.SfResponse, error) {
-	logging.WithContext(ctx).Debug("running object builder response builder")
+	logging.DebugContext(ctx, "running object builder response builder")
 
 	val, err := generateValue(ctx, o.object)
 	if err != nil {

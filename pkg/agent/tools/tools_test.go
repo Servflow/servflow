@@ -13,6 +13,7 @@ import (
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	plan2 "github.com/Servflow/servflow/pkg/engine/plan"
 	requestctx2 "github.com/Servflow/servflow/pkg/engine/requestctx"
+	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/stretchr/testify/assert"
@@ -262,7 +263,7 @@ func TestNewClient(t *testing.T) {
 			Actions:        cfg.Actions,
 			Responses:      cfg.Responses,
 			CustomRegistry: customRegistry,
-		})
+		}, logging.GetNewLogger())
 
 		testPlan, err := planner.Plan()
 		require.NoError(t, err)

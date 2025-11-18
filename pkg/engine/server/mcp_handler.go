@@ -7,7 +7,7 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/Servflow/servflow/pkg/definitions"
+	apiconfig "github.com/Servflow/servflow/pkg/definitions"
 	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
@@ -17,12 +17,12 @@ import (
 )
 
 func (e *Engine) createMCPHandler(config *apiconfig.APIConfig) error {
-	logger := logging.GetLogger().With(zap.String("type", "mcp"), zap.String("tool", config.McpTool.Name))
+	logger := logging.FromContext(e.ctx).With(zap.String("type", "mcp"), zap.String("tool", config.McpTool.Name))
 	//generate plan
 	planner := plan.NewPlannerV2(plan.PlannerConfig{
 		Actions:    config.Actions,
 		Conditions: config.Conditionals,
-	})
+	}, logger)
 
 	p, err := planner.Plan()
 	if err != nil {
@@ -55,7 +55,7 @@ func (e *Engine) createMCPHandler(config *apiconfig.APIConfig) error {
 
 	e.mcpServer.AddTool(mcp.NewTool(config.McpTool.Name, options...), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		start := time.Now()
-		logger := logging.GetRequestLogger(ctx).With(zap.String("toolName", config.McpTool.Name))
+		logger := logging.WithContextEnriched(ctx).With(zap.String("toolName", config.McpTool.Name))
 
 		reqCtx, ok := requestctx.FromContext(ctx)
 		if !ok {

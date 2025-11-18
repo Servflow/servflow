@@ -3,47 +3,56 @@ package logging
 import (
 	"context"
 	"os"
-	"sync"
 
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
-var (
-	systemLogger *zap.Logger
-	once         sync.Once
-)
-
-// init initializes the system logger with production configuration
-func init() {
+func GetNewLogger() *zap.Logger {
 	env := os.Getenv("SERVFLOW_ENV")
-
-	var config zap.Config
-	if env == "production" {
-		config = zap.NewProductionConfig()
-	} else {
-		config = zap.NewDevelopmentConfig()
+	var cfg zap.Config
+	switch env {
+	case "production":
+		cfg = zap.NewProductionConfig()
+	default:
+		cfg = zap.NewDevelopmentConfig()
 	}
-	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 
-	once.Do(func() {
-		logger, err := config.Build()
-		if err != nil {
-			panic("failed to initialize logger: " + err.Error())
+	logger, err := cfg.Build()
+	if err != nil {
+		panic(err)
+	}
+	return logger
+}
+
+// loggerKey is the context key for storing logger instances
+type loggerKey struct{}
+
+// WithLogger adds a logger to the context
+func WithLogger(ctx context.Context, logger *zap.Logger) context.Context {
+	return context.WithValue(ctx, loggerKey{}, logger)
+}
+
+// FromContext retrieves a logger from the context.
+// If no logger is found, it falls back to the singleton logger
+func FromContext(ctx context.Context) *zap.Logger {
+	if ctx != nil {
+		if logger, ok := ctx.Value(loggerKey{}).(*zap.Logger); ok {
+			return logger
 		}
-		systemLogger = logger
-	})
+	}
+	// Fallback to singleton during migration
+	return GetNewLogger()
 }
 
-// GetLogger returns the global system logger instance
-func GetLogger() *zap.Logger {
-	return systemLogger
+// WithContextEnriched returns a logger from context with request context enrichment
+func WithContextEnriched(ctx context.Context) *zap.Logger {
+	return WithContext(ctx)
 }
 
-// WithContext returns a logger with request context fields
 func WithContext(ctx context.Context) *zap.Logger {
-	logger := GetLogger()
+	logger := FromContext(ctx)
 
 	// Extract request context
 	reqCtx, ok := requestctx.FromContext(ctx)
@@ -55,62 +64,31 @@ func WithContext(ctx context.Context) *zap.Logger {
 	return logger.With(zap.String("request_id", reqCtx.ID()))
 }
 
-// GetRequestLogger is an alias for WithContext for more semantic naming
-func GetRequestLogger(ctx context.Context) *zap.Logger {
-	return WithContext(ctx)
+// InfoContext logs an info message using logger from context
+func InfoContext(ctx context.Context, msg string, fields ...zapcore.Field) {
+	WithContextEnriched(ctx).Info(msg, fields...)
 }
 
-// SetLogger allows setting a custom logger instance (mainly for testing)
-func SetLogger(l *zap.Logger) {
-	systemLogger = l
+// DebugContext logs a debug message using logger from context
+func DebugContext(ctx context.Context, msg string, fields ...zapcore.Field) {
+	WithContextEnriched(ctx).Debug(msg, fields...)
 }
 
-// Sync flushes any buffered log entries
-func Sync() error {
-	if systemLogger != nil {
-		return systemLogger.Sync()
-	}
-	return nil
+// WarnContext logs a warning message using logger from context
+func WarnContext(ctx context.Context, msg string, fields ...zapcore.Field) {
+	WithContextEnriched(ctx).Warn(msg, fields...)
 }
 
-// Error is a helper function to create a standardized error log
-func Error(ctx context.Context, msg string, err error, fields ...zapcore.Field) {
-	logger := WithContext(ctx)
+// ErrorContext logs an error message using logger from context
+func ErrorContext(ctx context.Context, msg string, err error, fields ...zapcore.Field) {
+	logger := WithContextEnriched(ctx)
 	if err != nil {
 		fields = append(fields, zap.Error(err))
 	}
 	logger.Error(msg, fields...)
 }
 
-// Info is a helper function to create a standardized info log
-func Info(ctx context.Context, msg string, fields ...zapcore.Field) {
-	WithContext(ctx).Info(msg, fields...)
-}
-
-// Debug is a helper function to create a standardized debug log
-func Debug(ctx context.Context, msg string, fields ...zapcore.Field) {
-	WithContext(ctx).Debug(msg, fields...)
-}
-
-// Warn is a helper function to create a standardized warning log
-func Warn(ctx context.Context, msg string, fields ...zapcore.Field) {
-	WithContext(ctx).Warn(msg, fields...)
-}
-
-// Fatal is a helper function to create a standardized fatal log
-func Fatal(ctx context.Context, msg string, fields ...zapcore.Field) {
-	WithContext(ctx).Fatal(msg, fields...)
-}
-
-// WithFields adds fields to a logger instance and returns a new logger
-func WithFields(logger *zap.Logger, fields ...zapcore.Field) *zap.Logger {
-	return logger.With(fields...)
-}
-
-// WithError adds an error field to a logger instance and returns a new logger
-func WithError(logger *zap.Logger, err error) *zap.Logger {
-	if err == nil {
-		return logger
-	}
-	return logger.With(zap.Error(err))
+// FatalContext logs a fatal message using logger from context
+func FatalContext(ctx context.Context, msg string, fields ...zapcore.Field) {
+	WithContextEnriched(ctx).Fatal(msg, fields...)
 }

@@ -33,19 +33,29 @@ import (
 	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/Servflow/servflow/pkg/storage"
 	"github.com/mark3labs/mcp-go/server"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
+
+type Option func(*Engine)
+
+func WithLogger(core zapcore.Core) Option {
+	return func(e *Engine) {
+		e.logger = zap.New(core)
+	}
+}
 
 type Engine struct {
 	server     *http.Server
 	cfg        *config.Config
 	yamlLoader *yamlloader.YAMLLoader
 	mcpServer  *server.MCPServer
-
-	ctx    context.Context
-	cancel func()
+	logger     *zap.Logger
+	ctx        context.Context
+	cancel     func()
 }
 
-func NewWithConfig(cfg *config.Config) (*Engine, error) {
+func NewWithConfig(cfg *config.Config, opts ...Option) (*Engine, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	e := &Engine{
@@ -53,6 +63,15 @@ func NewWithConfig(cfg *config.Config) (*Engine, error) {
 		ctx:    ctx,
 		cancel: cancel,
 	}
+
+	for _, opt := range opts {
+		opt(e)
+	}
+
+	if e.logger == nil {
+		e.logger = e.createLogger(cfg.Env)
+	}
+
 	return e, nil
 }
 
@@ -61,10 +80,13 @@ func (e *Engine) DoneChan() <-chan struct{} {
 }
 
 func (e *Engine) Start() error {
+	// Add logger to root context
+	e.ctx = logging.WithLogger(e.ctx, e.logger)
+
 	yamlLoader := yamlloader.NewYAMLLoader(
 		e.cfg.ConfigFolder,
 		e.cfg.IntegrationsFile,
-		logging.GetLogger(),
+		logging.FromContext(e.ctx),
 	)
 	e.yamlLoader = yamlLoader
 	requestctx.SetSecretStore(yamlLoader)
@@ -79,7 +101,7 @@ func (e *Engine) Start() error {
 		return fmt.Errorf("error fetching database configs: %w", err)
 	}
 
-	logging.Debug(e.ctx, "Starting integrations...")
+	logging.DebugContext(e.ctx, "Starting integrations...")
 	if err := integration.RegisterIntegrationsFromConfig(integrationsConfig); err != nil {
 		return err
 	}
@@ -90,9 +112,9 @@ func (e *Engine) Start() error {
 	}
 	e.server = srv
 
-	logging.Info(e.ctx, "starting engine...")
+	logging.InfoContext(e.ctx, "starting engine...")
 	e.startServer()
-	logging.Info(e.ctx, "engine started")
+	logging.InfoContext(e.ctx, "engine started")
 	return nil
 }
 
@@ -100,10 +122,26 @@ func (e *Engine) startServer() {
 	go func() {
 		err := e.server.ListenAndServe()
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logging.Error(e.ctx, "error starting server", err)
+			logging.ErrorContext(e.ctx, "error starting server", err)
 			e.cancel()
 		}
 	}()
+}
+
+func (e *Engine) createLogger(env string) *zap.Logger {
+	var c zap.Config
+	if env == "production" {
+		c = zap.NewProductionConfig()
+	} else {
+		c = zap.NewDevelopmentConfig()
+	}
+	c.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+
+	logger, err := c.Build()
+	if err != nil {
+		panic("failed to initialize logger: " + err.Error())
+	}
+	return logger
 }
 
 func (e *Engine) Stop() error {

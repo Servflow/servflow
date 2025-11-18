@@ -71,7 +71,6 @@ func silentLogger() *zap.Logger {
 }
 
 func BenchmarkTestPlannerV2_Generate(b *testing.B) {
-	logging.SetLogger(silentLogger())
 	ctrl := gomock.NewController(b)
 	defer ctrl.Finish()
 	mockExec := NewMockActionExecutable(ctrl)
@@ -91,7 +90,7 @@ func BenchmarkTestPlannerV2_Generate(b *testing.B) {
 		Responses:      sampleConfig.Responses,
 		TerminateTag:   "end",
 		CustomRegistry: mockRegistry,
-	})
+	}, logging.GetNewLogger())
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -152,7 +151,7 @@ func TestPlannerV2_Generate(t *testing.T) {
 			Conditions:     config.Conditionals,
 			Responses:      config.Responses,
 			CustomRegistry: mockRegistry,
-		})
+		}, silentLogger())
 
 		plan, err := planner.Plan()
 		require.NoError(t, err)
@@ -235,7 +234,7 @@ func TestPlannerV2_Generate(t *testing.T) {
 			Conditions:     config.Conditionals,
 			Responses:      config.Responses,
 			CustomRegistry: mockRegistry,
-		})
+		}, silentLogger())
 
 		plan, err := planner.Plan()
 		require.NoError(t, err)
@@ -269,7 +268,7 @@ func TestPlannerV2_generateActionStep(t *testing.T) {
 			Conditions:     sampleConfig.Conditionals,
 			Responses:      sampleConfig.Responses,
 			CustomRegistry: mockRegistry,
-		})
+		}, silentLogger())
 		_, err := planner.generateActionStep("action1")
 		require.NoError(t, err)
 
@@ -290,7 +289,7 @@ func TestPlannerV2_generateActionStep(t *testing.T) {
 			Conditions:     sampleConfig.Conditionals,
 			Responses:      sampleConfig.Responses,
 			CustomRegistry: mockRegistry,
-		})
+		}, silentLogger())
 		_, err := planner.generateActionStep("action2")
 		assert.ErrorContains(t, err, "error creating actions")
 	})
@@ -312,7 +311,7 @@ func TestPlannerV2_generateActionStep(t *testing.T) {
 			Conditions:     sampleConfig.Conditionals,
 			Responses:      sampleConfig.Responses,
 			CustomRegistry: mockRegistry,
-		})
+		}, silentLogger())
 		_, err := planner.generateActionStep("action1")
 		assert.ErrorContains(t, err, "not registered")
 	})
@@ -363,7 +362,7 @@ func TestPlannerV2_generateConditionalStep(t *testing.T) {
 		Responses:      config.Responses,
 		TerminateTag:   "end",
 		CustomRegistry: mockRegistry,
-	})
+	}, silentLogger())
 
 	condition, err := planner.generateConditionalStep("cond1")
 	require.NoError(t, err)
@@ -406,7 +405,7 @@ func TestPlannerV2_generateResponseStep(t *testing.T) {
 		Responses:      config.Responses,
 		TerminateTag:   "end",
 		CustomRegistry: mockRegistry,
-	})
+	}, silentLogger())
 
 	response, err := planner.generateResponseStep("success")
 	require.NoError(t, err)

@@ -1,3 +1,4 @@
+//go:generate mockgen -source secrets.go -destination secrets_mock.go -package secrets
 package secrets
 
 import (
@@ -8,6 +9,7 @@ import (
 type SecretStorage interface {
 	Init()
 	FetchSecret(key string) string
+	AddSecret(key string, value string)
 }
 
 var (
@@ -34,10 +36,17 @@ func FetchSecret(key string) string {
 }
 
 func NewEnvStorage() SecretStorage {
-	return &envStorage{}
+	return &envStorage{
+		localSecrets: make(map[string]string),
+	}
 }
 
 type envStorage struct {
+	localSecrets map[string]string
+}
+
+func (e *envStorage) AddSecret(key string, value string) {
+	e.localSecrets[key] = value
 }
 
 func (e *envStorage) Init() {
@@ -45,5 +54,8 @@ func (e *envStorage) Init() {
 }
 
 func (e *envStorage) FetchSecret(key string) string {
+	if value, ok := e.localSecrets[key]; ok {
+		return value
+	}
 	return os.Getenv(key)
 }

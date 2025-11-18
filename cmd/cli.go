@@ -9,7 +9,6 @@ import (
 
 	"github.com/Servflow/servflow/config"
 	"github.com/Servflow/servflow/pkg/engine/server"
-	"github.com/Servflow/servflow/pkg/engine/yamlloader"
 	"github.com/Servflow/servflow/pkg/storage"
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
@@ -34,7 +33,7 @@ func RunServer(cfg *config.Config) error {
 		return err
 	}
 
-	eng, err := server.NewWithConfig(cfg)
+	eng, err := server.New(cfg)
 	if err != nil {
 		return err
 	}
@@ -61,8 +60,7 @@ func RunServer(cfg *config.Config) error {
 
 func ValidateConfigs(configFolder string, verbose bool) error {
 	var logger = zap.NewNop()
-	loader := yamlloader.NewYAMLLoader(configFolder, "", logger)
-	configs, err := loader.FetchAPIConfigs(true)
+	configs, err := server.LoadAPIConfigsFromYAML(configFolder, true, logger)
 	if err != nil {
 		return fmt.Errorf("failed to load API configs: %w", err)
 	}

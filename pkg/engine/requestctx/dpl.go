@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"sync"
 	"text/template"
 )
 
@@ -46,25 +45,10 @@ var (
 	templateRegex *regexp.Regexp
 )
 
-type SecretStore interface {
-	GetSecret(key string) ([]byte, error)
-}
-
 func init() {
 	quoteRegex = regexp.MustCompile(regexMatchString)
 	templateRegex = regexp.MustCompile(regexMatchTemplate)
 
-}
-
-var (
-	secretStore SecretStore
-	once        sync.Once
-)
-
-func SetSecretStore(sl SecretStore) {
-	once.Do(func() {
-		secretStore = sl
-	})
 }
 
 // ReplaceVariableValuesInContext scans the input string for placeholders formatted as {{key}}
@@ -125,17 +109,12 @@ func ReplaceVariableValues(in string, values map[string]interface{}) (string, er
 }
 
 func createTemplate(in string, funcMap template.FuncMap, wrapJSON bool) (*template.Template, error) {
+	funcMap = getFuncMap(funcMap)
 	replaced := replaceEscapedQuotes(in)
 	if wrapJSON {
 		replaced = wrapWithJSON(replaced)
 	}
-	f := template.FuncMap{
-		"secret": secretTemplateFunc,
-	}
-	for k, v := range funcMap {
-		f[k] = v
-	}
-	return template.New("input").Option("missingkey=zero").Funcs(f).Parse(replaced)
+	return template.New("input").Option("missingkey=zero").Funcs(funcMap).Parse(replaced)
 }
 
 // DEPRECATED jsonout will be added in action generation
@@ -166,20 +145,14 @@ func WrapWithFunction(template, funcWrap string) string {
 	return replaced
 }
 
-func secretTemplateFunc(key string) string {
-	secret, err := secretStore.GetSecret(key)
-	if err != nil {
-		return ""
-	}
-	return string(secret)
-}
-
 // CreateTextTemplate is what should be called in config items to create a template;
 // it also loads up the template variables stored in the request context
 func CreateTextTemplate(reqCtx context.Context, config string, funcMap template.FuncMap) (*template.Template, error) {
 	rCtx, ok := FromContext(reqCtx)
 
-	funcMap = getFuncMap(funcMap)
+	if funcMap == nil {
+		funcMap = template.FuncMap{}
+	}
 	if ok && rCtx != nil {
 		rcFunc := rCtx.TemplateFunctions()
 		for k, v := range rcFunc {

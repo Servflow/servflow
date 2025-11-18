@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/Servflow/servflow/config"
+	apiconfig "github.com/Servflow/servflow/pkg/definitions"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/agent"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/authenticate"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/delete_action"
@@ -28,8 +29,6 @@ import (
 	_ "github.com/Servflow/servflow/pkg/engine/integration/integrations/openai"
 	_ "github.com/Servflow/servflow/pkg/engine/integration/integrations/qdrant"
 	_ "github.com/Servflow/servflow/pkg/engine/integration/integrations/sql"
-	"github.com/Servflow/servflow/pkg/engine/requestctx"
-	"github.com/Servflow/servflow/pkg/engine/yamlloader"
 	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/Servflow/servflow/pkg/storage"
 	"github.com/mark3labs/mcp-go/server"
@@ -45,17 +44,28 @@ func WithLogger(core zapcore.Core) Option {
 	}
 }
 
-type Engine struct {
-	server     *http.Server
-	cfg        *config.Config
-	yamlLoader *yamlloader.YAMLLoader
-	mcpServer  *server.MCPServer
-	logger     *zap.Logger
-	ctx        context.Context
-	cancel     func()
+func WithDirectConfigs(directConfigs *DirectConfigs) Option {
+	return func(e *Engine) {
+		e.directConfigs = directConfigs
+	}
 }
 
-func NewWithConfig(cfg *config.Config, opts ...Option) (*Engine, error) {
+type DirectConfigs struct {
+	APIConfigs         []*apiconfig.APIConfig
+	IntegrationConfigs []apiconfig.IntegrationConfig
+}
+
+type Engine struct {
+	server        *http.Server
+	cfg           *config.Config
+	directConfigs *DirectConfigs
+	mcpServer     *server.MCPServer
+	logger        *zap.Logger
+	ctx           context.Context
+	cancel        func()
+}
+
+func New(cfg *config.Config, opts ...Option) (*Engine, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	e := &Engine{
@@ -80,27 +90,31 @@ func (e *Engine) DoneChan() <-chan struct{} {
 }
 
 func (e *Engine) Start() error {
-	// Add logger to root context
 	e.ctx = logging.WithLogger(e.ctx, e.logger)
 
-	yamlLoader := yamlloader.NewYAMLLoader(
-		e.cfg.ConfigFolder,
-		e.cfg.IntegrationsFile,
-		logging.FromContext(e.ctx),
-	)
-	e.yamlLoader = yamlLoader
-	requestctx.SetSecretStore(yamlLoader)
+	var apiConfigs []*apiconfig.APIConfig
+	var integrationConfigs []apiconfig.IntegrationConfig
+	var err error
 
-	apiConfigs, err := yamlLoader.FetchAPIConfigs(false)
-	if err != nil {
-		return fmt.Errorf("error fetching actions: %w", err)
+	if e.directConfigs != nil {
+		apiConfigs = e.directConfigs.APIConfigs
+		integrationConfigs = e.directConfigs.IntegrationConfigs
+	} else {
+		apiConfigs, err = LoadAPIConfigsFromYAML(e.cfg.ConfigFolder, false, logging.FromContext(e.ctx))
+		if err != nil {
+			return fmt.Errorf("error fetching actions: %w", err)
+		}
+
+		integrationConfigs, err = LoadIntegrationsConfigFromYAML(e.cfg.IntegrationsFile, logging.FromContext(e.ctx))
+		if err != nil {
+			return fmt.Errorf("error fetching database configs: %w", err)
+		}
 	}
 
-	integrationsConfig, err := yamlLoader.FetchIntegrationsConfig()
-	if err != nil {
-		return fmt.Errorf("error fetching database configs: %w", err)
-	}
+	return e.startWithConfigs(apiConfigs, integrationConfigs)
+}
 
+func (e *Engine) startWithConfigs(apiConfigs []*apiconfig.APIConfig, integrationsConfig []apiconfig.IntegrationConfig) error {
 	logging.DebugContext(e.ctx, "Starting integrations...")
 	if err := integration.RegisterIntegrationsFromConfig(integrationsConfig); err != nil {
 		return err

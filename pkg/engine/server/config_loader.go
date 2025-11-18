@@ -1,4 +1,4 @@
-package yamlloader
+package server
 
 import (
 	"fmt"
@@ -6,37 +6,21 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/Servflow/servflow/pkg/definitions"
+	apiconfig "github.com/Servflow/servflow/pkg/definitions"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 )
 
-// YAMLLoader handles loading configurations from YAML files
-type YAMLLoader struct {
-	apisFolder       string
-	integrationsFile string
-	logger           *zap.Logger
-}
-
-// NewYAMLLoader creates a new YAML loader instance
-func NewYAMLLoader(apisFolder, integrationsFile string, logger *zap.Logger) *YAMLLoader {
-	return &YAMLLoader{
-		apisFolder:       apisFolder,
-		integrationsFile: integrationsFile,
-		logger:           logger,
-	}
-}
-
-// FetchAPIConfigs loads API configurations from YAML files in the APIs folder
+// LoadAPIConfigsFromYAML loads API configurations from YAML files in the specified folder
 // if shouldFail is true the first yaml config failed will end the run
-func (l *YAMLLoader) FetchAPIConfigs(shouldFail bool) ([]*apiconfig.APIConfig, error) {
-	l.logger.Debug("Loading API configs from YAML files", zap.String("folder", l.apisFolder))
+func LoadAPIConfigsFromYAML(apisFolder string, shouldFail bool, logger *zap.Logger) ([]*apiconfig.APIConfig, error) {
+	logger.Debug("Loading API configs from YAML files", zap.String("folder", apisFolder))
 
-	if l.apisFolder == "" {
+	if apisFolder == "" {
 		return nil, fmt.Errorf("APIs folder not specified")
 	}
 
-	contents, err := readYAMLFilesInFolder(l.apisFolder)
+	contents, err := readYAMLFilesInFolder(apisFolder)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read YAML files from API folder: %w", err)
 	}
@@ -44,34 +28,34 @@ func (l *YAMLLoader) FetchAPIConfigs(shouldFail bool) ([]*apiconfig.APIConfig, e
 	configs := make([]*apiconfig.APIConfig, 0)
 	for path, content := range contents {
 		name := filepath.Base(path)
-		l.logger.Debug("Parsing API config file", zap.String("file", name))
+		logger.Debug("Parsing API config file", zap.String("file", name))
 
 		var cfg apiconfig.APIConfig
 		if err := yaml.Unmarshal(content, &cfg); err != nil {
 			if shouldFail {
 				return nil, fmt.Errorf("failed to unmarshal YAML file %s: %w", name, err)
 			}
-			l.logger.Warn("failed to unmarshal config file", zap.Error(err), zap.String("file", name))
+			logger.Warn("failed to unmarshal config file", zap.Error(err), zap.String("file", name))
 			continue
 		}
 
 		configs = append(configs, &cfg)
 	}
 
-	l.logger.Debug("Successfully loaded API configs", zap.Int("count", len(configs)))
+	logger.Debug("Successfully loaded API configs", zap.Int("count", len(configs)))
 	return configs, nil
 }
 
-// FetchIntegrationsConfig loads integrations configuration from YAML file
-func (l *YAMLLoader) FetchIntegrationsConfig() ([]apiconfig.IntegrationConfig, error) {
-	l.logger.Debug("Loading integrations config from YAML file", zap.String("file", l.integrationsFile))
+// LoadIntegrationsConfigFromYAML loads integrations configuration from YAML file
+func LoadIntegrationsConfigFromYAML(integrationsFile string, logger *zap.Logger) ([]apiconfig.IntegrationConfig, error) {
+	logger.Debug("Loading integrations config from YAML file", zap.String("file", integrationsFile))
 
-	if l.integrationsFile == "" {
-		l.logger.Debug("No integrations file specified, returning empty config")
+	if integrationsFile == "" {
+		logger.Debug("No integrations file specified, returning empty config")
 		return nil, nil
 	}
 
-	contents, err := os.ReadFile(l.integrationsFile)
+	contents, err := os.ReadFile(integrationsFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read integrations config file: %w", err)
 	}
@@ -91,20 +75,8 @@ func (l *YAMLLoader) FetchIntegrationsConfig() ([]apiconfig.IntegrationConfig, e
 		configs = append(configs, conf)
 	}
 
-	l.logger.Debug("Successfully loaded integrations config", zap.Int("count", len(configs)))
+	logger.Debug("Successfully loaded integrations config", zap.Int("count", len(configs)))
 	return configs, nil
-}
-
-// GetSecret retrieves a secret from environment variables
-func (l *YAMLLoader) GetSecret(key string) ([]byte, error) {
-	l.logger.Debug("Getting secret from environment", zap.String("key", key))
-
-	value := os.Getenv(key)
-	if value == "" {
-		return nil, fmt.Errorf("secret %s not found in environment variables", key)
-	}
-
-	return []byte(value), nil
 }
 
 // readYAMLFilesInFolder reads all YAML files from a directory recursively

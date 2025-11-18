@@ -150,6 +150,9 @@ func WrapWithFunction(template, funcWrap string) string {
 func CreateTextTemplate(reqCtx context.Context, config string, funcMap template.FuncMap) (*template.Template, error) {
 	rCtx, ok := FromContext(reqCtx)
 
+	if funcMap == nil {
+		funcMap = template.FuncMap{}
+	}
 	if ok && rCtx != nil {
 		rcFunc := rCtx.TemplateFunctions()
 		for k, v := range rcFunc {

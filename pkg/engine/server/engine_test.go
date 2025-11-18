@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewWithDirectConfigs(t *testing.T) {
+func TestNew_WithDirectConfigs(t *testing.T) {
 	cfg := &config.Config{
 		Port: "8080",
 		Env:  "test",
@@ -29,43 +29,28 @@ func TestNewWithDirectConfigs(t *testing.T) {
 		IntegrationConfigs: []apiconfig.IntegrationConfig{},
 	}
 
-	engine, err := NewWithDirectConfigs(cfg, directConfigs)
+	engine, err := New(cfg, WithDirectConfigs(directConfigs))
 	require.NoError(t, err)
 	assert.NotNil(t, engine)
 	assert.Equal(t, cfg, engine.cfg)
 	assert.Equal(t, directConfigs, engine.directConfigs)
-	assert.Nil(t, engine.yamlLoader)
 	assert.NotNil(t, engine.logger)
 	assert.NotNil(t, engine.ctx)
 }
 
-func TestNewWithConfig(t *testing.T) {
+func TestNew_WithFileConfig(t *testing.T) {
 	cfg := &config.Config{
 		Port: "8080",
 		Env:  "test",
 	}
 
-	engine, err := NewWithConfig(cfg)
+	engine, err := New(cfg)
 	require.NoError(t, err)
 	assert.NotNil(t, engine)
 	assert.Equal(t, cfg, engine.cfg)
 	assert.Nil(t, engine.directConfigs)
 	assert.NotNil(t, engine.logger)
 	assert.NotNil(t, engine.ctx)
-}
-
-func TestStartWithDirectConfigs_NilDirectConfigs(t *testing.T) {
-	cfg := &config.Config{
-		Port: "8080",
-		Env:  "test",
-	}
-
-	engine, err := NewWithDirectConfigs(cfg, nil)
-	require.NoError(t, err)
-
-	err = engine.StartWithDirectConfigs()
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "direct configs not provided")
 }
 
 func TestDirectConfigs_APIConfigsIntegrity(t *testing.T) {
@@ -112,7 +97,7 @@ func TestEngine_DoneChan(t *testing.T) {
 		IntegrationConfigs: []apiconfig.IntegrationConfig{},
 	}
 
-	engine, err := NewWithDirectConfigs(cfg, directConfigs)
+	engine, err := New(cfg, WithDirectConfigs(directConfigs))
 	require.NoError(t, err)
 
 	doneChan := engine.DoneChan()
@@ -136,7 +121,7 @@ func TestEngine_DoneChan(t *testing.T) {
 	}
 }
 
-func TestEngine_WithLogger(t *testing.T) {
+func TestNew_WithLogger(t *testing.T) {
 	cfg := &config.Config{
 		Port: "8080",
 		Env:  "test",
@@ -148,12 +133,12 @@ func TestEngine_WithLogger(t *testing.T) {
 	}
 
 	// Test with custom logger option
-	engine, err := NewWithDirectConfigs(cfg, directConfigs, WithLogger(nil))
+	engine, err := New(cfg, WithDirectConfigs(directConfigs), WithLogger(nil))
 	require.NoError(t, err)
 	assert.NotNil(t, engine.logger)
 }
 
-func TestDirectConfigs_EmptyConfigs(t *testing.T) {
+func TestNew_EmptyDirectConfigs(t *testing.T) {
 	cfg := &config.Config{
 		Port: "8080",
 		Env:  "test",
@@ -164,9 +149,35 @@ func TestDirectConfigs_EmptyConfigs(t *testing.T) {
 		IntegrationConfigs: []apiconfig.IntegrationConfig{},
 	}
 
-	engine, err := NewWithDirectConfigs(cfg, directConfigs)
+	engine, err := New(cfg, WithDirectConfigs(directConfigs))
 	require.NoError(t, err)
 	assert.NotNil(t, engine)
 	assert.Len(t, engine.directConfigs.APIConfigs, 0)
 	assert.Len(t, engine.directConfigs.IntegrationConfigs, 0)
+}
+
+func TestNew_MultipleOptions(t *testing.T) {
+	cfg := &config.Config{
+		Port: "8080",
+		Env:  "test",
+	}
+
+	directConfigs := &DirectConfigs{
+		APIConfigs: []*apiconfig.APIConfig{
+			{
+				ID: "test-api",
+				HttpConfig: apiconfig.HttpConfig{
+					ListenPath: "/test",
+					Method:     "GET",
+				},
+			},
+		},
+		IntegrationConfigs: []apiconfig.IntegrationConfig{},
+	}
+
+	engine, err := New(cfg, WithDirectConfigs(directConfigs), WithLogger(nil))
+	require.NoError(t, err)
+	assert.NotNil(t, engine)
+	assert.Equal(t, directConfigs, engine.directConfigs)
+	assert.NotNil(t, engine.logger)
 }

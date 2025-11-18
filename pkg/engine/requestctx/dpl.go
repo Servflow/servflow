@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"sync"
 	"text/template"
 )
 
@@ -46,25 +45,10 @@ var (
 	templateRegex *regexp.Regexp
 )
 
-type SecretStore interface {
-	GetSecret(key string) ([]byte, error)
-}
-
 func init() {
 	quoteRegex = regexp.MustCompile(regexMatchString)
 	templateRegex = regexp.MustCompile(regexMatchTemplate)
 
-}
-
-var (
-	secretStore SecretStore
-	once        sync.Once
-)
-
-func SetSecretStore(sl SecretStore) {
-	once.Do(func() {
-		secretStore = sl
-	})
 }
 
 // ReplaceVariableValuesInContext scans the input string for placeholders formatted as {{key}}
@@ -129,13 +113,7 @@ func createTemplate(in string, funcMap template.FuncMap, wrapJSON bool) (*templa
 	if wrapJSON {
 		replaced = wrapWithJSON(replaced)
 	}
-	f := template.FuncMap{
-		"secret": secretTemplateFunc,
-	}
-	for k, v := range funcMap {
-		f[k] = v
-	}
-	return template.New("input").Option("missingkey=zero").Funcs(f).Parse(replaced)
+	return template.New("input").Option("missingkey=zero").Funcs(funcMap).Parse(replaced)
 }
 
 // DEPRECATED jsonout will be added in action generation
@@ -164,14 +142,6 @@ func WrapWithFunction(template, funcWrap string) string {
 		return fmt.Sprintf("{{ %s (%s) }}", funcWrap, submatches[1])
 	})
 	return replaced
-}
-
-func secretTemplateFunc(key string) string {
-	secret, err := secretStore.GetSecret(key)
-	if err != nil {
-		return ""
-	}
-	return string(secret)
 }
 
 // CreateTextTemplate is what should be called in config items to create a template;

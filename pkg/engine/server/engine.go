@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/Servflow/servflow/config"
+	apiconfig "github.com/Servflow/servflow/pkg/definitions"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/agent"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/authenticate"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/delete_action"
@@ -28,7 +29,6 @@ import (
 	_ "github.com/Servflow/servflow/pkg/engine/integration/integrations/openai"
 	_ "github.com/Servflow/servflow/pkg/engine/integration/integrations/qdrant"
 	_ "github.com/Servflow/servflow/pkg/engine/integration/integrations/sql"
-	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/engine/yamlloader"
 	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/Servflow/servflow/pkg/storage"
@@ -45,14 +45,20 @@ func WithLogger(core zapcore.Core) Option {
 	}
 }
 
+type DirectConfigs struct {
+	APIConfigs         []*apiconfig.APIConfig
+	IntegrationConfigs []apiconfig.IntegrationConfig
+}
+
 type Engine struct {
-	server     *http.Server
-	cfg        *config.Config
-	yamlLoader *yamlloader.YAMLLoader
-	mcpServer  *server.MCPServer
-	logger     *zap.Logger
-	ctx        context.Context
-	cancel     func()
+	server        *http.Server
+	cfg           *config.Config
+	yamlLoader    *yamlloader.YAMLLoader
+	directConfigs *DirectConfigs
+	mcpServer     *server.MCPServer
+	logger        *zap.Logger
+	ctx           context.Context
+	cancel        func()
 }
 
 func NewWithConfig(cfg *config.Config, opts ...Option) (*Engine, error) {
@@ -62,6 +68,27 @@ func NewWithConfig(cfg *config.Config, opts ...Option) (*Engine, error) {
 		cfg:    cfg,
 		ctx:    ctx,
 		cancel: cancel,
+	}
+
+	for _, opt := range opts {
+		opt(e)
+	}
+
+	if e.logger == nil {
+		e.logger = e.createLogger(cfg.Env)
+	}
+
+	return e, nil
+}
+
+func NewWithDirectConfigs(cfg *config.Config, directConfigs *DirectConfigs, opts ...Option) (*Engine, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	e := &Engine{
+		cfg:           cfg,
+		directConfigs: directConfigs,
+		ctx:           ctx,
+		cancel:        cancel,
 	}
 
 	for _, opt := range opts {
@@ -89,7 +116,6 @@ func (e *Engine) Start() error {
 		logging.FromContext(e.ctx),
 	)
 	e.yamlLoader = yamlLoader
-	requestctx.SetSecretStore(yamlLoader)
 
 	apiConfigs, err := yamlLoader.FetchAPIConfigs(false)
 	if err != nil {
@@ -101,6 +127,20 @@ func (e *Engine) Start() error {
 		return fmt.Errorf("error fetching database configs: %w", err)
 	}
 
+	return e.startWithConfigs(apiConfigs, integrationsConfig)
+}
+
+func (e *Engine) StartWithDirectConfigs() error {
+	e.ctx = logging.WithLogger(e.ctx, e.logger)
+
+	if e.directConfigs == nil {
+		return fmt.Errorf("direct configs not provided")
+	}
+
+	return e.startWithConfigs(e.directConfigs.APIConfigs, e.directConfigs.IntegrationConfigs)
+}
+
+func (e *Engine) startWithConfigs(apiConfigs []*apiconfig.APIConfig, integrationsConfig []apiconfig.IntegrationConfig) error {
 	logging.DebugContext(e.ctx, "Starting integrations...")
 	if err := integration.RegisterIntegrationsFromConfig(integrationsConfig); err != nil {
 		return err

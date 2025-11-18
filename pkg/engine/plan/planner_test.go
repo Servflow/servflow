@@ -151,7 +151,7 @@ func TestPlannerV2_Generate(t *testing.T) {
 			Conditions:     config.Conditionals,
 			Responses:      config.Responses,
 			CustomRegistry: mockRegistry,
-		}, logging.GetNewLogger())
+		}, silentLogger())
 
 		plan, err := planner.Plan()
 		require.NoError(t, err)
@@ -234,7 +234,7 @@ func TestPlannerV2_Generate(t *testing.T) {
 			Conditions:     config.Conditionals,
 			Responses:      config.Responses,
 			CustomRegistry: mockRegistry,
-		}, logging.GetNewLogger())
+		}, silentLogger())
 
 		plan, err := planner.Plan()
 		require.NoError(t, err)
@@ -268,7 +268,7 @@ func TestPlannerV2_generateActionStep(t *testing.T) {
 			Conditions:     sampleConfig.Conditionals,
 			Responses:      sampleConfig.Responses,
 			CustomRegistry: mockRegistry,
-		}, logging.GetNewLogger())
+		}, silentLogger())
 		_, err := planner.generateActionStep("action1")
 		require.NoError(t, err)
 
@@ -289,7 +289,7 @@ func TestPlannerV2_generateActionStep(t *testing.T) {
 			Conditions:     sampleConfig.Conditionals,
 			Responses:      sampleConfig.Responses,
 			CustomRegistry: mockRegistry,
-		}, logging.GetNewLogger())
+		}, silentLogger())
 		_, err := planner.generateActionStep("action2")
 		assert.ErrorContains(t, err, "error creating actions")
 	})
@@ -311,7 +311,7 @@ func TestPlannerV2_generateActionStep(t *testing.T) {
 			Conditions:     sampleConfig.Conditionals,
 			Responses:      sampleConfig.Responses,
 			CustomRegistry: mockRegistry,
-		}, logging.GetNewLogger())
+		}, silentLogger())
 		_, err := planner.generateActionStep("action1")
 		assert.ErrorContains(t, err, "not registered")
 	})
@@ -362,7 +362,7 @@ func TestPlannerV2_generateConditionalStep(t *testing.T) {
 		Responses:      config.Responses,
 		TerminateTag:   "end",
 		CustomRegistry: mockRegistry,
-	}, logging.GetNewLogger())
+	}, silentLogger())
 
 	condition, err := planner.generateConditionalStep("cond1")
 	require.NoError(t, err)
@@ -405,7 +405,7 @@ func TestPlannerV2_generateResponseStep(t *testing.T) {
 		Responses:      config.Responses,
 		TerminateTag:   "end",
 		CustomRegistry: mockRegistry,
-	}, logging.GetNewLogger())
+	}, silentLogger())
 
 	response, err := planner.generateResponseStep("success")
 	require.NoError(t, err)

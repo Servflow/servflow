@@ -158,6 +158,25 @@ func (e *Engine) createLogger(env string) *zap.Logger {
 	return logger
 }
 
+func (e *Engine) ReloadConfigs(newDirectConfigs *DirectConfigs) error {
+	if newDirectConfigs == nil {
+		return fmt.Errorf("new configs cannot be nil")
+	}
+
+	if len(newDirectConfigs.APIConfigs) == 0 {
+		return fmt.Errorf("at least one API config is required")
+	}
+
+	logging.DebugContext(e.ctx, "Reloading API configurations...")
+
+	newHandler := e.createCustomMuxHandler(newDirectConfigs.APIConfigs)
+
+	e.server.Handler = newHandler
+
+	logging.InfoContext(e.ctx, "API configurations reloaded successfully")
+	return nil
+}
+
 func (e *Engine) Stop() error {
 	cl, err := storage.GetClient()
 	if err != nil {

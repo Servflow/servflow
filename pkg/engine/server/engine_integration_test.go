@@ -81,7 +81,7 @@ func TestDirectConfigEngine_Integration(t *testing.T) {
 
 	integrationConfigs := []apiconfig.IntegrationConfig{}
 
-	directConfigs := &DirectConfigs{
+	directConfigs := DirectConfigs{
 		APIConfigs:         apiConfigs,
 		IntegrationConfigs: integrationConfigs,
 	}
@@ -181,7 +181,7 @@ func TestDirectConfigEngine_ValidationError(t *testing.T) {
 		},
 	}
 
-	directConfigs := &DirectConfigs{
+	directConfigs := DirectConfigs{
 		APIConfigs:         apiConfigs,
 		IntegrationConfigs: []apiconfig.IntegrationConfig{},
 	}
@@ -202,7 +202,7 @@ func TestDirectConfigEngine_EmptyConfigs(t *testing.T) {
 		Env:  "test",
 	}
 
-	directConfigs := &DirectConfigs{
+	directConfigs := DirectConfigs{
 		APIConfigs:         []*apiconfig.APIConfig{},
 		IntegrationConfigs: []apiconfig.IntegrationConfig{},
 	}
@@ -249,7 +249,7 @@ func TestDirectConfigEngine_ContextCancellation(t *testing.T) {
 		},
 	}
 
-	directConfigs := &DirectConfigs{
+	directConfigs := DirectConfigs{
 		APIConfigs:         apiConfigs,
 		IntegrationConfigs: []apiconfig.IntegrationConfig{},
 	}

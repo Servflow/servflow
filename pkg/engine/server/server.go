@@ -19,14 +19,12 @@ import (
 
 // TODO move stuff and test engine easily
 // TODO only expose profile if debug
-func (e *Engine) createServer(apiConfigs []*apiconfig.APIConfig, port string) (*http.Server, error) {
+func (e *Engine) createServer(apiConfigs []*apiconfig.APIConfig) (*http.Server, error) {
 	if len(apiConfigs) < 1 {
 		return nil, errors.New("no configuration files found")
 	}
 
-	logging.FromContext(e.ctx).Info("starting engine on " + port)
 	httpServer := &http.Server{
-		Addr:    ":" + port,
 		Handler: e.createCustomMuxHandler(apiConfigs),
 	}
 

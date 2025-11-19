@@ -16,7 +16,7 @@ func TestNew_WithDirectConfigs(t *testing.T) {
 		Env:  "test",
 	}
 
-	directConfigs := &DirectConfigs{
+	directConfigs := DirectConfigs{
 		APIConfigs: []*apiconfig.APIConfig{
 			{
 				ID: "test-api",
@@ -46,7 +46,7 @@ func TestNew_WithFileConfig(t *testing.T) {
 	engine, err := New(FromConfig(cfg))
 	require.NoError(t, err)
 	assert.NotNil(t, engine)
-	assert.Nil(t, engine.config.directConfigs)
+	assert.Nil(t, engine.config.directConfigs.APIConfigs)
 	assert.NotNil(t, engine.config.logger)
 	assert.NotNil(t, engine.ctx)
 }
@@ -73,7 +73,7 @@ func TestDirectConfigs_APIConfigsIntegrity(t *testing.T) {
 		Type: "test-type",
 	}
 
-	directConfigs := &DirectConfigs{
+	directConfigs := DirectConfigs{
 		APIConfigs:         []*apiconfig.APIConfig{apiConfig},
 		IntegrationConfigs: []apiconfig.IntegrationConfig{integrationConfig},
 	}
@@ -90,7 +90,7 @@ func TestEngine_DoneChan(t *testing.T) {
 		Env:  "test",
 	}
 
-	directConfigs := &DirectConfigs{
+	directConfigs := DirectConfigs{
 		APIConfigs:         []*apiconfig.APIConfig{},
 		IntegrationConfigs: []apiconfig.IntegrationConfig{},
 	}
@@ -125,7 +125,7 @@ func TestNew_WithLogger(t *testing.T) {
 		Env:  "test",
 	}
 
-	directConfigs := &DirectConfigs{
+	directConfigs := DirectConfigs{
 		APIConfigs:         []*apiconfig.APIConfig{},
 		IntegrationConfigs: []apiconfig.IntegrationConfig{},
 	}
@@ -142,7 +142,7 @@ func TestNew_EmptyDirectConfigs(t *testing.T) {
 		Env:  "test",
 	}
 
-	directConfigs := &DirectConfigs{
+	directConfigs := DirectConfigs{
 		APIConfigs:         []*apiconfig.APIConfig{},
 		IntegrationConfigs: []apiconfig.IntegrationConfig{},
 	}
@@ -160,7 +160,7 @@ func TestNew_MultipleOptions(t *testing.T) {
 		Env:  "test",
 	}
 
-	directConfigs := &DirectConfigs{
+	directConfigs := DirectConfigs{
 		APIConfigs: []*apiconfig.APIConfig{
 			{
 				ID: "test-api",

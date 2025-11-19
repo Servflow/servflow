@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
-	"time"
 
 	"github.com/Servflow/servflow/config"
 	apiconfig "github.com/Servflow/servflow/pkg/definitions"
@@ -51,7 +51,7 @@ func WithLoggerCore(core zapcore.Core) Option {
 	}
 }
 
-func WithDirectConfigs(directConfigs *DirectConfigs) Option {
+func WithDirectConfigs(directConfigs DirectConfigs) Option {
 	return func(e *Engine) {
 		e.config.directConfigs = directConfigs
 	}
@@ -66,6 +66,12 @@ func WithPort(port string) Option {
 func WithEnvironment(env string) Option {
 	return func(e *Engine) {
 		e.config.env = env
+	}
+}
+
+func WithListener(listener net.Listener) Option {
+	return func(e *Engine) {
+		e.config.listener = listener
 	}
 }
 
@@ -114,34 +120,23 @@ type engineConfig struct {
 	env              string
 	configFolder     string
 	integrationsFile string
-	directConfigs    *DirectConfigs
+	directConfigs    DirectConfigs
 	logger           *zap.Logger
-	shutdownTimeout  time.Duration
-	readTimeout      time.Duration
-	writeTimeout     time.Duration
+	listener         net.Listener
 }
 
 func (c *engineConfig) setDefaults() {
-	if c.port == "" {
+	if c.listener == nil && c.port == "" {
 		c.port = "8080"
 	}
 	if c.env == "" {
 		c.env = "development"
 	}
-	if c.shutdownTimeout == 0 {
-		c.shutdownTimeout = 30 * time.Second
-	}
-	if c.readTimeout == 0 {
-		c.readTimeout = 10 * time.Second
-	}
-	if c.writeTimeout == 0 {
-		c.writeTimeout = 10 * time.Second
-	}
 }
 
 func (c *engineConfig) validate() error {
-	if c.port == "" {
-		return errors.New("port is required")
+	if c.listener == nil && c.port == "" {
+		return errors.New("either port or listener is required")
 	}
 	if c.env == "" {
 		return errors.New("environment is required")
@@ -196,7 +191,27 @@ func (e *Engine) Start() error {
 	var integrationConfigs []apiconfig.IntegrationConfig
 	var err error
 
-	if e.config.directConfigs != nil {
+	if e.config.configFolder != "" {
+		apiCfgs, err := LoadAPIConfigsFromYAML(e.config.configFolder, false, logging.FromContext(e.ctx))
+		if err != nil {
+			return err
+		}
+		apiConfigs = apiCfgs
+	} else {
+		apiConfigs = e.config.directConfigs.APIConfigs
+	}
+
+	if e.config.integrationsFile != "" {
+		itgCfg, err := LoadIntegrationsConfigFromYAML(e.config.integrationsFile, logging.FromContext(e.ctx))
+		if err != nil {
+			return err
+		}
+		integrationConfigs = itgCfg
+	} else {
+		integrationConfigs = e.config.directConfigs.IntegrationConfigs
+	}
+
+	if e.config.directConfigs.APIConfigs != nil {
 		apiConfigs = e.config.directConfigs.APIConfigs
 		integrationConfigs = e.config.directConfigs.IntegrationConfigs
 	} else {
@@ -214,27 +229,48 @@ func (e *Engine) Start() error {
 	return e.startWithConfigs(apiConfigs, integrationConfigs)
 }
 
+func (e *Engine) createListener() (net.Listener, error) {
+	if e.config.listener != nil {
+		logging.InfoContext(e.ctx, "using provided listener", zap.String("addr", e.config.listener.Addr().String()))
+		return e.config.listener, nil
+	}
+
+	addr := ":" + e.config.port
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create listener: %w", err)
+	}
+
+	logging.InfoContext(e.ctx, "created listener", zap.String("addr", listener.Addr().String()))
+	return listener, nil
+}
+
 func (e *Engine) startWithConfigs(apiConfigs []*apiconfig.APIConfig, integrationsConfig []apiconfig.IntegrationConfig) error {
 	logging.DebugContext(e.ctx, "Starting integrations...")
 	if err := integration.RegisterIntegrationsFromConfig(integrationsConfig); err != nil {
 		return err
 	}
 
-	srv, err := e.createServer(apiConfigs, e.config.port)
+	srv, err := e.createServer(apiConfigs)
 	if err != nil {
 		return fmt.Errorf("error creating server: %w", err)
 	}
 	e.server = srv
 
+	listener, err := e.createListener()
+	if err != nil {
+		return fmt.Errorf("error creating listener: %w", err)
+	}
+
 	logging.InfoContext(e.ctx, "starting engine...")
-	e.startServer()
+	e.startServer(listener)
 	logging.InfoContext(e.ctx, "engine started")
 	return nil
 }
 
-func (e *Engine) startServer() {
+func (e *Engine) startServer(listener net.Listener) {
 	go func() {
-		err := e.server.ListenAndServe()
+		err := e.server.Serve(listener)
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logging.ErrorContext(e.ctx, "error starting server", err)
 			e.cancel()

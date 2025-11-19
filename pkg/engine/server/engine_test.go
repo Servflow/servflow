@@ -16,7 +16,7 @@ func TestNew_WithDirectConfigs(t *testing.T) {
 		Env:  "test",
 	}
 
-	directConfigs := &DirectConfigs{
+	directConfigs := DirectConfigs{
 		APIConfigs: []*apiconfig.APIConfig{
 			{
 				ID: "test-api",
@@ -29,12 +29,11 @@ func TestNew_WithDirectConfigs(t *testing.T) {
 		IntegrationConfigs: []apiconfig.IntegrationConfig{},
 	}
 
-	engine, err := New(cfg, WithDirectConfigs(directConfigs))
+	engine, err := New(FromConfig(cfg), WithDirectConfigs(directConfigs))
 	require.NoError(t, err)
 	assert.NotNil(t, engine)
-	assert.Equal(t, cfg, engine.cfg)
-	assert.Equal(t, directConfigs, engine.directConfigs)
-	assert.NotNil(t, engine.logger)
+	assert.Equal(t, directConfigs, engine.config.directConfigs)
+	assert.NotNil(t, engine.config.logger)
 	assert.NotNil(t, engine.ctx)
 }
 
@@ -44,12 +43,11 @@ func TestNew_WithFileConfig(t *testing.T) {
 		Env:  "test",
 	}
 
-	engine, err := New(cfg)
+	engine, err := New(FromConfig(cfg))
 	require.NoError(t, err)
 	assert.NotNil(t, engine)
-	assert.Equal(t, cfg, engine.cfg)
-	assert.Nil(t, engine.directConfigs)
-	assert.NotNil(t, engine.logger)
+	assert.Nil(t, engine.config.directConfigs.APIConfigs)
+	assert.NotNil(t, engine.config.logger)
 	assert.NotNil(t, engine.ctx)
 }
 
@@ -75,7 +73,7 @@ func TestDirectConfigs_APIConfigsIntegrity(t *testing.T) {
 		Type: "test-type",
 	}
 
-	directConfigs := &DirectConfigs{
+	directConfigs := DirectConfigs{
 		APIConfigs:         []*apiconfig.APIConfig{apiConfig},
 		IntegrationConfigs: []apiconfig.IntegrationConfig{integrationConfig},
 	}
@@ -92,12 +90,12 @@ func TestEngine_DoneChan(t *testing.T) {
 		Env:  "test",
 	}
 
-	directConfigs := &DirectConfigs{
+	directConfigs := DirectConfigs{
 		APIConfigs:         []*apiconfig.APIConfig{},
 		IntegrationConfigs: []apiconfig.IntegrationConfig{},
 	}
 
-	engine, err := New(cfg, WithDirectConfigs(directConfigs))
+	engine, err := New(FromConfig(cfg), WithDirectConfigs(directConfigs))
 	require.NoError(t, err)
 
 	doneChan := engine.DoneChan()
@@ -127,15 +125,15 @@ func TestNew_WithLogger(t *testing.T) {
 		Env:  "test",
 	}
 
-	directConfigs := &DirectConfigs{
+	directConfigs := DirectConfigs{
 		APIConfigs:         []*apiconfig.APIConfig{},
 		IntegrationConfigs: []apiconfig.IntegrationConfig{},
 	}
 
 	// Test with custom logger option
-	engine, err := New(cfg, WithDirectConfigs(directConfigs), WithLogger(nil))
+	engine, err := New(FromConfig(cfg), WithDirectConfigs(directConfigs), WithLogger(nil))
 	require.NoError(t, err)
-	assert.NotNil(t, engine.logger)
+	assert.NotNil(t, engine.config.logger)
 }
 
 func TestNew_EmptyDirectConfigs(t *testing.T) {
@@ -144,16 +142,16 @@ func TestNew_EmptyDirectConfigs(t *testing.T) {
 		Env:  "test",
 	}
 
-	directConfigs := &DirectConfigs{
+	directConfigs := DirectConfigs{
 		APIConfigs:         []*apiconfig.APIConfig{},
 		IntegrationConfigs: []apiconfig.IntegrationConfig{},
 	}
 
-	engine, err := New(cfg, WithDirectConfigs(directConfigs))
+	engine, err := New(FromConfig(cfg), WithDirectConfigs(directConfigs))
 	require.NoError(t, err)
 	assert.NotNil(t, engine)
-	assert.Len(t, engine.directConfigs.APIConfigs, 0)
-	assert.Len(t, engine.directConfigs.IntegrationConfigs, 0)
+	assert.Len(t, engine.config.directConfigs.APIConfigs, 0)
+	assert.Len(t, engine.config.directConfigs.IntegrationConfigs, 0)
 }
 
 func TestNew_MultipleOptions(t *testing.T) {
@@ -162,7 +160,7 @@ func TestNew_MultipleOptions(t *testing.T) {
 		Env:  "test",
 	}
 
-	directConfigs := &DirectConfigs{
+	directConfigs := DirectConfigs{
 		APIConfigs: []*apiconfig.APIConfig{
 			{
 				ID: "test-api",
@@ -175,9 +173,85 @@ func TestNew_MultipleOptions(t *testing.T) {
 		IntegrationConfigs: []apiconfig.IntegrationConfig{},
 	}
 
-	engine, err := New(cfg, WithDirectConfigs(directConfigs), WithLogger(nil))
+	engine, err := New(FromConfig(cfg), WithDirectConfigs(directConfigs), WithLogger(nil))
 	require.NoError(t, err)
 	assert.NotNil(t, engine)
-	assert.Equal(t, directConfigs, engine.directConfigs)
-	assert.NotNil(t, engine.logger)
+	assert.Equal(t, directConfigs, engine.config.directConfigs)
+	assert.NotNil(t, engine.config.logger)
+}
+
+func TestNew_WithOptions(t *testing.T) {
+	engine, err := New(
+		WithPort("9000"),
+		WithEnvironment("production"),
+		WithConfigFolder("./test-configs"),
+		WithIntegrationsFile("./test-integrations.yaml"),
+	)
+	require.NoError(t, err)
+	assert.NotNil(t, engine)
+	assert.Equal(t, "9000", engine.config.port)
+	assert.Equal(t, "production", engine.config.env)
+	assert.Equal(t, "./test-configs", engine.config.configFolder)
+	assert.Equal(t, "./test-integrations.yaml", engine.config.integrationsFile)
+	assert.NotNil(t, engine.config.logger)
+}
+
+func TestNew_WithDefaults(t *testing.T) {
+	engine, err := New(WithDefaults())
+	require.NoError(t, err)
+	assert.NotNil(t, engine)
+	assert.Equal(t, "8080", engine.config.port)
+	assert.Equal(t, "development", engine.config.env)
+	assert.NotNil(t, engine.config.logger)
+}
+
+func TestNew_ConfigValidation(t *testing.T) {
+	tests := []struct {
+		name        string
+		options     []Option
+		expectError bool
+	}{
+		{
+			name: "valid config with explicit values",
+			options: []Option{
+				WithPort("9000"),
+				WithEnvironment("production"),
+				WithConfigFolder("./configs"),
+			},
+			expectError: false,
+		},
+		{
+			name: "valid config with defaults only",
+			options: []Option{
+				WithDefaults(),
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			engine, err := New(tt.options...)
+			if tt.expectError {
+				require.Error(t, err)
+				assert.Nil(t, engine)
+			} else {
+				require.NoError(t, err)
+				assert.NotNil(t, engine)
+			}
+		})
+	}
+}
+
+func TestNewWithConfig_BackwardCompatibility(t *testing.T) {
+	cfg := &config.Config{
+		Port: "8080",
+		Env:  "test",
+	}
+
+	engine, err := NewWithConfig(cfg)
+	require.NoError(t, err)
+	assert.NotNil(t, engine)
+	assert.Equal(t, cfg.Port, engine.config.port)
+	assert.Equal(t, cfg.Env, engine.config.env)
 }

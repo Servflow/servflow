@@ -33,7 +33,7 @@ func RunServer(cfg *config.Config) error {
 		return err
 	}
 
-	eng, err := server.New(cfg)
+	eng, err := server.New(server.FromConfig(cfg), server.WithDefaults())
 	if err != nil {
 		return err
 	}

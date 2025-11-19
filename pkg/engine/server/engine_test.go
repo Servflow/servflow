@@ -181,3 +181,103 @@ func TestNew_MultipleOptions(t *testing.T) {
 	assert.Equal(t, directConfigs, engine.directConfigs)
 	assert.NotNil(t, engine.logger)
 }
+
+func TestEngine_ReloadConfigs(t *testing.T) {
+	cfg := &config.Config{
+		Port: "8080",
+		Env:  "test",
+	}
+
+	initialConfigs := &DirectConfigs{
+		APIConfigs: []*apiconfig.APIConfig{
+			{
+				ID: "initial-api",
+				HttpConfig: apiconfig.HttpConfig{
+					ListenPath: "/initial",
+					Method:     "GET",
+				},
+			},
+		},
+		IntegrationConfigs: []apiconfig.IntegrationConfig{},
+	}
+
+	engine, err := New(cfg, WithDirectConfigs(initialConfigs))
+	require.NoError(t, err)
+
+	err = engine.Start()
+	require.NoError(t, err)
+	defer engine.Stop()
+
+	newConfigs := &DirectConfigs{
+		APIConfigs: []*apiconfig.APIConfig{
+			{
+				ID: "reloaded-api",
+				HttpConfig: apiconfig.HttpConfig{
+					ListenPath: "/reloaded",
+					Method:     "POST",
+				},
+			},
+		},
+	}
+
+	err = engine.ReloadConfigs(newConfigs)
+	require.NoError(t, err)
+}
+
+func TestEngine_ReloadConfigs_NilConfigs(t *testing.T) {
+	cfg := &config.Config{
+		Port: "8080",
+		Env:  "test",
+	}
+
+	initialConfigs := &DirectConfigs{
+		APIConfigs: []*apiconfig.APIConfig{
+			{
+				ID: "initial-api",
+				HttpConfig: apiconfig.HttpConfig{
+					ListenPath: "/initial",
+					Method:     "GET",
+				},
+			},
+		},
+		IntegrationConfigs: []apiconfig.IntegrationConfig{},
+	}
+
+	engine, err := New(cfg, WithDirectConfigs(initialConfigs))
+	require.NoError(t, err)
+
+	err = engine.ReloadConfigs(nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "new configs cannot be nil")
+}
+
+func TestEngine_ReloadConfigs_EmptyAPIConfigs(t *testing.T) {
+	cfg := &config.Config{
+		Port: "8080",
+		Env:  "test",
+	}
+
+	initialConfigs := &DirectConfigs{
+		APIConfigs: []*apiconfig.APIConfig{
+			{
+				ID: "initial-api",
+				HttpConfig: apiconfig.HttpConfig{
+					ListenPath: "/initial",
+					Method:     "GET",
+				},
+			},
+		},
+		IntegrationConfigs: []apiconfig.IntegrationConfig{},
+	}
+
+	engine, err := New(cfg, WithDirectConfigs(initialConfigs))
+	require.NoError(t, err)
+
+	emptyConfigs := &DirectConfigs{
+		APIConfigs: []*apiconfig.APIConfig{},
+	}
+
+	err = engine.ReloadConfigs(emptyConfigs)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "at least one API config is required")
+}

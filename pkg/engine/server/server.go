@@ -19,7 +19,6 @@ import (
 
 // TODO move stuff and test engine easily
 // TODO only expose profile if debug
-
 func (e *Engine) createServer(apiConfigs []*apiconfig.APIConfig, port string) (*http.Server, error) {
 	if len(apiConfigs) < 1 {
 		return nil, errors.New("no configuration files found")

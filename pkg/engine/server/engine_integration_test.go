@@ -86,7 +86,7 @@ func TestDirectConfigEngine_Integration(t *testing.T) {
 		IntegrationConfigs: integrationConfigs,
 	}
 
-	engine, err := New(cfg, WithDirectConfigs(directConfigs))
+	engine, err := New(FromConfig(cfg), WithDirectConfigs(directConfigs))
 	require.NoError(t, err)
 
 	// Start engine in goroutine
@@ -186,14 +186,14 @@ func TestDirectConfigEngine_ValidationError(t *testing.T) {
 		IntegrationConfigs: []apiconfig.IntegrationConfig{},
 	}
 
-	engine, err := New(cfg, WithDirectConfigs(directConfigs))
+	engine, err := New(FromConfig(cfg), WithDirectConfigs(directConfigs))
 	require.NoError(t, err)
 
 	// Validation should occur during startup, but since we're using stub actions
 	// and the engine doesn't validate configs by default during startup,
 	// this test verifies the engine can be created with invalid configs
 	assert.NotNil(t, engine)
-	assert.Equal(t, directConfigs, engine.directConfigs)
+	assert.Equal(t, directConfigs, engine.config.directConfigs)
 }
 
 func TestDirectConfigEngine_EmptyConfigs(t *testing.T) {
@@ -207,7 +207,7 @@ func TestDirectConfigEngine_EmptyConfigs(t *testing.T) {
 		IntegrationConfigs: []apiconfig.IntegrationConfig{},
 	}
 
-	engine, err := New(cfg, WithDirectConfigs(directConfigs))
+	engine, err := New(FromConfig(cfg), WithDirectConfigs(directConfigs))
 	require.NoError(t, err)
 
 	// Should be able to start with empty configs, but createServer will fail
@@ -254,7 +254,7 @@ func TestDirectConfigEngine_ContextCancellation(t *testing.T) {
 		IntegrationConfigs: []apiconfig.IntegrationConfig{},
 	}
 
-	engine, err := New(cfg, WithDirectConfigs(directConfigs))
+	engine, err := New(FromConfig(cfg), WithDirectConfigs(directConfigs))
 	require.NoError(t, err)
 
 	doneChan := engine.DoneChan()

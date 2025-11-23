@@ -10,14 +10,13 @@ import (
 	apiconfig "github.com/Servflow/servflow/pkg/definitions"
 	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
-	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"go.uber.org/zap"
 )
 
 func (e *Engine) createMCPHandler(config *apiconfig.APIConfig) error {
-	logger := logging.FromContext(e.ctx).With(zap.String("type", "mcp"), zap.String("tool", config.McpTool.Name))
+	logger := e.logger.With(zap.String("type", "mcp"), zap.String("tool", config.McpTool.Name))
 	//generate plan
 	planner := plan.NewPlannerV2(plan.PlannerConfig{
 		Actions:    config.Actions,
@@ -55,7 +54,7 @@ func (e *Engine) createMCPHandler(config *apiconfig.APIConfig) error {
 
 	e.mcpServer.AddTool(mcp.NewTool(config.McpTool.Name, options...), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		start := time.Now()
-		logger := logging.WithContextEnriched(ctx).With(zap.String("toolName", config.McpTool.Name))
+		logger := logger.With(zap.String("toolName", config.McpTool.Name))
 
 		reqCtx, ok := requestctx.FromContext(ctx)
 		if !ok {

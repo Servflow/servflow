@@ -70,7 +70,7 @@ func (e *Engine) createCustomMuxHandler(configs []*apiconfig.APIConfig) http.Han
 			continue
 		}
 
-		h := wrapMiddleware(handler)
+		h := wrapMiddlewareWithReqIDLogger(e.logger, handler)
 		logger.Info("registered handler for " + conf.ID)
 
 		r.Handle(listenPath, h).Methods(method, http.MethodOptions)
@@ -78,16 +78,19 @@ func (e *Engine) createCustomMuxHandler(configs []*apiconfig.APIConfig) http.Han
 
 	if e.mcpServer != nil {
 		httpHandler := server.NewStreamableHTTPServer(e.mcpServer)
-		r.HandleFunc("/mcp", wrapMiddleware(httpHandler).ServeHTTP).Methods(http.MethodGet, http.MethodOptions, http.MethodPost)
+		r.HandleFunc("/mcp", wrapMiddlewareWithReqIDLogger(e.logger, httpHandler).ServeHTTP).Methods(http.MethodGet, http.MethodOptions, http.MethodPost)
 	}
 
 	return r
 }
 
-func wrapMiddleware(handler http.Handler) http.Handler {
+func wrapMiddlewareWithReqIDLogger(logger *zap.Logger, handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		aggCtx := requestctx.NewRequestContext(fmt.Sprintf("request_%d", time.Now().UnixNano()))
+		requestID := fmt.Sprintf("request_%d", time.Now().UnixNano())
+		aggCtx := requestctx.NewRequestContext(requestID)
 		ctx := requestctx.WithAggregationContext(r.Context(), aggCtx)
+		logger := logger.With(zap.String("request_id", requestID), zap.String("method", r.Method), zap.String("path", r.URL.Path))
+		ctx = logging.WithLogger(ctx, logger)
 		handler.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

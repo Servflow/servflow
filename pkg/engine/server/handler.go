@@ -29,7 +29,7 @@ import (
 // actions and datasource managers
 func (e *Engine) createBasicHandler(config *apiconfig.APIConfig) (http.Handler, error) {
 	logger := logging.FromContext(e.ctx)
-	logger.Info("Loading API configuration", zap.String("api", config.ID), zap.String("path", config.HttpConfig.ListenPath), zap.String("method", config.HttpConfig.Method))
+	logger.Debug("Loading API configuration", zap.String("api", config.ID), zap.String("path", config.HttpConfig.ListenPath), zap.String("method", config.HttpConfig.Method))
 
 	planner := plan.NewPlannerV2(plan.PlannerConfig{
 		Actions:    config.Actions,
@@ -41,7 +41,7 @@ func (e *Engine) createBasicHandler(config *apiconfig.APIConfig) (http.Handler, 
 		return nil, err
 	}
 
-	logging.FromContext(e.ctx).Debug("Starting plan generation from", zap.String("start", config.HttpConfig.Next))
+	logger.Debug("Starting plan generation from", zap.String("start", config.HttpConfig.Next))
 
 	a := &APIHandler{
 		apiPath:   config.HttpConfig.ListenPath,
@@ -101,7 +101,7 @@ func (h *APIHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	start := time.Now()
 	ctx := req.Context()
 
-	logger := logging.FromContext(ctx).With(zap.String("path", req.URL.Path), zap.String("method", req.Method))
+	logger := logging.FromContext(ctx)
 	logger.Debug("Handling request")
 	if tracing.OTELEnabled() {
 		var span trace.Span

@@ -270,3 +270,89 @@ func TestDirectConfigEngine_ContextCancellation(t *testing.T) {
 		t.Fatal("DoneChan should be closed after context cancellation")
 	}
 }
+
+func TestDirectConfigEngine_IdleTimeout(t *testing.T) {
+	// Get a random available port
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	port := listener.Addr().(*net.TCPAddr).Port
+	listener.Close()
+
+	cfg := &config.Config{
+		Port: fmt.Sprintf("%d", port),
+		Env:  "test",
+	}
+
+	apiConfigs := []*apiconfig.APIConfig{
+		{
+			ID: "test-idle",
+			HttpConfig: apiconfig.HttpConfig{
+				ListenPath: "/test",
+				Method:     "GET",
+				Next:       "action.test",
+			},
+			Actions: map[string]apiconfig.Action{
+				"test": {
+					Type: "stub",
+					Next: "response.ok",
+					Config: map[string]interface{}{
+						"result": "ok",
+					},
+				},
+			},
+			Responses: map[string]apiconfig.ResponseConfig{
+				"ok": {
+					Code:     200,
+					Type:     "template",
+					Template: "OK",
+				},
+			},
+		},
+	}
+
+	directConfigs := &DirectConfigs{
+		APIConfigs:         apiConfigs,
+		IntegrationConfigs: []apiconfig.IntegrationConfig{},
+	}
+
+	// Test with 200ms idle timeout
+	engine, err := New(cfg, WithDirectConfigs(directConfigs), WithIdleTimeout(200*time.Millisecond))
+	require.NoError(t, err)
+
+	// Start engine
+	errChan := make(chan error, 1)
+	go func() {
+		if err := engine.Start(); err != nil {
+			errChan <- err
+		}
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	baseURL := fmt.Sprintf("http://127.0.0.1:%d", port)
+
+	// Make a request to reset the timer
+	resp, err := http.Get(baseURL + "/test")
+	require.NoError(t, err)
+	resp.Body.Close()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// Engine should still be alive after 100ms (less than timeout)
+	time.Sleep(100 * time.Millisecond)
+	select {
+	case <-engine.DoneChan():
+		t.Fatal("Engine should not have timed out yet")
+	default:
+		// Expected - engine still running
+	}
+
+	// Wait for idle timeout to trigger (total 300ms > 200ms timeout)
+	time.Sleep(250 * time.Millisecond)
+	select {
+	case <-engine.DoneChan():
+		// Expected - engine should be shut down due to idle timeout
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("Engine should have shut down due to idle timeout")
+	}
+
+	engine.Stop()
+}

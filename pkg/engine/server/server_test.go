@@ -14,6 +14,7 @@ import (
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
+	"go.uber.org/zap"
 )
 
 var sessionIDHeader = "Mcp-Session-Id"
@@ -71,7 +72,13 @@ func (r *TestRunner) WithDefaultMocks() *TestRunner {
 
 // Init initializes the test runner, creating the HTTP handler
 func (r *TestRunner) Init() *TestRunner {
-	eng := Engine{}
+	devLogger, err := zap.NewDevelopment()
+	if err != nil {
+		r.t.Fatal(err)
+	}
+	eng := Engine{
+		logger: devLogger,
+	}
 	r.handler = eng.createCustomMuxHandler([]*apiconfig.APIConfig{r.apiConfig})
 	return r
 }
@@ -192,8 +199,7 @@ func TestCreateCustomMuxHandler(t *testing.T) {
 	}
 
 	// Create and initialize test runner
-	runner := NewTestRunner(t, config).
-		Init()
+	runner := NewTestRunner(t, config).Init()
 
 	// Run all test requests
 	var sessionID string

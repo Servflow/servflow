@@ -182,6 +182,30 @@ func TestNew_MultipleOptions(t *testing.T) {
 	assert.NotNil(t, engine.logger)
 }
 
+func TestNew_WithIdleTimeout(t *testing.T) {
+	cfg := &config.Config{
+		Port: "8080",
+		Env:  "test",
+	}
+
+	directConfigs := &DirectConfigs{
+		APIConfigs:         []*apiconfig.APIConfig{},
+		IntegrationConfigs: []apiconfig.IntegrationConfig{},
+	}
+
+	timeout := 5 * time.Minute
+	engine, err := New(cfg, WithDirectConfigs(directConfigs), WithIdleTimeout(timeout))
+	require.NoError(t, err)
+	assert.NotNil(t, engine)
+	assert.Equal(t, timeout, engine.idleTimeout)
+
+	// Test with zero timeout (disabled)
+	engine2, err := New(cfg, WithDirectConfigs(directConfigs), WithIdleTimeout(0))
+	require.NoError(t, err)
+	assert.NotNil(t, engine2)
+	assert.Equal(t, time.Duration(0), engine2.idleTimeout)
+}
+
 func TestEngine_ReloadConfigs(t *testing.T) {
 	cfg := &config.Config{
 		Port: "8080",

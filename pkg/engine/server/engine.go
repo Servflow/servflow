@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
+	"time"
 
 	"github.com/Servflow/servflow/config"
 	apiconfig "github.com/Servflow/servflow/pkg/definitions"
@@ -50,6 +52,12 @@ func WithDirectConfigs(directConfigs *DirectConfigs) Option {
 	}
 }
 
+func WithIdleTimeout(timeout time.Duration) Option {
+	return func(e *Engine) {
+		e.idleTimeout = timeout
+	}
+}
+
 type DirectConfigs struct {
 	APIConfigs         []*apiconfig.APIConfig
 	IntegrationConfigs []apiconfig.IntegrationConfig
@@ -63,6 +71,9 @@ type Engine struct {
 	logger        *zap.Logger
 	ctx           context.Context
 	cancel        func()
+	idleTimeout   time.Duration
+	idleTimer     *time.Timer
+	timerMutex    sync.Mutex
 }
 
 func New(cfg *config.Config, opts ...Option) (*Engine, error) {
@@ -126,6 +137,8 @@ func (e *Engine) startWithConfigs(apiConfigs []*apiconfig.APIConfig, integration
 	}
 	e.server = srv
 
+	e.initIdleTimer()
+
 	logging.InfoContext(e.ctx, "starting engine...")
 	e.startServer()
 	logging.InfoContext(e.ctx, "engine started")
@@ -178,6 +191,13 @@ func (e *Engine) ReloadConfigs(newDirectConfigs *DirectConfigs) error {
 }
 
 func (e *Engine) Stop() error {
+	e.timerMutex.Lock()
+	if e.idleTimer != nil {
+		e.idleTimer.Stop()
+		e.idleTimer = nil
+	}
+	e.timerMutex.Unlock()
+
 	cl, err := storage.GetClient()
 	if err != nil {
 		return err
@@ -187,4 +207,31 @@ func (e *Engine) Stop() error {
 		return err
 	}
 	return e.server.Shutdown(e.ctx)
+}
+
+func (e *Engine) initIdleTimer() {
+	if e.idleTimeout <= 0 {
+		return
+	}
+
+	e.timerMutex.Lock()
+	defer e.timerMutex.Unlock()
+
+	e.idleTimer = time.AfterFunc(e.idleTimeout, func() {
+		logging.InfoContext(e.ctx, "Idle timeout reached, shutting down engine")
+		e.cancel()
+	})
+}
+
+func (e *Engine) resetIdleTimer() {
+	if e.idleTimeout <= 0 {
+		return
+	}
+
+	e.timerMutex.Lock()
+	defer e.timerMutex.Unlock()
+
+	if e.idleTimer != nil {
+		e.idleTimer.Reset(e.idleTimeout)
+	}
 }

@@ -142,7 +142,7 @@ func init() {
 			Type:        actions.FieldTypeString,
 			Label:       "User Prompt",
 			Placeholder: "User message or query",
-			Required:    true,
+			Required:    false,
 		},
 		"integrationID": {
 			Type:        actions.FieldTypeIntegration,

@@ -6,6 +6,8 @@ import (
 	"fmt"
 
 	"github.com/Servflow/servflow/pkg/engine/actions"
+	"github.com/Servflow/servflow/pkg/logging"
+	"go.uber.org/zap"
 )
 
 type Executable struct {
@@ -31,6 +33,9 @@ func (s *Executable) Config() string {
 }
 
 func (s *Executable) Execute(ctx context.Context, modifiedConfig string) (interface{}, error) {
+	logger := logging.FromContext(ctx).With(zap.String("execution_type", s.Type()))
+	ctx = logging.WithLogger(ctx, logger)
+
 	var newFields map[string]interface{}
 	if err := json.Unmarshal([]byte(modifiedConfig), &newFields); err != nil {
 		return nil, err

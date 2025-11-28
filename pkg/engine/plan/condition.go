@@ -57,7 +57,7 @@ func (c *ConditionStep) Execute(ctx context.Context) (Step, error) {
 	ctx, span = tracing.SpanCtxFromContext(ctx, "condition.execute."+c.id)
 	defer span.End()
 
-	logger := logging.WithContextEnriched(ctx)
+	logger := logging.FromContext(ctx)
 	if c.exprString == "" {
 		return c.OnValid, nil
 	}

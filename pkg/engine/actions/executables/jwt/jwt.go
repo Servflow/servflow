@@ -10,7 +10,9 @@ import (
 	"time"
 
 	"github.com/Servflow/servflow/pkg/engine/actions"
+	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/golang-jwt/jwt/v5"
+	"go.uber.org/zap"
 )
 
 type Config struct {
@@ -39,6 +41,9 @@ func (a *JWT) Config() string {
 }
 
 func (a *JWT) Execute(ctx context.Context, modifiedConfig string) (interface{}, error) {
+	logger := logging.FromContext(ctx).With(zap.String("execution_type", a.Type()))
+	ctx = logging.WithLogger(ctx, logger)
+
 	field := modifiedConfig
 	if a.config.Mode == "" {
 		a.config.Mode = "encode"

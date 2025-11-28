@@ -20,7 +20,8 @@ type Plan struct {
 }
 
 func (p *Plan) executeStep(ctx context.Context, step Step, endValue string) (*http.SfResponse, error) {
-	logger := logging.WithContextEnriched(ctx).With(zap.String("id", step.ID()))
+	logger := logging.FromContext(ctx).With(zap.String("step_id", step.ID()))
+	ctx = logging.WithLogger(ctx, logger)
 	var (
 		next Step
 		err  error

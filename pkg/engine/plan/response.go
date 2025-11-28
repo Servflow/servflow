@@ -7,6 +7,8 @@ import (
 	"github.com/Servflow/servflow/internal/http"
 	apiconfig "github.com/Servflow/servflow/pkg/definitions"
 	"github.com/Servflow/servflow/pkg/engine/plan/responsebuilder"
+	"github.com/Servflow/servflow/pkg/logging"
+	"go.uber.org/zap"
 )
 
 // TODO improve response handling
@@ -64,5 +66,8 @@ func (r *Response) Execute(ctx context.Context) (Step, error) {
 }
 
 func (r *Response) WriteResponse(ctx context.Context) (*http.SfResponse, error) {
+	logger := logging.FromContext(ctx).With(zap.String("response_id", r.id))
+	ctx = logging.WithLogger(ctx, logger)
+
 	return r.responseBuilder.BuildResponse(ctx)
 }

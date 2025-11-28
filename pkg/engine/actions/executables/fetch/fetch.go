@@ -9,6 +9,8 @@ import (
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/integration"
 	"github.com/Servflow/servflow/pkg/engine/integration/integrations/filters"
+	"github.com/Servflow/servflow/pkg/logging"
+	"go.uber.org/zap"
 )
 
 type Fetch struct {
@@ -65,6 +67,9 @@ func (f *Fetch) Config() string {
 }
 
 func (f *Fetch) Execute(ctx context.Context, modifiedConfig string) (interface{}, error) {
+	logger := logging.FromContext(ctx).With(zap.String("execution_type", f.Type()))
+	ctx = logging.WithLogger(ctx, logger)
+
 	var filters []filters.Filter
 	if err := json.Unmarshal([]byte(modifiedConfig), &filters); err != nil {
 		return "", err

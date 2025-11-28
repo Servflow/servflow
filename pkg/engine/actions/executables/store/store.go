@@ -8,7 +8,9 @@ import (
 
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/integration"
+	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 type storageIntegrations interface {
@@ -64,6 +66,9 @@ func (s *Store) Config() string {
 }
 
 func (s *Store) Execute(ctx context.Context, modifiedConfig string) (interface{}, error) {
+	logger := logging.FromContext(ctx).With(zap.String("execution_type", s.Type()))
+	ctx = logging.WithLogger(ctx, logger)
+
 	var item map[string]interface{}
 	if err := json.Unmarshal([]byte(modifiedConfig), &item); err != nil {
 		return "", nil

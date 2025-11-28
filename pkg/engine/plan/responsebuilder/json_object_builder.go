@@ -9,6 +9,7 @@ import (
 	apiconfig "github.com/Servflow/servflow/pkg/definitions"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
+	"go.uber.org/zap"
 )
 
 type JSONObjectBuilder struct {
@@ -24,7 +25,10 @@ func NewObjectBuilder(object *apiconfig.ResponseObject, code int) *JSONObjectBui
 }
 
 func (o *JSONObjectBuilder) BuildResponse(ctx context.Context) (*http.SfResponse, error) {
-	logging.DebugContext(ctx, "running object builder response builder")
+	logger := logging.FromContext(ctx).With(zap.String("builder_type", "json_object"))
+	ctx = logging.WithLogger(ctx, logger)
+
+	logger.Debug("running object builder response builder")
 
 	val, err := generateValue(ctx, o.object)
 	if err != nil {

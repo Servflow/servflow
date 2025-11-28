@@ -20,7 +20,7 @@ type Plan struct {
 }
 
 func (p *Plan) executeStep(ctx context.Context, step Step, endValue string) (*http.SfResponse, error) {
-	logger := logging.WithContextEnriched(ctx).With(zap.String("id", step.ID()))
+	logger := logging.FromContext(ctx)
 	var (
 		next Step
 		err  error
@@ -65,9 +65,12 @@ func (p *Plan) generateEndValue(ctx context.Context, logger *zap.Logger, endValu
 }
 
 func (p *Plan) Execute(ctx context.Context, id, endValue string) (*http.SfResponse, error) {
-	logging.DebugContext(ctx, "Executing step", zap.String("id", id), zap.String("endValue", endValue))
+	logger := logging.FromContext(ctx).With(zap.String("step_id", id))
+	ctx = logging.WithLogger(ctx, logger)
+
+	logger.Debug("starting execution")
+	defer logger.Debug("finished execution")
 	ctx = context.WithValue(ctx, ContextKey, p)
-	//ctx = logging.WithLogger(ctx, p.)
 	step, ok := p.steps[id]
 	if !ok {
 		return nil, errors.New("step not found")

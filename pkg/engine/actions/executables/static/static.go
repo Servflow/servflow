@@ -37,7 +37,7 @@ func (s *Executable) Config() string {
 
 func (s *Executable) Execute(ctx context.Context, modifiedConfig string) (interface{}, error) {
 	logger := logging.FromContext(ctx).With(zap.String("execution_type", s.Type()))
-	ctx = logging.WithLogger(ctx, logger)
+	_ = logging.WithLogger(ctx, logger)
 
 	return s.Return, nil
 }

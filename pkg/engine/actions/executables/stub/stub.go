@@ -34,7 +34,7 @@ func (s *Executable) Config() string {
 
 func (s *Executable) Execute(ctx context.Context, modifiedConfig string) (interface{}, error) {
 	logger := logging.FromContext(ctx).With(zap.String("execution_type", s.Type()))
-	ctx = logging.WithLogger(ctx, logger)
+	_ = logging.WithLogger(ctx, logger)
 
 	var newFields map[string]interface{}
 	if err := json.Unmarshal([]byte(modifiedConfig), &newFields); err != nil {

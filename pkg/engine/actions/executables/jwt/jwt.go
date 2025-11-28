@@ -42,7 +42,7 @@ func (a *JWT) Config() string {
 
 func (a *JWT) Execute(ctx context.Context, modifiedConfig string) (interface{}, error) {
 	logger := logging.FromContext(ctx).With(zap.String("execution_type", a.Type()))
-	ctx = logging.WithLogger(ctx, logger)
+	_ = logging.WithLogger(ctx, logger)
 
 	field := modifiedConfig
 	if a.config.Mode == "" {

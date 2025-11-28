@@ -43,7 +43,7 @@ func (h *Hash) Config() string {
 
 func (h *Hash) Execute(ctx context.Context, modifiedConfig string) (interface{}, error) {
 	logger := logging.FromContext(ctx).With(zap.String("execution_type", h.Type()))
-	ctx = logging.WithLogger(ctx, logger)
+	_ = logging.WithLogger(ctx, logger)
 
 	res, err := bcrypt.GenerateFromPassword([]byte(modifiedConfig), 10)
 	if err != nil {

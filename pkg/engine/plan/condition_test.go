@@ -20,65 +20,65 @@ func TestConditionStep_Execute(t *testing.T) {
 
 	t.Run("fail", func(t *testing.T) {
 		condition := ConditionStep{
-			OnValid:    validStep,
-			OnInvalid:  invalidStep,
+			OnValid:    &stepWrapper{id: "valid", step: validStep},
+			OnInvalid:  &stepWrapper{id: "invalid", step: invalidStep},
 			exprString: `{{ email .test "email" }}`,
 		}
 
 		ctx := requestctx2.NewTestContext()
 		requestctx2.AddRequestVariables(ctx, map[string]interface{}{"test": "value"}, "")
-		next, err := condition.Execute(ctx)
+		next, err := condition.execute(ctx)
 		require.NoError(t, err)
-		assert.Equal(t, invalidStep, next)
+		assert.Equal(t, &stepWrapper{id: "invalid", step: invalidStep}, next)
 	})
 	t.Run("on empty condition", func(t *testing.T) {
 		condition := ConditionStep{
-			OnValid:    validStep,
-			OnInvalid:  invalidStep,
+			OnValid:    &stepWrapper{id: "valid", step: validStep},
+			OnInvalid:  &stepWrapper{id: "invalid", step: invalidStep},
 			exprString: "",
 		}
 
 		ctx := requestctx2.NewTestContext()
-		next, err := condition.Execute(ctx)
+		next, err := condition.execute(ctx)
 		require.NoError(t, err)
-		assert.Equal(t, validStep, next)
+		assert.Equal(t, &stepWrapper{id: "valid", step: validStep}, next)
 	})
 	t.Run("on empty template", func(t *testing.T) {
 		condition := ConditionStep{
-			OnValid:    validStep,
-			OnInvalid:  invalidStep,
+			OnValid:    &stepWrapper{id: "valid", step: validStep},
+			OnInvalid:  &stepWrapper{id: "invalid", step: invalidStep},
 			exprString: "{{ }}",
 		}
 
 		ctx := requestctx2.NewTestContext()
-		_, err := condition.Execute(ctx)
+		_, err := condition.execute(ctx)
 		require.Error(t, err)
 	})
 	t.Run("pass", func(t *testing.T) {
 		condition := ConditionStep{
-			OnValid:    validStep,
-			OnInvalid:  invalidStep,
+			OnValid:    &stepWrapper{id: "valid", step: validStep},
+			OnInvalid:  &stepWrapper{id: "invalid", step: invalidStep},
 			exprString: `{{ email .test "email"}}`,
 		}
 
 		ctx := requestctx2.NewTestContext()
 		requestctx2.AddRequestVariables(ctx, map[string]interface{}{"test": "value@addition.com"}, "")
-		next, err := condition.Execute(ctx)
+		next, err := condition.execute(ctx)
 		require.NoError(t, err)
-		assert.Equal(t, validStep, next)
+		assert.Equal(t, &stepWrapper{id: "valid", step: validStep}, next)
 	})
 	t.Run("fail with error", func(t *testing.T) {
 		condition := ConditionStep{
-			OnValid:    validStep,
-			OnInvalid:  invalidStep,
+			OnValid:    &stepWrapper{id: "valid", step: validStep},
+			OnInvalid:  &stepWrapper{id: "invalid", step: invalidStep},
 			exprString: `{{ email .test "email"}}`,
 		}
 
 		ctx := requestctx2.NewTestContext()
 		requestctx2.AddRequestVariables(ctx, map[string]interface{}{"test": "value"}, "")
-		next, err := condition.Execute(ctx)
+		next, err := condition.execute(ctx)
 		require.NoError(t, err)
-		assert.Equal(t, invalidStep, next)
+		assert.Equal(t, &stepWrapper{id: "invalid", step: invalidStep}, next)
 
 		errVal, err := requestctx2.GetRequestVariable(ctx, requestctx2.ErrorTagStripped)
 		require.NoError(t, err)
@@ -192,17 +192,17 @@ func TestConditionTemplateFunctions(t *testing.T) {
 			cond := ConditionStep{
 				id:         "test",
 				exprString: testCase.template,
-				OnValid:    &validNext,
-				OnInvalid:  &invalidNext,
+				OnValid:    &stepWrapper{id: "valid", step: &validNext},
+				OnInvalid:  &stepWrapper{id: "invalid", step: &invalidNext},
 			}
 
-			next, err := cond.Execute(ctx)
+			next, err := cond.execute(ctx)
 			require.NoError(t, err)
 
 			if testCase.expected == "true" {
-				assert.Equal(t, &validNext, next)
+				assert.Equal(t, &stepWrapper{id: "valid", step: &validNext}, next)
 			} else if testCase.expected == "false" {
-				assert.Equal(t, &invalidNext, next)
+				assert.Equal(t, &stepWrapper{id: "invalid", step: &invalidNext}, next)
 			}
 
 			if testCase.expectValidationError {

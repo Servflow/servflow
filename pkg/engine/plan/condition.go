@@ -40,8 +40,8 @@ const (
 
 type ConditionStep struct {
 	id         string
-	OnValid    Step
-	OnInvalid  Step
+	OnValid    *stepWrapper
+	OnInvalid  *stepWrapper
 	exprString string
 }
 
@@ -51,7 +51,7 @@ func (c *ConditionStep) ID() string {
 
 // Execute will execute the conditions and generate error messages for conditions that use
 // request variables
-func (c *ConditionStep) Execute(ctx context.Context) (Step, error) {
+func (c *ConditionStep) execute(ctx context.Context) (*stepWrapper, error) {
 	// set up tracer
 	var span trace.Span
 	ctx, span = tracing.SpanCtxFromContext(ctx, "condition.execute."+c.id)

@@ -22,7 +22,7 @@ func (e *EndStep) ID() string {
 }
 
 // Execute copies the value in the context from the lookupKey to the destinationKey
-func (e *EndStep) Execute(ctx context.Context) (Step, error) {
+func (e *EndStep) execute(ctx context.Context) (*stepWrapper, error) {
 	if e.destinationKey == "" {
 		return nil, nil
 	}

@@ -1,3 +1,4 @@
+//go:generate mockgen -source executionstep.go -destination executionstep_mock.go -package plan
 package plan
 
 import (
@@ -5,6 +6,5 @@ import (
 )
 
 type Step interface {
-	Execute(ctx context.Context) (Step, error)
-	ID() string
+	execute(ctx context.Context) (*stepWrapper, error)
 }

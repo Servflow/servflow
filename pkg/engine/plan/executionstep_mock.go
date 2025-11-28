@@ -39,31 +39,17 @@ func (m *MockStep) EXPECT() *MockStepMockRecorder {
 	return m.recorder
 }
 
-// Execute mocks base method.
-func (m *MockStep) Execute(ctx context.Context) (Step, error) {
+// execute mocks base method.
+func (m *MockStep) execute(ctx context.Context) (*stepWrapper, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Execute", ctx)
-	ret0, _ := ret[0].(Step)
+	ret := m.ctrl.Call(m, "execute", ctx)
+	ret0, _ := ret[0].(*stepWrapper)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// Execute indicates an expected call of Execute.
-func (mr *MockStepMockRecorder) Execute(ctx any) *gomock.Call {
+// execute indicates an expected call of execute.
+func (mr *MockStepMockRecorder) execute(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockStep)(nil).Execute), ctx)
-}
-
-// ID mocks base method.
-func (m *MockStep) ID() string {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ID")
-	ret0, _ := ret[0].(string)
-	return ret0
-}
-
-// ID indicates an expected call of ID.
-func (mr *MockStepMockRecorder) ID() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ID", reflect.TypeOf((*MockStep)(nil).ID))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "execute", reflect.TypeOf((*MockStep)(nil).execute), ctx)
 }

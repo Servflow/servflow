@@ -21,8 +21,8 @@ import (
 
 type Action struct {
 	configStr string
-	next      Step
-	fail      Step
+	next      *stepWrapper
+	fail      *stepWrapper
 	exec      actions.ActionExecutable
 	out       string
 	id        string
@@ -38,7 +38,7 @@ func (a *Action) ID() string {
 
 // TODO think of having actions manage their own executables
 
-func (a *Action) Execute(ctx context.Context) (Step, error) {
+func (a *Action) execute(ctx context.Context) (*stepWrapper, error) {
 	var span trace.Span
 	ctx, span = tracing.SpanCtxFromContext(ctx, "actions.StartAction."+a.id)
 	defer span.End()
@@ -77,7 +77,7 @@ func (a *Action) Execute(ctx context.Context) (Step, error) {
 
 	resp, err := a.exec.Execute(ctx, cfg)
 	if err != nil {
-		logger.Debug("error executing action", zap.String("config", a.configStr), zap.Error(err))
+		logger.Error("error executing action", zap.String("config", a.configStr), zap.Error(err))
 		span.RecordError(err)
 		if err2 := requestctx.AddRequestVariables(ctx, map[string]interface{}{requestctx.ErrorTagStripped: err.Error()}, ""); err2 != nil {
 			return nil, err2

@@ -22,7 +22,7 @@ func (t *testStep) ID() string {
 	panic("implement me")
 }
 
-func (t *testStep) Execute(ctx context.Context) (Step, error) {
+func (t *testStep) execute(ctx context.Context) (*stepWrapper, error) {
 	return nil, nil
 }
 
@@ -47,13 +47,13 @@ func TestAction_Execute(t *testing.T) {
 				configStr: conf,
 				exec:      mockExec,
 				id:        "test",
-				next:      &nextStep,
+				next:      &stepWrapper{id: "next", step: &nextStep},
 				out:       fmt.Sprintf("%stest", requestctx2.VariableActionPrefix),
 			}
 
-			next, err := act.Execute(ctx)
+			next, err := act.execute(ctx)
 			assert.NoError(t, err)
-			assert.Equal(t, &nextStep, next)
+			assert.Equal(t, &stepWrapper{id: "next", step: &nextStep}, next)
 
 			field, err := requestctx2.ReplaceVariableValuesInContext(ctx, fmt.Sprintf("{{ .%stest }}", requestctx2.VariableActionPrefix))
 			require.NoError(t, err)
@@ -82,13 +82,13 @@ func TestAction_Execute(t *testing.T) {
 				configStr: config,
 				exec:      mockExec,
 				id:        "test",
-				next:      &nextStep,
+				next:      &stepWrapper{id: "next", step: &nextStep},
 				out:       fmt.Sprintf("%stest", requestctx2.VariableActionPrefix),
 			}
 
-			next, err := act.Execute(ctx)
+			next, err := act.execute(ctx)
 			assert.NoError(t, err)
-			assert.Equal(t, &nextStep, next)
+			assert.Equal(t, &stepWrapper{id: "next", step: &nextStep}, next)
 
 			field, err := requestctx2.ReplaceVariableValuesInContext(ctx, fmt.Sprintf("{{ .%stest }}", requestctx2.VariableActionPrefix))
 			require.NoError(t, err)
@@ -109,13 +109,13 @@ func TestAction_Execute(t *testing.T) {
 			act := Action{
 				exec: mockExec,
 				id:   "test",
-				next: &nextStep,
+				next: &stepWrapper{id: "next", step: &nextStep},
 				out:  "custom_out",
 			}
 
-			next, err := act.Execute(ctx)
+			next, err := act.execute(ctx)
 			assert.NoError(t, err)
-			assert.Equal(t, &nextStep, next)
+			assert.Equal(t, &stepWrapper{id: "next", step: &nextStep}, next)
 
 			field, err := requestctx2.ReplaceVariableValuesInContext(ctx, "{{ .custom_out }}")
 			require.NoError(t, err)
@@ -142,12 +142,12 @@ func TestAction_Execute(t *testing.T) {
 				exec: mockExec,
 				out:  "field1",
 				id:   "test",
-				next: &mockStep,
+				next: &stepWrapper{id: "next", step: &mockStep},
 			}
 
-			next, err := act.Execute(ctx)
+			next, err := act.execute(ctx)
 			assert.Error(t, err)
-			assert.Equal(t, next, nil)
+			assert.Nil(t, next)
 
 		})
 
@@ -169,13 +169,13 @@ func TestAction_Execute(t *testing.T) {
 				exec: mockExec,
 				out:  "field1",
 				id:   "test",
-				next: &nextStep,
-				fail: &failStep,
+				next: &stepWrapper{id: "next", step: &nextStep},
+				fail: &stepWrapper{id: "fail", step: &failStep},
 			}
 
-			next, err := act.Execute(ctx)
+			next, err := act.execute(ctx)
 			assert.NoError(t, err)
-			assert.Equal(t, &failStep, next)
+			assert.Equal(t, &stepWrapper{id: "fail", step: &failStep}, next)
 			val, err := requestctx2.GetRequestVariable(ctx, requestctx2.ErrorTagStripped)
 			assert.NoError(t, err)
 			assert.Equal(t, "dummy error", val)

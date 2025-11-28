@@ -20,7 +20,7 @@ func TestEndStep_Execute(t *testing.T) {
 		err := requestctx2.AddRequestVariables(ctx, map[string]interface{}{endStep.lookupKey: "testvalue"}, "")
 		require.NoError(t, err)
 
-		v, err := endStep.Execute(ctx)
+		v, err := endStep.execute(ctx)
 		assert.Nil(t, v)
 		assert.NoError(t, err)
 		val, err := requestctx2.GetRequestVariable(ctx, "groupid")
@@ -30,7 +30,7 @@ func TestEndStep_Execute(t *testing.T) {
 
 	t.Run("no end destinationKey and endvar", func(t *testing.T) {
 		endStep := &EndStep{}
-		v, err := endStep.Execute(requestctx2.NewTestContext())
+		v, err := endStep.execute(requestctx2.NewTestContext())
 		assert.Nil(t, v)
 		assert.NoError(t, err)
 	})
@@ -47,7 +47,7 @@ func TestEndStep_Execute(t *testing.T) {
 		}, "")
 		require.NoError(t, err)
 
-		v, err := endStep.Execute(ctx)
+		v, err := endStep.execute(ctx)
 		assert.Nil(t, v)
 		assert.NoError(t, err)
 		val, err := requestctx2.GetRequestVariable(ctx, "groupid")

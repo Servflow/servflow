@@ -71,7 +71,7 @@ func (a *Action) execute(ctx context.Context) (*stepWrapper, error) {
 			}
 			return nil, err
 		}
-		logger.Debug("template evaluated to " + cfg)
+		logger.Debug("template evaluated successfully")
 	}
 
 	resp, err := a.exec.Execute(ctx, cfg)

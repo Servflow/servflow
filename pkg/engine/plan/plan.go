@@ -16,21 +16,28 @@ type contextKey string
 const ContextKey contextKey = "planContextKey"
 
 type Plan struct {
-	steps map[string]Step
+	steps map[string]stepWrapper
 }
 
-func (p *Plan) executeStep(ctx context.Context, step Step, endValue string) (*http.SfResponse, error) {
-	logger := logging.FromContext(ctx)
+type stepWrapper struct {
+	id   string
+	step Step
+}
+
+func (p *Plan) executeStep(ctx context.Context, step *stepWrapper, endValue string) (*http.SfResponse, error) {
+	logger := logging.FromContext(ctx).With(zap.String("step_id", step.id))
 	var (
-		next Step
+		next *stepWrapper
 		err  error
 	)
 
-	switch s := step.(type) {
+	switch s := step.step.(type) {
 	case *Response:
 		return s.WriteResponse(ctx)
 	default:
-		next, err = s.Execute(ctx)
+		logger.Debug("starting execution")
+		next, err = s.execute(logging.WithLogger(ctx, logger))
+		logger.Debug("finished execution")
 	}
 	if err != nil {
 		if errors.Is(err, errExecutingAction) {
@@ -65,18 +72,13 @@ func (p *Plan) generateEndValue(ctx context.Context, logger *zap.Logger, endValu
 }
 
 func (p *Plan) Execute(ctx context.Context, id, endValue string) (*http.SfResponse, error) {
-	logger := logging.FromContext(ctx).With(zap.String("step_id", id))
-	ctx = logging.WithLogger(ctx, logger)
-
-	logger.Debug("starting execution")
-	defer logger.Debug("finished execution")
 	ctx = context.WithValue(ctx, ContextKey, p)
 	step, ok := p.steps[id]
 	if !ok {
 		return nil, errors.New("step not found")
 	}
 
-	return p.executeStep(ctx, step, endValue)
+	return p.executeStep(ctx, &step, endValue)
 }
 
 func ExecuteFromContext(ctx context.Context, id, endValue string) (*http.SfResponse, error) {

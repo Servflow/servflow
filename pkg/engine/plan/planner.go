@@ -41,13 +41,13 @@ type PlannerConfig struct {
 
 type PlannerV2 struct {
 	config     PlannerConfig
-	finalSteps map[string]Step
+	finalSteps map[string]stepWrapper
 	registry   *actions.Registry
 	logger     *zap.Logger
 }
 
 func NewPlannerV2(config PlannerConfig, logger *zap.Logger) *PlannerV2 {
-	return &PlannerV2{config: config, finalSteps: make(map[string]Step), registry: config.CustomRegistry, logger: logger}
+	return &PlannerV2{config: config, finalSteps: make(map[string]stepWrapper), registry: config.CustomRegistry, logger: logger}
 }
 
 func (p *PlannerV2) Plan() (*Plan, error) {
@@ -90,7 +90,7 @@ func (p *PlannerV2) generate(id string) error {
 	return nil
 }
 
-func (p *PlannerV2) generateStep(id string) (Step, error) {
+func (p *PlannerV2) generateStep(id string) (*stepWrapper, error) {
 	if id == "" || id == p.config.TerminateTag {
 		return nil, nil
 	}
@@ -100,8 +100,8 @@ func (p *PlannerV2) generateStep(id string) (Step, error) {
 	// backwards compatibility
 	id = strings.TrimPrefix(id, "$")
 
-	if _, ok := p.finalSteps[id]; ok {
-		return p.finalSteps[id], nil
+	if st, ok := p.finalSteps[id]; ok {
+		return &st, nil
 	}
 
 	var (
@@ -121,8 +121,13 @@ func (p *PlannerV2) generateStep(id string) (Step, error) {
 	if err != nil {
 		return nil, err
 	}
-	p.finalSteps[id] = step
-	return step, nil
+
+	stepWr := stepWrapper{
+		id:   id,
+		step: step,
+	}
+	p.finalSteps[id] = stepWr
+	return &stepWr, nil
 }
 
 func (p *PlannerV2) generateActionStep(id string) (*Action, error) {
@@ -155,7 +160,7 @@ func (p *PlannerV2) generateActionStep(id string) (*Action, error) {
 		return nil, err
 	}
 
-	var failStep Step
+	var failStep *stepWrapper
 	if a.Fail != "" {
 		failStep, err = p.generateStep(a.Fail)
 		if err != nil {

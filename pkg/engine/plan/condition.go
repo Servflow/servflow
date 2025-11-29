@@ -40,8 +40,8 @@ const (
 
 type ConditionStep struct {
 	id         string
-	OnValid    Step
-	OnInvalid  Step
+	OnValid    *stepWrapper
+	OnInvalid  *stepWrapper
 	exprString string
 }
 
@@ -51,7 +51,7 @@ func (c *ConditionStep) ID() string {
 
 // Execute will execute the conditions and generate error messages for conditions that use
 // request variables
-func (c *ConditionStep) Execute(ctx context.Context) (Step, error) {
+func (c *ConditionStep) execute(ctx context.Context) (*stepWrapper, error) {
 	// set up tracer
 	var span trace.Span
 	ctx, span = tracing.SpanCtxFromContext(ctx, "condition.execute."+c.id)
@@ -76,18 +76,18 @@ func (c *ConditionStep) Execute(ctx context.Context) (Step, error) {
 
 	resp, err := requestctx2.ExecuteTemplateFromContext(ctx, tmpl)
 	if err != nil {
-		logger.Debug("error executing template", zap.String("template", c.exprString), zap.Error(err))
+		logger.Error("error executing template: "+c.exprString, zap.Error(err))
 		span.RecordError(err)
 		return nil, err
 	}
 
 	err = requestctx2.AddValidationErrors(ctx)
 	if err != nil {
-		logger.Debug("error adding validation error", zap.String("template", c.exprString), zap.Error(err))
+		logger.Error("error adding validation error", zap.Error(err))
 		return nil, err
 	}
 
-	logger.Debug("executed condition", zap.String("condition", c.exprString), zap.Any("response", resp))
+	logger.Debug("condition evaluated to "+resp, zap.String("condition", c.exprString))
 	if strings.TrimSpace(resp) == "true" {
 		span.SetAttributes(attribute.Bool("condition.isValid", true))
 		return c.OnValid, nil

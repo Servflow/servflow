@@ -223,6 +223,57 @@ func BenchmarkWriteAndGetEntriesJSON(b *testing.B) {
 	})
 }
 
+func TestDatabaseReopening(t *testing.T) {
+	t.Run("set and get work after database close", func(t *testing.T) {
+		key := "reopen-test-key"
+		value := "reopen-test-value"
+
+		err := Set(key, value)
+		require.NoError(t, err)
+
+		retrieved, found, err := Get(key)
+		require.NoError(t, err)
+		assert.True(t, found)
+		assert.Equal(t, value, retrieved)
+
+		client, err := GetClient()
+		require.NoError(t, err)
+
+		err = client.Close()
+		require.NoError(t, err)
+
+		newKey := "reopen-test-key-2"
+		newValue := "reopen-test-value-2"
+
+		err = Set(newKey, newValue)
+		require.NoError(t, err)
+
+		retrieved, found, err = Get(newKey)
+		require.NoError(t, err)
+		assert.True(t, found)
+		assert.Equal(t, newValue, retrieved)
+	})
+
+	t.Run("get works after database close", func(t *testing.T) {
+		key := "get-reopen-test"
+		value := "get-reopen-value"
+
+		err := Set(key, value)
+		require.NoError(t, err)
+
+		client, err := GetClient()
+		require.NoError(t, err)
+
+		err = client.Close()
+		require.NoError(t, err)
+
+		retrieved, found, err := Get("non-existent-key")
+		require.NoError(t, err)
+		assert.False(t, found)
+		assert.Equal(t, "", retrieved)
+	})
+}
+
 func BenchmarkWriteAndGetEntriesFLB(b *testing.B) {
 
 	expected := []*flatBufferMessage{

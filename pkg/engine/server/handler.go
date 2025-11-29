@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -120,9 +119,9 @@ func (h *APIHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	resp, err := h.p.Execute(ctx, h.planStart, "")
 	if err != nil || resp == nil {
 		if err != nil {
-			h.logAndWriteInternalServerError(wr, err)
+			h.logAndWriteInternalServerError(wr, err, logger)
 		} else {
-			h.logAndWriteInternalServerError(wr, errors.New("error executing api, response missing"))
+			h.logAndWriteInternalServerError(wr, errors.New("error executing api, response missing"), logger)
 		}
 		return
 	}
@@ -136,8 +135,8 @@ func (h *APIHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	logger.Debug("Finished handling request", zap.String("timeTaken", timeTaken.String()))
 }
 
-func (h *APIHandler) logAndWriteInternalServerError(w http.ResponseWriter, err error) {
-	logging.ErrorContext(context.Background(), "error handling request", err)
+func (h *APIHandler) logAndWriteInternalServerError(w http.ResponseWriter, err error, logger *zap.Logger) {
+	logger.Error("error handling request", zap.Error(err))
 	w.WriteHeader(http.StatusInternalServerError)
 	w.Write([]byte("error completing request, please reach out to admin"))
 }

@@ -16,6 +16,7 @@ type Client struct {
 }
 
 var client *Client
+var clientMutex sync.Mutex
 
 const (
 	servflowPrefix = "servflow"
@@ -23,31 +24,68 @@ const (
 	envStorageKey  = "SERVFLOW_STORAGE_PATH"
 )
 
+var getClientOnce sync.Once
+
+func openDB() (*badger.DB, error) {
+	path := os.Getenv(envStorageKey)
+	opts := badger.DefaultOptions(path)
+	opts.Logger = nil
+	if path == "" {
+		return badger.Open(opts.WithInMemory(true))
+	}
+	return badger.Open(opts)
+}
+
 func GetClient() (*Client, error) {
-	return sync.OnceValues(func() (*Client, error) {
+	getClientOnce.Do(func() {
+		clientMutex.Lock()
+		defer clientMutex.Unlock()
+
 		if client != nil {
-			return client, nil
+			return
 		}
 
-		var (
-			err error
-			db  *badger.DB
-		)
-		path := os.Getenv(envStorageKey)
-		opts := badger.DefaultOptions(path)
-		opts.Logger = nil
-		if path == "" {
-			db, err = badger.Open(opts.WithInMemory(true))
-		} else {
-			db, err = badger.Open(opts)
-		}
+		db, err := openDB()
 		if err != nil {
-			return nil, err
+			client = &Client{db: nil}
+			return
 		}
 
 		client = &Client{db: db}
-		return client, nil
-	})()
+	})
+
+	clientMutex.Lock()
+	defer clientMutex.Unlock()
+
+	if client == nil || client.db == nil {
+		return nil, errors.New("failed to initialize client")
+	}
+
+	return client, nil
+}
+
+func isDBClosedError(err error) bool {
+	return errors.Is(err, badger.ErrDBClosed)
+}
+
+func resetClient() error {
+	clientMutex.Lock()
+	defer clientMutex.Unlock()
+
+	if client != nil && client.db != nil {
+		client.db.Close()
+	}
+
+	client = nil
+	getClientOnce = sync.Once{}
+
+	db, err := openDB()
+	if err != nil {
+		return err
+	}
+
+	client = &Client{db: db}
+	return nil
 }
 
 type Serializable interface {
@@ -121,22 +159,52 @@ func GetLogEntriesByPrefix(prefix string, deserializeFunc func([]byte) (any, err
 	return result, err
 }
 
+func withRetryOnClose[T any](operation func(*Client) (T, error)) (T, error) {
+	var zero T
+
+	c, err := GetClient()
+	if err != nil {
+		return zero, err
+	}
+
+	result, err := operation(c)
+	if isDBClosedError(err) {
+		if resetErr := resetClient(); resetErr != nil {
+			return zero, resetErr
+		}
+
+		c, err = GetClient()
+		if err != nil {
+			return zero, err
+		}
+
+		result, err = operation(c)
+	}
+
+	return result, err
+}
+
 // Set stores a key-value pair in the database
 func Set(key string, value string) error {
 	if key == "" {
 		return errors.New("key cannot be empty")
 	}
 
-	c, err := GetClient()
-	if err != nil {
-		return err
-	}
-
 	k := []byte(fmt.Sprintf("%s:%s:%s", servflowPrefix, kvPrefix, key))
 
-	return c.db.Update(func(txn *badger.Txn) error {
-		return txn.Set(k, []byte(value))
+	_, err := withRetryOnClose(func(c *Client) (struct{}, error) {
+		err := c.db.Update(func(txn *badger.Txn) error {
+			return txn.Set(k, []byte(value))
+		})
+		return struct{}{}, err
 	})
+
+	return err
+}
+
+type GetResult struct {
+	Value string
+	Found bool
 }
 
 // Get retrieves a value by key from the database
@@ -146,35 +214,31 @@ func Get(key string) (string, bool, error) {
 		return "", false, errors.New("key cannot be empty")
 	}
 
-	c, err := GetClient()
-	if err != nil {
-		return "", false, err
-	}
-
 	k := []byte(fmt.Sprintf("%s:%s:%s", servflowPrefix, kvPrefix, key))
 
-	var value []byte
-	var found bool
-	err = c.db.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(k)
-		if err != nil {
-			if err == badger.ErrKeyNotFound {
-				found = false
-				return nil // Return no error, key just doesn't exist
-			}
-			return err
-		}
+	result, err := withRetryOnClose(func(c *Client) (GetResult, error) {
+		var value []byte
+		var found bool
 
-		found = true
-		return item.Value(func(val []byte) error {
-			value = append([]byte(nil), val...)
-			return nil
+		err := c.db.View(func(txn *badger.Txn) error {
+			item, err := txn.Get(k)
+			if err != nil {
+				if err == badger.ErrKeyNotFound {
+					found = false
+					return nil
+				}
+				return err
+			}
+
+			found = true
+			return item.Value(func(val []byte) error {
+				value = append([]byte(nil), val...)
+				return nil
+			})
 		})
+
+		return GetResult{Value: string(value), Found: found}, err
 	})
 
-	if err != nil {
-		return "", false, err
-	}
-
-	return string(value), found, nil
+	return result.Value, result.Found, err
 }

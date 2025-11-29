@@ -159,31 +159,31 @@ func TestPlannerV2_Generate(t *testing.T) {
 		t.Run("check all items exist", func(t *testing.T) {
 			for id := range config.Actions {
 				assert.NotNil(t, plan.steps[requestctx.ActionConfigPrefix+id])
-				assert.IsType(t, &Action{}, plan.steps[requestctx.ActionConfigPrefix+id])
+				assert.IsType(t, &Action{}, plan.steps[requestctx.ActionConfigPrefix+id].step)
 			}
 			for id := range config.Conditionals {
 				assert.NotNil(t, plan.steps[requestctx.ConditionalConfigPrefix+id])
-				assert.IsType(t, &ConditionStep{}, plan.steps[requestctx.ConditionalConfigPrefix+id])
+				assert.IsType(t, &ConditionStep{}, plan.steps[requestctx.ConditionalConfigPrefix+id].step)
 			}
 			for id := range config.Responses {
 				assert.NotNil(t, plan.steps[requestctx.ResponsesConfigPrefix+id])
-				assert.IsType(t, &Response{}, plan.steps[requestctx.ResponsesConfigPrefix+id])
+				assert.IsType(t, &Response{}, plan.steps[requestctx.ResponsesConfigPrefix+id].step)
 			}
 		})
 
 		t.Run("basic check of next", func(t *testing.T) {
 			assert.NotNil(t, plan.steps[requestctx.ActionConfigPrefix+"action1"])
 
-			act, ok := plan.steps[requestctx.ActionConfigPrefix+"action1"].(*Action)
+			act, ok := plan.steps[requestctx.ActionConfigPrefix+"action1"].step.(*Action)
 			require.True(t, ok, "expected action to be a *Action")
 
-			assert.IsType(t, &ConditionStep{}, act.next)
+			assert.IsType(t, &ConditionStep{}, act.next.step)
 		})
 
 		t.Run("Action Step with End", func(t *testing.T) {
 			assert.NotNil(t, plan.steps[requestctx.ActionConfigPrefix+"action2"])
 
-			act, ok := plan.steps[requestctx.ActionConfigPrefix+"action2"].(*Action)
+			act, ok := plan.steps[requestctx.ActionConfigPrefix+"action2"].step.(*Action)
 			require.True(t, ok, "expected action to be a *Action")
 
 			assert.Nil(t, act.next)
@@ -192,10 +192,10 @@ func TestPlannerV2_Generate(t *testing.T) {
 		t.Run("Conditional Step", func(t *testing.T) {
 			assert.NotNil(t, plan.steps[requestctx.ConditionalConfigPrefix+"cond1"])
 
-			cond, ok := plan.steps[requestctx.ConditionalConfigPrefix+"cond1"].(*ConditionStep)
+			cond, ok := plan.steps[requestctx.ConditionalConfigPrefix+"cond1"].step.(*ConditionStep)
 			require.True(t, ok, "expected conditional step to be a *ConditionStep")
-			assert.IsType(t, &Response{}, cond.OnValid)
-			assert.IsType(t, &Response{}, cond.OnInvalid)
+			assert.IsType(t, &Response{}, cond.OnValid.step)
+			assert.IsType(t, &Response{}, cond.OnInvalid.step)
 		})
 	})
 
@@ -241,7 +241,7 @@ func TestPlannerV2_Generate(t *testing.T) {
 
 		for id := range config.Responses {
 			assert.NotNil(t, plan.steps[requestctx.ResponsesConfigPrefix+id])
-			assert.IsType(t, &Response{}, plan.steps[requestctx.ResponsesConfigPrefix+id])
+			assert.IsType(t, &Response{}, plan.steps[requestctx.ResponsesConfigPrefix+id].step)
 		}
 	})
 }
@@ -368,8 +368,8 @@ func TestPlannerV2_generateConditionalStep(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, condition)
 	assert.Equal(t, "cond1", condition.id)
-	assert.IsType(t, &Response{}, condition.OnValid)
-	assert.IsType(t, &Response{}, condition.OnInvalid)
+	assert.IsType(t, &Response{}, condition.OnValid.step)
+	assert.IsType(t, &Response{}, condition.OnInvalid.step)
 
 	structuredCondition, err := planner.generateConditionalStep("cond2")
 	require.NoError(t, err)

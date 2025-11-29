@@ -21,8 +21,8 @@ import (
 
 type Action struct {
 	configStr string
-	next      Step
-	fail      Step
+	next      *stepWrapper
+	fail      *stepWrapper
 	exec      actions.ActionExecutable
 	out       string
 	id        string
@@ -38,7 +38,7 @@ func (a *Action) ID() string {
 
 // TODO think of having actions manage their own executables
 
-func (a *Action) Execute(ctx context.Context) (Step, error) {
+func (a *Action) execute(ctx context.Context) (*stepWrapper, error) {
 	var span trace.Span
 	ctx, span = tracing.SpanCtxFromContext(ctx, "actions.StartAction."+a.id)
 	defer span.End()
@@ -52,7 +52,6 @@ func (a *Action) Execute(ctx context.Context) (Step, error) {
 		cfg  string
 	)
 	if a.configStr != "" {
-		logger.Debug("generated template", zap.String("config", a.configStr))
 		tmpl, err = requestctx.CreateTextTemplate(ctx, a.configStr, nil)
 		if err != nil {
 			span.RecordError(err)
@@ -64,7 +63,7 @@ func (a *Action) Execute(ctx context.Context) (Step, error) {
 	if tmpl != nil {
 		cfg, err = requestctx.ExecuteTemplateFromContext(ctx, tmpl)
 		if err != nil {
-			logger.Error("error executing template for action", zap.String("config", a.configStr), zap.Error(err))
+			logger.Error("error executing template for action", zap.Error(err))
 			span.RecordError(err)
 			span.SetStatus(codes.Error, err.Error())
 			if a.fail != nil {
@@ -72,12 +71,12 @@ func (a *Action) Execute(ctx context.Context) (Step, error) {
 			}
 			return nil, err
 		}
-		logger.Debug("generated template", zap.String("config", cfg))
+		logger.Debug("template evaluated to " + cfg)
 	}
 
 	resp, err := a.exec.Execute(ctx, cfg)
 	if err != nil {
-		logger.Debug("error executing action", zap.String("config", a.configStr), zap.Error(err))
+		logger.Error("error executing action", zap.Error(err))
 		span.RecordError(err)
 		if err2 := requestctx.AddRequestVariables(ctx, map[string]interface{}{requestctx.ErrorTagStripped: err.Error()}, ""); err2 != nil {
 			return nil, err2

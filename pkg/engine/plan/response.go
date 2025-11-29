@@ -61,7 +61,7 @@ func newResponse(id string, resp apiconfig.ResponseConfig) (*Response, error) {
 
 }
 
-func (r *Response) Execute(ctx context.Context) (Step, error) {
+func (r *Response) execute(ctx context.Context) (*stepWrapper, error) {
 	return nil, nil
 }
 

@@ -148,6 +148,19 @@
         },
         "expression": {
           "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["template", "structured"]
+        },
+        "structure": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/ConditionItem"
+            }
+          }
         }
       },
       "additionalProperties": false
@@ -188,6 +201,41 @@
         }
       },
       "additionalProperties": false
+    },
+    "ConditionItem": {
+      "type": "object",
+      "required": ["content", "function"],
+      "properties": {
+        "content": {
+          "type": "string"
+        },
+        "comparison": {
+          "type": "string"
+        },
+        "function": {
+          "type": "string",
+          "enum": [
+            "email",
+            "empty",
+            "notempty",
+            "bcrypt",
+            "eq",
+            "ne",
+            "lt",
+            "le",
+            "gt",
+            "ge"
+          ]
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RequestType": {
+      "type": "string",
+      "enum": ["json", "form-data"]
     }
   }
 }

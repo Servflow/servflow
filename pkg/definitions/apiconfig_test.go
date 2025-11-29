@@ -229,6 +229,37 @@ func TestAPIConfig_Validate(t *testing.T) {
 			wantError: true,
 		},
 		{
+			name: "valid config with structured conditional",
+			config: func() APIConfig {
+				return APIConfig{
+					ID: "test-structured-conditional",
+					HttpConfig: HttpConfig{
+						ListenPath: "/test",
+						Method:     "POST",
+						Next:       "cond1",
+					},
+					Conditionals: map[string]Conditional{
+						"cond1": {
+							Type: "structured",
+							Structure: [][]ConditionItem{
+								{
+									{Content: ".email", Function: "email", Title: "Email"},
+									{Content: ".status", Comparison: "\"active\"", Function: "eq"},
+								},
+							},
+							OnTrue:  "response1",
+							OnFalse: "response2",
+						},
+					},
+					Responses: map[string]ResponseConfig{
+						"response1": {Code: 200, Type: "template", Template: "Success"},
+						"response2": {Code: 400, Type: "template", Template: "Failed"},
+					},
+				}
+			},
+			wantError: false,
+		},
+		{
 			name: "valid mcp config only",
 			config: func() APIConfig {
 				cfg := validConfig

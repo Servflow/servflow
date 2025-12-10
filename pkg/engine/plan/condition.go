@@ -104,52 +104,52 @@ type ConditionalFunctionSpec struct {
 
 var conditionalFunctionSpecs = map[string]ConditionalFunctionSpec{
 	FunctionEmail: {
-		Template:           "email %s \"%s\"",
+		Template:           "email (%s) (\"%s\")",
 		RequiresTitle:      true,
 		RequiresComparison: false,
 	},
 	FunctionEmpty: {
-		Template:           "empty %s \"%s\"",
+		Template:           "empty (%s) (\"%s\")",
 		RequiresTitle:      true,
 		RequiresComparison: false,
 	},
 	FunctionNotempty: {
-		Template:           "notempty %s \"%s\"",
+		Template:           "notempty (%s) (\"%s\")",
 		RequiresTitle:      true,
 		RequiresComparison: false,
 	},
 	FunctionBcrypt: {
-		Template:           "bcrypt %s %s \"%s\"",
+		Template:           "bcrypt (%s) (%s) (\"%s\")",
 		RequiresTitle:      true,
 		RequiresComparison: true,
 	},
 	FunctionEq: {
-		Template:           "eq %s %s",
+		Template:           "eq (%s) (%s)",
 		RequiresTitle:      false,
 		RequiresComparison: true,
 	},
 	FunctionNe: {
-		Template:           "ne %s %s",
+		Template:           "ne (%s) (%s)",
 		RequiresTitle:      false,
 		RequiresComparison: true,
 	},
 	FunctionLt: {
-		Template:           "lt %s %s",
+		Template:           "lt (%s) (%s)",
 		RequiresTitle:      false,
 		RequiresComparison: true,
 	},
 	FunctionLe: {
-		Template:           "le %s %s",
+		Template:           "le (%s) (%s)",
 		RequiresTitle:      false,
 		RequiresComparison: true,
 	},
 	FunctionGt: {
-		Template:           "gt %s %s",
+		Template:           "gt (%s) (%s)",
 		RequiresTitle:      false,
 		RequiresComparison: true,
 	},
 	FunctionGe: {
-		Template:           "ge %s %s",
+		Template:           "ge (%s) (%s)",
 		RequiresTitle:      false,
 		RequiresComparison: true,
 	},
@@ -202,7 +202,7 @@ func generateConditionItemTemplate(item apiconfig.ConditionItem) (string, error)
 	}
 
 	if spec.RequiresTitle && item.Title == "" {
-		return "", fmt.Errorf("function '%s' requires a title field", item.Function)
+		item.Title = "field"
 	}
 
 	if spec.RequiresComparison && item.Comparison == "" {

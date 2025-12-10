@@ -229,7 +229,7 @@ func TestGenerateConditionItemTemplate(t *testing.T) {
 				Function: FunctionEmail,
 				Title:    "Email Address",
 			},
-			expected: "email .email \"Email Address\"",
+			expected: "email (.email) (\"Email Address\")",
 		},
 		{
 			name: "notempty function",
@@ -238,7 +238,7 @@ func TestGenerateConditionItemTemplate(t *testing.T) {
 				Function: FunctionNotempty,
 				Title:    "Username",
 			},
-			expected: "notempty .username \"Username\"",
+			expected: "notempty (.username) (\"Username\")",
 		},
 		{
 			name: "empty function",
@@ -247,7 +247,7 @@ func TestGenerateConditionItemTemplate(t *testing.T) {
 				Function: FunctionEmpty,
 				Title:    "Field",
 			},
-			expected: "empty .field \"Field\"",
+			expected: "empty (.field) (\"Field\")",
 		},
 		{
 			name: "bcrypt function",
@@ -257,7 +257,7 @@ func TestGenerateConditionItemTemplate(t *testing.T) {
 				Function:   FunctionBcrypt,
 				Title:      "Password",
 			},
-			expected: "bcrypt .password .storedHash \"Password\"",
+			expected: "bcrypt (.password) (.storedHash) (\"Password\")",
 		},
 		{
 			name: "bcrypt missing comparison",
@@ -274,7 +274,7 @@ func TestGenerateConditionItemTemplate(t *testing.T) {
 				Content:  ".email",
 				Function: FunctionEmail,
 			},
-			hasError: true,
+			expected: "email (.email) (\"field\")",
 		},
 		{
 			name: "invalid function",
@@ -292,7 +292,7 @@ func TestGenerateConditionItemTemplate(t *testing.T) {
 				Comparison: "\"active\"",
 				Function:   FunctionEq,
 			},
-			expected: "eq .status \"active\"",
+			expected: "eq (.status) (\"active\")",
 		},
 		{
 			name: "ne function",
@@ -301,7 +301,7 @@ func TestGenerateConditionItemTemplate(t *testing.T) {
 				Comparison: "\"admin\"",
 				Function:   FunctionNe,
 			},
-			expected: "ne .role \"admin\"",
+			expected: "ne (.role) (\"admin\")",
 		},
 		{
 			name: "lt function",
@@ -310,7 +310,7 @@ func TestGenerateConditionItemTemplate(t *testing.T) {
 				Comparison: "18",
 				Function:   FunctionLt,
 			},
-			expected: "lt .age 18",
+			expected: "lt (.age) (18)",
 		},
 		{
 			name: "le function",
@@ -319,7 +319,7 @@ func TestGenerateConditionItemTemplate(t *testing.T) {
 				Comparison: "100",
 				Function:   FunctionLe,
 			},
-			expected: "le .score 100",
+			expected: "le (.score) (100)",
 		},
 		{
 			name: "gt function",
@@ -328,7 +328,7 @@ func TestGenerateConditionItemTemplate(t *testing.T) {
 				Comparison: "50",
 				Function:   FunctionGt,
 			},
-			expected: "gt .price 50",
+			expected: "gt (.price) (50)",
 		},
 		{
 			name: "ge function",
@@ -337,7 +337,7 @@ func TestGenerateConditionItemTemplate(t *testing.T) {
 				Comparison: "1",
 				Function:   FunctionGe,
 			},
-			expected: "ge .quantity 1",
+			expected: "ge (.quantity) (1)",
 		},
 		{
 			name: "eq missing comparison",
@@ -381,7 +381,7 @@ func TestConvertStructureToTemplate(t *testing.T) {
 					{Content: ".email", Function: FunctionEmail, Title: "Email"},
 				},
 			},
-			expected: "{{ email .email \"Email\" }}",
+			expected: "{{ email (.email) (\"Email\") }}",
 		},
 		{
 			name: "single AND group",
@@ -391,7 +391,7 @@ func TestConvertStructureToTemplate(t *testing.T) {
 					{Content: ".username", Function: FunctionNotempty, Title: "Username"},
 				},
 			},
-			expected: "{{ and (email .email \"Email\") (notempty .username \"Username\") }}",
+			expected: "{{ and (email (.email) (\"Email\")) (notempty (.username) (\"Username\")) }}",
 		},
 		{
 			name: "multiple OR groups",
@@ -403,7 +403,7 @@ func TestConvertStructureToTemplate(t *testing.T) {
 					{Content: ".adminToken", Function: FunctionNotempty, Title: "Admin Token"},
 				},
 			},
-			expected: "{{ or (email .email \"Email\") (notempty .adminToken \"Admin Token\") }}",
+			expected: "{{ or (email (.email) (\"Email\")) (notempty (.adminToken) (\"Admin Token\")) }}",
 		},
 		{
 			name: "complex DNF",
@@ -416,7 +416,7 @@ func TestConvertStructureToTemplate(t *testing.T) {
 					{Content: ".adminField", Function: FunctionEmpty, Title: "Admin Field"},
 				},
 			},
-			expected: "{{ or (and (email .email \"Email\") (bcrypt .password .hash \"Password\")) (empty .adminField \"Admin Field\") }}",
+			expected: "{{ or (and (email (.email) (\"Email\")) (bcrypt (.password) (.hash) (\"Password\"))) (empty (.adminField) (\"Admin Field\")) }}",
 		},
 		{
 			name: "invalid function in structure",
@@ -435,7 +435,7 @@ func TestConvertStructureToTemplate(t *testing.T) {
 					{Content: ".age", Comparison: "18", Function: FunctionGt},
 				},
 			},
-			expected: "{{ and (eq .status \"active\") (gt .age 18) }}",
+			expected: "{{ and (eq (.status) (\"active\")) (gt (.age) (18)) }}",
 		},
 		{
 			name: "mixed validation and comparison functions",
@@ -448,7 +448,7 @@ func TestConvertStructureToTemplate(t *testing.T) {
 					{Content: ".balance", Comparison: "0", Function: FunctionGt},
 				},
 			},
-			expected: "{{ or (and (email .email \"Email\") (eq .role \"admin\")) (gt .balance 0) }}",
+			expected: "{{ or (and (email (.email) (\"Email\")) (eq (.role) (\"admin\"))) (gt (.balance) (0)) }}",
 		},
 	}
 

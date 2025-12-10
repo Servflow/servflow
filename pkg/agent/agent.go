@@ -159,7 +159,7 @@ func (a *Session) Query(ctx context.Context, query string) (string, error) {
 }
 
 func (a *Session) startLoop(ctx context.Context) chan agentOutput {
-	logger := logging.WithContextEnriched(ctx).With(zap.String("module", "agent"))
+	logger := logging.FromContext(ctx).With(zap.String("module", "agent"))
 	out := make(chan agentOutput)
 
 	toolList := a.toolManager.ToolList()
@@ -178,7 +178,7 @@ func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 
 			// process content output
 			for _, c := range r.Content {
-				logger.Info("LLm response", zap.Any("response", c.Text))
+				logger.Info("LLm response: " + c.Text)
 				a.addToMessages(logger, ContentMessage{
 					Message: Message{Type: MessageTypeText},
 					Role:    RoleTypeAssistant,
@@ -201,7 +201,7 @@ func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 
 			// TODO call tools in parallel
 			for _, tool := range r.Tools {
-				logger.Info("attempting to execute tool", zap.String("tool", tool.Name), zap.Any("params", tool.Input))
+				logger.Info("attempting to execute tool: "+tool.Name, zap.Any("params", tool.Input))
 				toolResp, err := a.toolManager.CallTool(ctx, tool.Name, tool.Input)
 				if err != nil {
 					a.addToMessages(logger, ToolCallOutputMessage{
@@ -217,7 +217,7 @@ func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 					Output:  toolResp,
 					ID:      tool.ToolID,
 				}, out)
-				logger.Info("successfully executed tool", zap.String("tool", tool.Name), zap.String("toolResp", toolResp))
+				logger.Info("successfully executed tool: "+tool.Name, zap.String("toolResp", toolResp))
 			}
 		}
 		close(out)

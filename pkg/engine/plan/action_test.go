@@ -5,9 +5,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"strings"
 	"testing"
 
-	requestctx2 "github.com/Servflow/servflow/pkg/engine/requestctx"
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -32,15 +34,15 @@ func TestAction_Execute(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			conf := fmt.Sprintf("test {{ .%sname }}", requestctx2.BareVariablesPrefixStripped)
+			conf := fmt.Sprintf("test {{ .%sname }}", requestctx.BareVariablesPrefixStripped)
 
 			mockExec := NewMockActionExecutable(ctrl)
 			mockExec.EXPECT().Execute(gomock.Any(), "test actual name").Return("response string", nil)
 
 			nextStep := testStep{id: "next"}
 
-			ctx := requestctx2.NewTestContext()
-			err := requestctx2.AddRequestVariables(ctx, map[string]interface{}{fmt.Sprintf("%sname", requestctx2.BareVariablesPrefixStripped): "actual name"}, "")
+			ctx := requestctx.NewTestContext()
+			err := requestctx.AddRequestVariables(ctx, map[string]interface{}{fmt.Sprintf("%sname", requestctx.BareVariablesPrefixStripped): "actual name"}, "")
 			require.NoError(t, err)
 
 			act := Action{
@@ -48,14 +50,14 @@ func TestAction_Execute(t *testing.T) {
 				exec:      mockExec,
 				id:        "test",
 				next:      &stepWrapper{id: "next", step: &nextStep},
-				out:       fmt.Sprintf("%stest", requestctx2.VariableActionPrefix),
+				out:       fmt.Sprintf("%stest", requestctx.VariableActionPrefix),
 			}
 
 			next, err := act.execute(ctx)
 			assert.NoError(t, err)
 			assert.Equal(t, &stepWrapper{id: "next", step: &nextStep}, next)
 
-			field, err := requestctx2.ReplaceVariableValuesInContext(ctx, fmt.Sprintf("{{ .%stest }}", requestctx2.VariableActionPrefix))
+			field, err := requestctx.ReplaceVariableValuesInContext(ctx, fmt.Sprintf("{{ .%stest }}", requestctx.VariableActionPrefix))
 			require.NoError(t, err)
 			assert.Equal(t, "response string", field)
 		})
@@ -65,14 +67,14 @@ func TestAction_Execute(t *testing.T) {
 			defer ctrl.Finish()
 
 			mockExec := NewMockActionExecutable(ctrl)
-			config := fmt.Sprintf("test {{ .%sname.actualname }}", requestctx2.BareVariablesPrefixStripped)
+			config := fmt.Sprintf("test {{ .%sname.actualname }}", requestctx.BareVariablesPrefixStripped)
 			mockExec.EXPECT().Execute(gomock.Any(), "test actual name").Return("response string", nil)
 
 			nextStep := testStep{id: "next"}
 
-			ctx := requestctx2.NewTestContext()
-			err := requestctx2.AddRequestVariables(ctx, map[string]interface{}{
-				fmt.Sprintf("%sname", requestctx2.BareVariablesPrefixStripped): map[string]interface{}{
+			ctx := requestctx.NewTestContext()
+			err := requestctx.AddRequestVariables(ctx, map[string]interface{}{
+				fmt.Sprintf("%sname", requestctx.BareVariablesPrefixStripped): map[string]interface{}{
 					"actualname": "actual name",
 				},
 			}, "")
@@ -83,14 +85,14 @@ func TestAction_Execute(t *testing.T) {
 				exec:      mockExec,
 				id:        "test",
 				next:      &stepWrapper{id: "next", step: &nextStep},
-				out:       fmt.Sprintf("%stest", requestctx2.VariableActionPrefix),
+				out:       fmt.Sprintf("%stest", requestctx.VariableActionPrefix),
 			}
 
 			next, err := act.execute(ctx)
 			assert.NoError(t, err)
 			assert.Equal(t, &stepWrapper{id: "next", step: &nextStep}, next)
 
-			field, err := requestctx2.ReplaceVariableValuesInContext(ctx, fmt.Sprintf("{{ .%stest }}", requestctx2.VariableActionPrefix))
+			field, err := requestctx.ReplaceVariableValuesInContext(ctx, fmt.Sprintf("{{ .%stest }}", requestctx.VariableActionPrefix))
 			require.NoError(t, err)
 			assert.Equal(t, "response string", field)
 		})
@@ -104,7 +106,7 @@ func TestAction_Execute(t *testing.T) {
 
 			nextStep := testStep{id: "next"}
 
-			ctx := requestctx2.NewTestContext()
+			ctx := requestctx.NewTestContext()
 
 			act := Action{
 				exec: mockExec,
@@ -117,9 +119,47 @@ func TestAction_Execute(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, &stepWrapper{id: "next", step: &nextStep}, next)
 
-			field, err := requestctx2.ReplaceVariableValuesInContext(ctx, "{{ .custom_out }}")
+			field, err := requestctx.ReplaceVariableValuesInContext(ctx, "{{ .custom_out }}")
 			require.NoError(t, err)
 			assert.Equal(t, "custom response", field)
+		})
+
+		t.Run("success with reader response stored as file", func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockExec := NewMockActionExecutable(ctrl)
+			fileContent := "test file content"
+			reader := strings.NewReader(fileContent)
+			mockExec.EXPECT().Execute(gomock.Any(), "").Return(reader, nil)
+
+			nextStep := testStep{id: "next"}
+
+			ctx := requestctx.NewTestContext()
+
+			act := Action{
+				exec: mockExec,
+				id:   "test",
+				next: &stepWrapper{id: "next", step: &nextStep},
+				out:  "file_output",
+			}
+
+			next, err := act.execute(ctx)
+			assert.NoError(t, err)
+			assert.Equal(t, &stepWrapper{id: "next", step: &nextStep}, next)
+
+			require.NoError(t, err)
+
+			fileValue, err := requestctx.GetFileFromContext(ctx, requestctx.FileInputTypeAction, "file_output")
+			require.NoError(t, err)
+			require.NotNil(t, fileValue)
+			assert.Equal(t, "file_output", fileValue.Name)
+
+			// Read the file content to verify it was stored correctly
+			var buf bytes.Buffer
+			_, err = io.Copy(&buf, fileValue.File)
+			require.NoError(t, err)
+			assert.Equal(t, fileContent, buf.String())
 		})
 	})
 
@@ -134,8 +174,8 @@ func TestAction_Execute(t *testing.T) {
 
 			mockStep := testStep{id: "next"}
 
-			ctx := requestctx2.NewTestContext()
-			err := requestctx2.AddRequestVariables(ctx, map[string]interface{}{fmt.Sprintf("%sname", requestctx2.BareVariablesPrefixStripped): "actual name"}, "")
+			ctx := requestctx.NewTestContext()
+			err := requestctx.AddRequestVariables(ctx, map[string]interface{}{fmt.Sprintf("%sname", requestctx.BareVariablesPrefixStripped): "actual name"}, "")
 			require.NoError(t, err)
 
 			act := Action{
@@ -149,6 +189,15 @@ func TestAction_Execute(t *testing.T) {
 			assert.Error(t, err)
 			assert.Nil(t, next)
 
+			// Verify error variable is stored
+			errorVal, err := requestctx.GetRequestVariable(ctx, requestctx.ErrorTagStripped)
+			assert.NoError(t, err)
+			assert.Equal(t, "dummy error", errorVal)
+
+			// Verify output variable contains error message
+			outVal, err := requestctx.GetRequestVariable(ctx, "field1")
+			assert.NoError(t, err)
+			assert.Equal(t, "error: dummy error", outVal)
 		})
 
 		t.Run("error with a fail step", func(t *testing.T) {
@@ -161,8 +210,8 @@ func TestAction_Execute(t *testing.T) {
 			nextStep := testStep{id: "next"}
 			failStep := testStep{id: "fail"}
 
-			ctx := requestctx2.NewTestContext()
-			err := requestctx2.AddRequestVariables(ctx, map[string]interface{}{fmt.Sprintf("%sname", requestctx2.BareVariablesPrefixStripped): "actual name"}, "")
+			ctx := requestctx.NewTestContext()
+			err := requestctx.AddRequestVariables(ctx, map[string]interface{}{fmt.Sprintf("%sname", requestctx.BareVariablesPrefixStripped): "actual name"}, "")
 			require.NoError(t, err)
 
 			act := Action{
@@ -176,9 +225,16 @@ func TestAction_Execute(t *testing.T) {
 			next, err := act.execute(ctx)
 			assert.NoError(t, err)
 			assert.Equal(t, &stepWrapper{id: "fail", step: &failStep}, next)
-			val, err := requestctx2.GetRequestVariable(ctx, requestctx2.ErrorTagStripped)
+
+			// Verify error variable is stored
+			errorVal, err := requestctx.GetRequestVariable(ctx, requestctx.ErrorTagStripped)
 			assert.NoError(t, err)
-			assert.Equal(t, "dummy error", val)
+			assert.Equal(t, "dummy error", errorVal)
+
+			// Verify output variable contains error message
+			outVal, err := requestctx.GetRequestVariable(ctx, "field1")
+			assert.NoError(t, err)
+			assert.Equal(t, "error: dummy error", outVal)
 		})
 
 	})
@@ -203,7 +259,7 @@ func TestActionTemplateFunctions(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			tmpl, err := requestctx2.CreateTextTemplate(context.Background(), testCase.template, nil)
+			tmpl, err := requestctx.CreateTextTemplate(context.Background(), testCase.template, nil)
 			require.NoError(t, err)
 			var buff bytes.Buffer
 			err = tmpl.Execute(&buff, variables)

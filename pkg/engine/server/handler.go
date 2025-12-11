@@ -116,6 +116,13 @@ func (h *APIHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	}
 	rectx.AddRequestTemplateFunctions(requestTemplateFunctions(req))
 
+	err := rectx.LoadRequestFiles(req)
+	if err != nil {
+		logger.Error("Error storing HTTP request", zap.Error(err))
+		http.Error(wr, "Error processing request", http.StatusInternalServerError)
+		return
+	}
+
 	resp, err := h.p.Execute(ctx, h.planStart, "")
 	if err != nil || resp == nil {
 		if err != nil {

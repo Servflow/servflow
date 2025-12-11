@@ -11,8 +11,7 @@ import (
 )
 
 type Executable struct {
-	ReturnConfig string
-	Return       string
+	Return string
 }
 
 func (s *Executable) Type() string {
@@ -20,26 +19,24 @@ func (s *Executable) Type() string {
 }
 
 type Config struct {
-	Return       string `json:"return"`
-	ReturnConfig string `json:"config"`
+	Return string `json:"return"`
 }
 
 func NewExecutable(cfg Config) *Executable {
 	return &Executable{
-		Return:       cfg.Return,
-		ReturnConfig: cfg.ReturnConfig,
+		Return: cfg.Return,
 	}
 }
 
 func (s *Executable) Config() string {
-	return s.ReturnConfig
+	return s.Return
 }
 
 func (s *Executable) Execute(ctx context.Context, modifiedConfig string) (interface{}, error) {
 	logger := logging.FromContext(ctx).With(zap.String("execution_type", s.Type()))
 	_ = logging.WithLogger(ctx, logger)
 
-	return s.Return, nil
+	return modifiedConfig, nil
 }
 
 func init() {

@@ -3,6 +3,7 @@ package agent
 import (
 	"encoding/json"
 
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
@@ -30,17 +31,18 @@ type LLMRequest struct {
 	Tools         []ToolInfo `json:"tools"`
 }
 
-type ContentMessage struct {
+type MessageContent struct {
 	Message
-	Role    RoleType
-	Content string
+	Role        RoleType
+	Content     string
+	FileContent *requestctx.FileValue
 }
 
-func (c *ContentMessage) Serialize() ([]byte, error) {
+func (c *MessageContent) Serialize() ([]byte, error) {
 	return json.Marshal(c)
 }
 
-func (c *ContentMessage) Deserialize(bytes []byte) error {
+func (c *MessageContent) Deserialize(bytes []byte) error {
 	return json.Unmarshal(bytes, c)
 }
 
@@ -48,32 +50,32 @@ type Message struct {
 	Type MessageType `json:"type"`
 }
 
-type ToolCallMessage struct {
+type MessageToolCall struct {
 	Message
 	ID        string
 	Name      string
 	Arguments map[string]interface{}
 }
 
-func (t *ToolCallMessage) Serialize() ([]byte, error) {
+func (t *MessageToolCall) Serialize() ([]byte, error) {
 	return json.Marshal(t)
 }
 
-func (t *ToolCallMessage) Deserialize(bytes []byte) error {
+func (t *MessageToolCall) Deserialize(bytes []byte) error {
 	return json.Unmarshal(bytes, t)
 }
 
-type ToolCallOutputMessage struct {
+type MessageToolCallResponse struct {
 	Message
 	ID     string
 	Output string
 }
 
-func (t *ToolCallOutputMessage) Serialize() ([]byte, error) {
+func (t *MessageToolCallResponse) Serialize() ([]byte, error) {
 	return json.Marshal(t)
 }
 
-func (t *ToolCallOutputMessage) Deserialize(bytes []byte) error {
+func (t *MessageToolCallResponse) Deserialize(bytes []byte) error {
 	return json.Unmarshal(bytes, t)
 }
 

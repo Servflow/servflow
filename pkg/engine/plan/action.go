@@ -94,9 +94,9 @@ func (a *Action) execute(ctx context.Context) (*stepWrapper, error) {
 	logger.Debug("action executed successfully", zap.Any("resp", resp))
 
 	// Check if response is an io.Reader and store as action file
-	if reader, ok := resp.(io.Reader); ok {
+	if f, ok := resp.(io.ReadCloser); ok {
 		fileValue := &requestctx.FileValue{
-			File: io.NopCloser(reader),
+			File: f,
 			Name: a.out,
 		}
 		reqCtx, err := requestctx.FromContextOrError(ctx)

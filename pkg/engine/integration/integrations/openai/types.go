@@ -119,18 +119,18 @@ func convertAgentRequestToRequest(logger *zap.Logger, req *agent.LLMRequest, mod
 
 	for _, m := range req.Messages {
 		switch val := m.(type) {
-		case agent.ContentMessage:
+		case agent.MessageContent:
 			r.Input = append(r.Input, MessageInput{
 				Role:    agentRoleToRoleMapping[val.Role],
 				Content: val.Content,
 			})
-		case agent.ToolCallOutputMessage:
+		case agent.MessageToolCallResponse:
 			r.Input = append(r.Input, FunctionCallOutput{
 				Type:   FunctionCallOutputType,
 				CallID: val.ID,
 				Output: val.Output,
 			})
-		case agent.ToolCallMessage:
+		case agent.MessageToolCall:
 			arguments, err := json.Marshal(val.Arguments)
 			if err != nil {
 				logger.Warn("Failed to marshal arguments", zap.Error(err))

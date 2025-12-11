@@ -68,15 +68,15 @@ func WithConversationID(id string) Option {
 			}
 			switch msg.Type {
 			case MessageTypeText:
-				var contentMessage ContentMessage
+				var contentMessage MessageContent
 				err = json.Unmarshal(data, &contentMessage)
 				return contentMessage, err
 			case MessageTypeToolResponse:
-				var toolResponse ToolCallOutputMessage
+				var toolResponse MessageToolCallResponse
 				err = json.Unmarshal(data, &toolResponse)
 				return toolResponse, err
 			case MessageTypeToolCall:
-				var toolCall ToolCallMessage
+				var toolCall MessageToolCall
 				err = json.Unmarshal(data, &toolCall)
 				return toolCall, err
 			default:
@@ -105,7 +105,7 @@ func NewSession(developerInstructions string, llm LLmProvider, options ...Option
 		messages: make([]any, 0),
 	}
 
-	agent.messages = append(agent.messages, ContentMessage{
+	agent.messages = append(agent.messages, MessageContent{
 		Message: Message{Type: MessageTypeText},
 		Role:    RoleTypeDeveloper,
 		Content: developerInstructions,
@@ -128,7 +128,7 @@ type agentOutput struct {
 func (a *Session) Query(ctx context.Context, query string) (string, error) {
 	logger := logging.WithContextEnriched(ctx).With(zap.String("module", "agent"))
 	if query != "" {
-		a.addToMessages(logger, ContentMessage{
+		a.addToMessages(logger, MessageContent{
 			Message: Message{Type: MessageTypeText},
 			Role:    RoleTypeUser,
 			Content: query,
@@ -179,7 +179,7 @@ func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 			// process content output
 			for _, c := range r.Content {
 				logger.Info("LLm response: " + c.Text)
-				a.addToMessages(logger, ContentMessage{
+				a.addToMessages(logger, MessageContent{
 					Message: Message{Type: MessageTypeText},
 					Role:    RoleTypeAssistant,
 					Content: c.Text,
@@ -191,7 +191,7 @@ func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 			}
 
 			for _, tool := range r.Tools {
-				a.addToMessages(logger, ToolCallMessage{
+				a.addToMessages(logger, MessageToolCall{
 					Message:   Message{Type: MessageTypeToolCall},
 					ID:        tool.ToolID,
 					Name:      tool.Name,
@@ -204,7 +204,7 @@ func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 				logger.Info("attempting to execute tool: "+tool.Name, zap.Any("params", tool.Input))
 				toolResp, err := a.toolManager.CallTool(ctx, tool.Name, tool.Input)
 				if err != nil {
-					a.addToMessages(logger, ToolCallOutputMessage{
+					a.addToMessages(logger, MessageToolCallResponse{
 						Message: Message{Type: MessageTypeToolResponse},
 						Output:  "error running tool",
 						ID:      tool.ToolID,
@@ -212,7 +212,7 @@ func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 					logger.Error("failed to execute tool", zap.String("tool", tool.Name), zap.Error(err))
 					continue
 				}
-				a.addToMessages(logger, ToolCallOutputMessage{
+				a.addToMessages(logger, MessageToolCallResponse{
 					Message: Message{Type: MessageTypeToolResponse},
 					Output:  toolResp,
 					ID:      tool.ToolID,
@@ -236,7 +236,7 @@ func (a *Session) addToMessages(logger *zap.Logger, message any, output chan age
 		serializable storage.Serializable
 	)
 	switch message := message.(type) {
-	case ContentMessage:
+	case MessageContent:
 		a.messages = append(a.messages, message)
 		if output != nil {
 			output <- agentOutput{
@@ -245,10 +245,10 @@ func (a *Session) addToMessages(logger *zap.Logger, message any, output chan age
 		}
 
 		serializable = &message
-	case ToolCallMessage:
+	case MessageToolCall:
 		a.messages = append(a.messages, message)
 		serializable = &message
-	case ToolCallOutputMessage:
+	case MessageToolCallResponse:
 		a.messages = append(a.messages, message)
 		serializable = &message
 	default:

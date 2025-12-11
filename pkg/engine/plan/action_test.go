@@ -130,7 +130,7 @@ func TestAction_Execute(t *testing.T) {
 
 			mockExec := NewMockActionExecutable(ctrl)
 			fileContent := "test file content"
-			reader := strings.NewReader(fileContent)
+			reader := io.NopCloser(strings.NewReader(fileContent))
 			mockExec.EXPECT().Execute(gomock.Any(), "").Return(reader, nil)
 
 			nextStep := testStep{id: "next"}

@@ -4,9 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
-	"strings"
 	"sync"
 	"text/template"
 )
@@ -16,18 +13,6 @@ var ErrNoContext = errors.New("no context provided in request")
 type contextKey string
 
 var aggContextKey = contextKey("aggregationContext")
-
-type FileInputType int
-
-const (
-	FileInputTypeRequest FileInputType = iota
-	FileInputTypeAction
-)
-
-const (
-	fileKeyActionPrefix  = "action."
-	fileKeyRequestPrefix = "request."
-)
 
 type RequestContext struct {
 	requestID string
@@ -63,11 +48,6 @@ func (rc *RequestContext) AddRequestTemplateFunctions(templateFuncs template.Fun
 
 func (rc *RequestContext) TemplateFunctions() template.FuncMap {
 	return rc.requestFuncs
-}
-
-type FileValue struct {
-	File io.ReadCloser
-	Name string
 }
 
 func NewRequestContext(id string) *RequestContext {
@@ -113,76 +93,6 @@ func GetRequestVariable(ctx context.Context, key string) (interface{}, error) {
 		return nil, err
 	}
 	return agg.requestVariables[key], nil
-}
-
-func (rc *RequestContext) AddRequestFile(fieldName string, file *FileValue) {
-	rc.Lock()
-	defer rc.Unlock()
-	rc.availableFiles[fileKeyRequestPrefix+fieldName] = file
-}
-
-func (rc *RequestContext) AddActionFile(name string, file *FileValue) {
-	rc.Lock()
-	defer rc.Unlock()
-	rc.availableFiles[fileKeyActionPrefix+name] = file
-}
-
-func (rc *RequestContext) LoadRequestFiles(r *http.Request) error {
-	if r == nil {
-		return nil
-	}
-
-	contentType := r.Header.Get("Content-Type")
-	if !strings.HasPrefix(contentType, "multipart/form-data") {
-		return nil
-	}
-
-	err := r.ParseMultipartForm(32 << 20) // 32 MB max memory
-	if err != nil {
-		return err
-	}
-
-	if r.MultipartForm != nil && r.MultipartForm.File != nil {
-		for fieldName, fileHeaders := range r.MultipartForm.File {
-			if len(fileHeaders) > 0 {
-				fileHeader := fileHeaders[0] // Take the first file if multiple
-				file, err := fileHeader.Open()
-				if err != nil {
-					continue
-				}
-				rc.availableFiles[fieldName] = &FileValue{
-					File: file,
-					Name: fileHeader.Filename,
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
-func GetFileFromContext(ctx context.Context, inputType FileInputType, identifier string) (*FileValue, error) {
-	reqCtx, err := FromContextOrError(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	var key string
-	switch inputType {
-	case FileInputTypeRequest:
-		key = fileKeyRequestPrefix + identifier
-	case FileInputTypeAction:
-		key = fileKeyActionPrefix + identifier
-	default:
-		return nil, fmt.Errorf("invalid file input type: %d", inputType)
-	}
-
-	file, ok := reqCtx.availableFiles[key]
-	if !ok {
-		return nil, fmt.Errorf("file '%s' not found", identifier)
-	}
-
-	return file, nil
 }
 
 // AddRequestVariables add all the variables to the request context, it adds the prefix

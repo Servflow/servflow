@@ -2,7 +2,9 @@ package requestctx
 
 import (
 	"bufio"
+	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -46,10 +48,7 @@ func (rc *RequestContext) LoadRequestFiles(r *http.Request) error {
 				if err != nil {
 					continue
 				}
-				rc.availableFiles[fieldName] = &FileValue{
-					File: file,
-					Name: fileHeader.Filename,
-				}
+				rc.availableFiles[fieldName] = NewFileValue(file, fileHeader.Filename)
 			}
 		}
 	}
@@ -58,9 +57,29 @@ func (rc *RequestContext) LoadRequestFiles(r *http.Request) error {
 }
 
 type FileValue struct {
-	File     io.ReadCloser
+	file     io.ReadCloser
+	content  []byte
+	reader   io.Reader
 	Name     string
-	MimeType string
+	mimeType string
+	closed   bool
+}
+
+func NewFileValue(file io.ReadCloser, name string) *FileValue {
+	return &FileValue{
+		file:   file,
+		reader: file,
+		Name:   name,
+	}
+}
+
+func (f *FileValue) Close() error {
+	if !f.closed && f.file != nil {
+		err := f.file.Close()
+		f.closed = true
+		return err
+	}
+	return nil
 }
 
 func GetFileFromContext(ctx context.Context, inputType FileInputType, identifier string) (*FileValue, error) {
@@ -99,16 +118,41 @@ func (rc *RequestContext) AddActionFile(name string, file *FileValue) {
 	rc.availableFiles[fileKeyActionPrefix+name] = file
 }
 
-func (f *FileValue) GenerateContentString() []byte {
-	
-}
-
-func (f *FileValue) mimeType() (string, error) {
-	if f.MimeType != "" {
-		return f.MimeType, nil
+func (f *FileValue) GenerateContentString() (string, error) {
+	mimeType, err := f.GetMimeType()
+	if err != nil {
+		return "", err
 	}
 
-	bufferedReader := bufio.NewReader(f.File)
+	if f.content == nil {
+		content, err := io.ReadAll(f.reader)
+		if err != nil {
+			return "", err
+		}
+		f.content = content
+		f.reader = bytes.NewReader(f.content)
+		f.closeOriginalFile()
+	}
+
+	base64Content := base64.StdEncoding.EncodeToString(f.content)
+	return fmt.Sprintf("data:%s;base64,%s", mimeType, base64Content), nil
+}
+
+func (f *FileValue) Read(p []byte) (n int, err error) {
+	return f.reader.Read(p)
+}
+
+func (f *FileValue) GetReader() io.Reader {
+	return f.reader
+}
+
+func (f *FileValue) GetMimeType() (string, error) {
+	if f.mimeType != "" {
+		return f.mimeType, nil
+	}
+
+	bufferedReader := bufio.NewReader(f.reader)
+	f.reader = bufferedReader
 
 	peek, err := bufferedReader.Peek(512)
 	if err != nil && err != io.EOF {
@@ -116,6 +160,13 @@ func (f *FileValue) mimeType() (string, error) {
 	}
 
 	mtype := mimetype.Detect(peek)
-	f.MimeType = mtype.String()
-	return f.MimeType, nil
+	f.mimeType = mtype.String()
+	return f.mimeType, nil
+}
+
+func (f *FileValue) closeOriginalFile() {
+	if !f.closed && f.file != nil {
+		f.file.Close()
+		f.closed = true
+	}
 }

@@ -11,7 +11,6 @@ import (
 
 	"github.com/Servflow/servflow/pkg/agent"
 	"github.com/Servflow/servflow/pkg/engine/integration"
-	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
 	"go.uber.org/zap"
 )
@@ -53,7 +52,7 @@ var (
 	defaultModel = "gpt-4.1"
 )
 
-func (c *Client) ProvideResponse(ctx context.Context, req agent.LLMRequest) (resp agent.LLMResponse, err error) {
+func (c *Client) ProvideResponse(ctx context.Context, agentReq agent.LLMRequest) (resp agent.LLMResponse, err error) {
 	logger := logging.WithContextEnriched(ctx)
 	input := convertAgentRequestToRequest(logger, &agentReq, c.model)
 

@@ -95,10 +95,7 @@ func (a *Action) execute(ctx context.Context) (*stepWrapper, error) {
 
 	// Check if response is an io.Reader and store as action file
 	if f, ok := resp.(io.ReadCloser); ok {
-		fileValue := &requestctx.FileValue{
-			File: f,
-			Name: a.out,
-		}
+		fileValue := requestctx.NewFileValue(f, a.out)
 		reqCtx, err := requestctx.FromContextOrError(ctx)
 		if err != nil {
 			return nil, err

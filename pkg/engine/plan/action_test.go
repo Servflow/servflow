@@ -157,7 +157,7 @@ func TestAction_Execute(t *testing.T) {
 
 			// Read the file content to verify it was stored correctly
 			var buf bytes.Buffer
-			_, err = io.Copy(&buf, fileValue.File)
+			_, err = io.Copy(&buf, fileValue.GetReader())
 			require.NoError(t, err)
 			assert.Equal(t, fileContent, buf.String())
 		})

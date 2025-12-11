@@ -2,6 +2,8 @@ package requestctx
 
 import (
 	"bytes"
+	"encoding/base64"
+	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -9,78 +11,120 @@ import (
 	"testing"
 )
 
-func TestRequestContext_AddAndRetrieveRequestFile(t *testing.T) {
+func TestRequestContext_FileManagement(t *testing.T) {
 	ctx := NewTestContext()
 	reqCtx, err := FromContextOrError(ctx)
 	if err != nil {
 		t.Fatalf("Failed to get request context: %v", err)
 	}
 
-	fileContent := "test file content"
-	file := io.NopCloser(strings.NewReader(fileContent))
+	t.Run("add and retrieve request file", func(t *testing.T) {
+		fileContent := "test file content"
+		file := io.NopCloser(strings.NewReader(fileContent))
 
-	reqCtx.AddRequestFile("testfile", &FileValue{
-		File: file,
-		Name: "test.txt",
+		reqCtx.AddRequestFile("testfile", NewFileValue(file, "test.txt"))
+
+		if len(reqCtx.availableFiles) != 1 {
+			t.Errorf("Expected 1 file in availableFiles, got %d", len(reqCtx.availableFiles))
+		}
+
+		expectedKey := fileKeyRequestPrefix + "testfile"
+		if _, exists := reqCtx.availableFiles[expectedKey]; !exists {
+			t.Errorf("Expected file with key '%s' not found in availableFiles", expectedKey)
+		}
+
+		reader, err := GetFileFromContext(ctx, FileInputTypeRequest, "testfile")
+		if err != nil {
+			t.Fatalf("Failed to retrieve file: %v", err)
+		}
+
+		content, err := io.ReadAll(reader.GetReader())
+		if err != nil {
+			t.Fatalf("Failed to read file content: %v", err)
+		}
+
+		if string(content) != fileContent {
+			t.Errorf("Expected file content '%s', got '%s'", fileContent, string(content))
+		}
+
+		reader.Close()
 	})
 
-	if len(reqCtx.availableFiles) != 1 {
-		t.Errorf("Expected 1 file in availableFiles, got %d", len(reqCtx.availableFiles))
-	}
+	t.Run("add and retrieve action file", func(t *testing.T) {
+		fileContent := "action file content"
+		file := io.NopCloser(strings.NewReader(fileContent))
 
-	expectedKey := fileKeyRequestPrefix + "testfile"
-	if _, exists := reqCtx.availableFiles[expectedKey]; !exists {
-		t.Errorf("Expected file with key '%s' not found in availableFiles", expectedKey)
-	}
+		reqCtx.AddActionFile("actionfile", NewFileValue(file, "action.txt"))
 
-	reader, err := GetFileFromContext(ctx, FileInputTypeRequest, "testfile")
-	if err != nil {
-		t.Fatalf("Failed to retrieve file: %v", err)
-	}
+		expectedKey := fileKeyActionPrefix + "actionfile"
+		if _, exists := reqCtx.availableFiles[expectedKey]; !exists {
+			t.Errorf("Expected file with key '%s' not found in availableFiles", expectedKey)
+		}
 
-	content, err := io.ReadAll(reader.File)
-	if err != nil {
-		t.Fatalf("Failed to read file content: %v", err)
-	}
+		reader, err := GetFileFromContext(ctx, FileInputTypeAction, "actionfile")
+		if err != nil {
+			t.Fatalf("Failed to retrieve action file: %v", err)
+		}
 
-	if string(content) != fileContent {
-		t.Errorf("Expected file content '%s', got '%s'", fileContent, string(content))
-	}
-}
+		content, err := io.ReadAll(reader.GetReader())
+		if err != nil {
+			t.Fatalf("Failed to read file content: %v", err)
+		}
 
-func TestRequestContext_AddAndRetrieveActionFile(t *testing.T) {
-	ctx := NewTestContext()
-	reqCtx, err := FromContextOrError(ctx)
-	if err != nil {
-		t.Fatalf("Failed to get request context: %v", err)
-	}
+		if string(content) != fileContent {
+			t.Errorf("Expected file content '%s', got '%s'", fileContent, string(content))
+		}
 
-	fileContent := "action file content"
-	file := io.NopCloser(strings.NewReader(fileContent))
-
-	reqCtx.AddActionFile("actionfile", &FileValue{
-		File: file,
-		Name: "action.txt",
+		reader.Close()
 	})
 
-	expectedKey := fileKeyActionPrefix + "actionfile"
-	if _, exists := reqCtx.availableFiles[expectedKey]; !exists {
-		t.Errorf("Expected file with key '%s' not found in availableFiles", expectedKey)
-	}
+	t.Run("multiple files in map", func(t *testing.T) {
+		reqCtx.AddRequestFile("req1", NewFileValue(io.NopCloser(strings.NewReader("request file 1")), "req1.txt"))
+		reqCtx.AddRequestFile("req2", NewFileValue(io.NopCloser(strings.NewReader("request file 2")), "req2.txt"))
+		reqCtx.AddActionFile("act1", NewFileValue(io.NopCloser(strings.NewReader("action file 1")), "act1.txt"))
 
-	reader, err := GetFileFromContext(ctx, FileInputTypeAction, "actionfile")
-	if err != nil {
-		t.Fatalf("Failed to retrieve action file: %v", err)
-	}
+		if len(reqCtx.availableFiles) != 5 {
+			t.Errorf("Expected 5 files in availableFiles, got %d", len(reqCtx.availableFiles))
+		}
 
-	content, err := io.ReadAll(reader.File)
-	if err != nil {
-		t.Fatalf("Failed to read file content: %v", err)
-	}
+		testCases := []struct {
+			inputType  FileInputType
+			identifier string
+			expected   string
+		}{
+			{FileInputTypeRequest, "req1", "request file 1"},
+			{FileInputTypeRequest, "req2", "request file 2"},
+			{FileInputTypeAction, "act1", "action file 1"},
+		}
 
-	if string(content) != fileContent {
-		t.Errorf("Expected file content '%s', got '%s'", fileContent, string(content))
-	}
+		for _, tc := range testCases {
+			reader, err := GetFileFromContext(ctx, tc.inputType, tc.identifier)
+			if err != nil {
+				t.Errorf("Failed to retrieve file '%s': %v", tc.identifier, err)
+				continue
+			}
+
+			content, _ := io.ReadAll(reader.GetReader())
+			if string(content) != tc.expected {
+				t.Errorf("File '%s': expected content '%s', got '%s'", tc.identifier, tc.expected, string(content))
+			}
+			reader.Close()
+		}
+	})
+
+	t.Run("file overwrite", func(t *testing.T) {
+		reqCtx.AddRequestFile("overwritefile", NewFileValue(io.NopCloser(strings.NewReader("original content")), "original.txt"))
+		reqCtx.AddRequestFile("overwritefile", NewFileValue(io.NopCloser(strings.NewReader("new content")), "new.txt"))
+
+		reader, _ := GetFileFromContext(ctx, FileInputTypeRequest, "overwritefile")
+		content, _ := io.ReadAll(reader.GetReader())
+
+		if string(content) != "new content" {
+			t.Errorf("Expected overwritten content 'new content', got '%s'", string(content))
+		}
+
+		reader.Close()
+	})
 }
 
 func TestRequestContext_LoadRequestFiles(t *testing.T) {
@@ -166,101 +210,244 @@ func TestRequestContext_LoadRequestFiles(t *testing.T) {
 	}
 }
 
-func TestGetReaderForFile_FileNotFound(t *testing.T) {
+func TestGetFileFromContext_Errors(t *testing.T) {
 	ctx := NewTestContext()
 
-	_, err := GetFileFromContext(ctx, FileInputTypeRequest, "nonexistent")
-	if err == nil {
-		t.Error("Expected error when retrieving non-existent file, got nil")
-	}
+	t.Run("file not found", func(t *testing.T) {
+		_, err := GetFileFromContext(ctx, FileInputTypeRequest, "nonexistent")
+		if err == nil {
+			t.Error("Expected error when retrieving non-existent file, got nil")
+		}
 
-	if !strings.Contains(err.Error(), "not found") {
-		t.Errorf("Expected 'not found' error, got: %v", err)
-	}
+		if !strings.Contains(err.Error(), "not found") {
+			t.Errorf("Expected 'not found' error, got: %v", err)
+		}
+	})
+
+	t.Run("invalid input type", func(t *testing.T) {
+		_, err := GetFileFromContext(ctx, FileInputType(999), "somefile")
+		if err == nil {
+			t.Error("Expected error for invalid input type, got nil")
+		}
+
+		if !strings.Contains(err.Error(), "invalid file input type") {
+			t.Errorf("Expected 'invalid file input type' error, got: %v", err)
+		}
+	})
 }
 
-func TestGetReaderForFile_InvalidInputType(t *testing.T) {
-	ctx := NewTestContext()
-
-	_, err := GetFileFromContext(ctx, FileInputType(999), "somefile")
-	if err == nil {
-		t.Error("Expected error for invalid input type, got nil")
-	}
-
-	if !strings.Contains(err.Error(), "invalid file input type") {
-		t.Errorf("Expected 'invalid file input type' error, got: %v", err)
-	}
-}
-
-func TestRequestContext_MultipleFilesInMap(t *testing.T) {
-	ctx := NewTestContext()
-	reqCtx, _ := FromContextOrError(ctx)
-
-	reqCtx.AddRequestFile("req1", &FileValue{
-		File: io.NopCloser(strings.NewReader("request file 1")),
-		Name: "req1.txt",
-	})
-
-	reqCtx.AddRequestFile("req2", &FileValue{
-		File: io.NopCloser(strings.NewReader("request file 2")),
-		Name: "req2.txt",
-	})
-
-	reqCtx.AddActionFile("act1", &FileValue{
-		File: io.NopCloser(strings.NewReader("action file 1")),
-		Name: "act1.txt",
-	})
-
-	if len(reqCtx.availableFiles) != 3 {
-		t.Errorf("Expected 3 files in availableFiles, got %d", len(reqCtx.availableFiles))
-	}
-
-	testCases := []struct {
-		inputType  FileInputType
-		identifier string
-		expected   string
+func TestFileValue_MimeTypeDetection(t *testing.T) {
+	tests := []struct {
+		name         string
+		content      []byte
+		expectedMime string
 	}{
-		{FileInputTypeRequest, "req1", "request file 1"},
-		{FileInputTypeRequest, "req2", "request file 2"},
-		{FileInputTypeAction, "act1", "action file 1"},
+		{
+			name:         "plain text",
+			content:      []byte("hello world"),
+			expectedMime: "text/plain",
+		},
+		{
+			name:         "json content",
+			content:      []byte(`{"key": "value"}`),
+			expectedMime: "application/json",
+		},
+		{
+			name:         "small content",
+			content:      []byte("hi"),
+			expectedMime: "text/plain",
+		},
 	}
 
-	for _, tc := range testCases {
-		reader, err := GetFileFromContext(ctx, tc.inputType, tc.identifier)
-		if err != nil {
-			t.Errorf("Failed to retrieve file '%s': %v", tc.identifier, err)
-			continue
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			file := io.NopCloser(bytes.NewReader(tt.content))
+			fv := NewFileValue(file, "test.txt")
 
-		content, _ := io.ReadAll(reader.File)
-		if string(content) != tc.expected {
-			t.Errorf("File '%s': expected content '%s', got '%s'", tc.identifier, tc.expected, string(content))
-		}
+			mimeType, err := fv.GetMimeType()
+			if err != nil {
+				t.Fatalf("GetMimeType() error = %v", err)
+			}
+
+			if !strings.HasPrefix(mimeType, tt.expectedMime) {
+				t.Errorf("Expected mime type to start with '%s', got '%s'", tt.expectedMime, mimeType)
+			}
+
+			mimeType2, err := fv.GetMimeType()
+			if err != nil {
+				t.Fatalf("Second GetMimeType() call error = %v", err)
+			}
+
+			if mimeType != mimeType2 {
+				t.Errorf("MIME type should be cached. First: %s, Second: %s", mimeType, mimeType2)
+			}
+
+			readContent, err := io.ReadAll(fv.GetReader())
+			if err != nil {
+				t.Fatalf("Reading after MIME detection error = %v", err)
+			}
+
+			if !bytes.Equal(readContent, tt.content) {
+				t.Errorf("Content mismatch. Expected: %s, Got: %s", string(tt.content), string(readContent))
+			}
+
+			fv.Close()
+		})
 	}
 }
 
-func TestRequestContext_FileOverwrite(t *testing.T) {
-	ctx := NewTestContext()
-	reqCtx, _ := FromContextOrError(ctx)
+func TestFileValue_GenerateContentString(t *testing.T) {
+	content := []byte("hello world")
+	file := io.NopCloser(bytes.NewReader(content))
+	fv := NewFileValue(file, "test.txt")
 
-	reqCtx.AddRequestFile("file", &FileValue{
-		File: io.NopCloser(strings.NewReader("original content")),
-		Name: "original.txt",
-	})
-
-	reqCtx.AddRequestFile("file", &FileValue{
-		File: io.NopCloser(strings.NewReader("new content")),
-		Name: "new.txt",
-	})
-
-	if len(reqCtx.availableFiles) != 1 {
-		t.Errorf("Expected 1 file after overwrite, got %d", len(reqCtx.availableFiles))
+	dataURI, err := fv.GenerateContentString()
+	if err != nil {
+		t.Fatalf("GenerateContentString() error = %v", err)
 	}
 
-	reader, _ := GetFileFromContext(ctx, FileInputTypeRequest, "file")
-	content, _ := io.ReadAll(reader.File)
-
-	if string(content) != "new content" {
-		t.Errorf("Expected overwritten content 'new content', got '%s'", string(content))
+	expectedPrefix := "data:text/plain"
+	if !strings.HasPrefix(dataURI, expectedPrefix) {
+		t.Errorf("Expected data URI to start with '%s', got '%s'", expectedPrefix, dataURI)
 	}
+
+	if !strings.Contains(dataURI, ";base64,") {
+		t.Errorf("Expected data URI to contain ';base64,', got '%s'", dataURI)
+	}
+
+	parts := strings.Split(dataURI, ";base64,")
+	if len(parts) != 2 {
+		t.Errorf("Expected data URI to have exactly one ';base64,' separator, got '%s'", dataURI)
+	}
+
+	decodedContent, err := base64.StdEncoding.DecodeString(parts[1])
+	if err != nil {
+		t.Fatalf("Failed to decode base64 content: %v", err)
+	}
+
+	if !bytes.Equal(decodedContent, content) {
+		t.Errorf("Decoded content mismatch. Expected: %s, Got: %s", string(content), string(decodedContent))
+	}
+
+	fv.Close()
+}
+
+func TestFileValue_ReadInterface(t *testing.T) {
+	content := []byte("test content for read interface")
+	file := io.NopCloser(bytes.NewReader(content))
+	fv := NewFileValue(file, "test.txt")
+
+	buf := make([]byte, 10)
+	n, err := fv.Read(buf)
+	if err != nil {
+		t.Fatalf("First Read() error = %v", err)
+	}
+
+	if n != 10 {
+		t.Errorf("Expected to read 10 bytes, got %d", n)
+	}
+
+	if !bytes.Equal(buf, content[:10]) {
+		t.Errorf("Read content mismatch. Expected: %s, Got: %s", string(content[:10]), string(buf))
+	}
+
+	remaining, err := io.ReadAll(fv)
+	if err != nil {
+		t.Fatalf("ReadAll() error = %v", err)
+	}
+
+	if !bytes.Equal(remaining, content[10:]) {
+		t.Errorf("Remaining content mismatch. Expected: %s, Got: %s", string(content[10:]), string(remaining))
+	}
+
+	fv.Close()
+}
+
+func TestFileValue_CompleteWorkflow(t *testing.T) {
+	imageContent := []byte{0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46}
+	file := io.NopCloser(bytes.NewReader(imageContent))
+	fv := NewFileValue(file, "test.jpg")
+
+	mimeType, err := fv.GetMimeType()
+	if err != nil {
+		t.Fatalf("GetMimeType() error = %v", err)
+	}
+
+	if !strings.HasPrefix(mimeType, "image/") {
+		t.Errorf("Expected image MIME type, got '%s'", mimeType)
+	}
+
+	dataURI, err := fv.GenerateContentString()
+	if err != nil {
+		t.Fatalf("GenerateContentString() error = %v", err)
+	}
+
+	expectedPrefix := fmt.Sprintf("data:%s;base64,", mimeType)
+	if !strings.HasPrefix(dataURI, expectedPrefix) {
+		t.Errorf("Expected data URI to start with '%s', got '%s'", expectedPrefix, dataURI)
+	}
+
+	parts := strings.Split(dataURI, ";base64,")
+	decodedContent, err := base64.StdEncoding.DecodeString(parts[1])
+	if err != nil {
+		t.Fatalf("Failed to decode base64 content: %v", err)
+	}
+
+	if !bytes.Equal(decodedContent, imageContent) {
+		t.Errorf("Decoded content mismatch")
+	}
+
+	readerContent, err := io.ReadAll(fv.GetReader())
+	if err != nil {
+		t.Fatalf("Failed to read from GetReader(): %v", err)
+	}
+
+	if !bytes.Equal(readerContent, imageContent) {
+		t.Errorf("GetReader() content mismatch")
+	}
+
+	fv.Close()
+}
+
+func TestFileValue_CloseBehavior(t *testing.T) {
+	t.Run("idempotent close", func(t *testing.T) {
+		content := []byte("test content")
+		file := io.NopCloser(bytes.NewReader(content))
+		fv := NewFileValue(file, "test.txt")
+
+		err := fv.Close()
+		if err != nil {
+			t.Errorf("Expected no error on close, got: %v", err)
+		}
+
+		err = fv.Close()
+		if err != nil {
+			t.Errorf("Expected no error on second close, got: %v", err)
+		}
+	})
+
+	t.Run("auto close on content caching", func(t *testing.T) {
+		content := []byte("test content for auto close")
+		file := io.NopCloser(bytes.NewReader(content))
+		fv := NewFileValue(file, "test.txt")
+
+		_, err := fv.GenerateContentString()
+		if err != nil {
+			t.Fatalf("GenerateContentString() error = %v", err)
+		}
+
+		err = fv.Close()
+		if err != nil {
+			t.Errorf("Expected no error on close after auto-close, got: %v", err)
+		}
+
+		readContent, err := io.ReadAll(fv.GetReader())
+		if err != nil {
+			t.Fatalf("Reading from cached content failed: %v", err)
+		}
+
+		if !bytes.Equal(readContent, content) {
+			t.Errorf("Cached content mismatch. Expected: %s, Got: %s", string(content), string(readContent))
+		}
+	})
 }

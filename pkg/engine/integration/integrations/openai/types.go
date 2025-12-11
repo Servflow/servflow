@@ -9,8 +9,14 @@ import (
 )
 
 type MessageInput struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role    string                `json:"role"`
+	Content []ContentInputWrapper `json:"content"`
+}
+
+type ContentInputWrapper struct {
+	Type     string `json:"type"`
+	Text     string `json:"text,omitempty"`
+	ImageURL string `json:"image_url,omitempty"`
 }
 
 type FunctionCallOutput struct {
@@ -53,6 +59,9 @@ const (
 	FunctionCallType       = "function_call"
 
 	ToolTypeFunction = "function"
+
+	InputTypeText  = "input_text"
+	InputTypeImage = "input_image"
 )
 
 var agentRoleToRoleMapping = map[agent.RoleType]string{
@@ -120,9 +129,24 @@ func convertAgentRequestToRequest(logger *zap.Logger, req *agent.LLMRequest, mod
 	for _, m := range req.Messages {
 		switch val := m.(type) {
 		case agent.MessageContent:
+			contents := make([]ContentInputWrapper, 0)
+			contents = append(contents, ContentInputWrapper{
+				Type: InputTypeText,
+				Text: val.Content,
+			})
+			if val.FileContent != nil {
+				c, err := val.FileContent.GenerateContentString()
+				if err != nil {
+					logger.Warn("Failed to generate content string", zap.Error(err))
+				}
+				contents = append(contents, ContentInputWrapper{
+					Type:     InputTypeImage,
+					ImageURL: c,
+				})
+			}
 			r.Input = append(r.Input, MessageInput{
 				Role:    agentRoleToRoleMapping[val.Role],
-				Content: val.Content,
+				Content: contents,
 			})
 		case agent.MessageToolCallResponse:
 			r.Input = append(r.Input, FunctionCallOutput{

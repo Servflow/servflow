@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -19,20 +20,15 @@ import (
 
 var sessionIDHeader = "Mcp-Session-Id"
 
-// TestRequest represents a single HTTP request to be made during testing
 type TestRequest struct {
-	Name        string                                       // Name of this request for logging/debugging
-	Path        string                                       // URL path for the request
-	Method      string                                       // HTTP method (GET, POST, etc)
-	Body        string                                       // Request body as a string
-	Headers     map[string]string                            // Custom headers for the request
-	WantStatus  int                                          // Expected HTTP status code
-	WantBody    string                                       // Expected response body (for exact matches)
-	WantJSON    interface{}                                  // Expected response body as JSON (for structured comparison)
-	AssertExtra func(*testing.T, *httptest.ResponseRecorder) // Additional custom assertions
+	Name        string
+	Request     *http.Request
+	WantStatus  int
+	WantBody    string
+	WantJSON    interface{}
+	AssertExtra func(*testing.T, *httptest.ResponseRecorder)
 }
 
-// TestRunner encapsulates the test environment and configuration
 type TestRunner struct {
 	t         *testing.T
 	ctrl      *gomock.Controller
@@ -40,7 +36,6 @@ type TestRunner struct {
 	handler   http.Handler
 }
 
-// NewTestRunner creates a new TestRunner with the given configuration
 func NewTestRunner(t *testing.T, config *apiconfig.APIConfig) *TestRunner {
 	t.Helper()
 	ctrl := gomock.NewController(t)
@@ -54,13 +49,11 @@ func NewTestRunner(t *testing.T, config *apiconfig.APIConfig) *TestRunner {
 	return runner
 }
 
-// WithMocks sets up mock expectations using a provided setup function
 func (r *TestRunner) WithMocks(setup func(*gomock.Controller)) *TestRunner {
 	setup(r.ctrl)
 	return r
 }
 
-// WithDefaultMocks sets up default mock behavior
 func (r *TestRunner) WithDefaultMocks() *TestRunner {
 	mockProvider := plan2.NewMockActionProvider(r.ctrl)
 	mockExecutable := plan2.NewMockActionExecutable(r.ctrl)
@@ -70,7 +63,6 @@ func (r *TestRunner) WithDefaultMocks() *TestRunner {
 	return r
 }
 
-// Init initializes the test runner, creating the HTTP handler
 func (r *TestRunner) Init() *TestRunner {
 	devLogger, err := zap.NewDevelopment()
 	if err != nil {
@@ -83,29 +75,16 @@ func (r *TestRunner) Init() *TestRunner {
 	return r
 }
 
-// RunRequests executes a series of test requests
 func (r *TestRunner) RunRequests(requests ...TestRequest) {
 	for _, req := range requests {
 		r.t.Run(req.Name, func(t *testing.T) {
-
-			httpReq := httptest.NewRequestWithContext(context.Background(), req.Method, req.Path, bytes.NewBufferString(req.Body))
-			httpReq.Header.Add("Content-Type", "application/json")
-			httpReq.Header.Add("Accept", "application/json")
-
-			// Add headers
-			for key, value := range req.Headers {
-				httpReq.Header.Add(key, value)
-			}
-
 			w := httptest.NewRecorder()
-			r.handler.ServeHTTP(w, httpReq)
+			r.handler.ServeHTTP(w, req.Request)
 
-			// Status code assertion
 			if req.WantStatus != 0 {
 				assert.Equal(t, req.WantStatus, w.Code, "unexpected status code")
 			}
 
-			// Body assertions
 			if req.WantBody != "" {
 				assert.Equal(t, req.WantBody, w.Body.String(), "unexpected response body")
 			}
@@ -117,7 +96,6 @@ func (r *TestRunner) RunRequests(requests ...TestRequest) {
 				assert.Equal(t, req.WantJSON, got, "unexpected JSON response")
 			}
 
-			// Run additional assertions if provided
 			if req.AssertExtra != nil {
 				req.AssertExtra(t, w)
 			}
@@ -125,45 +103,44 @@ func (r *TestRunner) RunRequests(requests ...TestRequest) {
 	}
 }
 
-// Example test data
 var mcpInit = `{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "method": "initialize",
-  "params": {
-    "protocolVersion": "2024-11-05",
-    "capabilities": {
-      "roots": {
-        "listChanged": true
-      },
-      "sampling": {},
-      "elicitation": {}
-    },
-    "clientInfo": {
-      "name": "ExampleClient",
-      "title": "Example Client Display Name",
-      "version": "1.0.0"
-    }
-  }
+		"jsonrpc": "2.0",
+		"id": 1,
+		"method": "initialize",
+		"params": {
+				"protocolVersion": "2024-11-05",
+				"capabilities": {
+						"roots": {
+								"listChanged": true
+						},
+						"sampling": {},
+						"elicitation": {}
+				},
+				"clientInfo": {
+						"name": "ExampleClient",
+						"title": "Example Client Display Name",
+						"version": "1.0.0"
+				}
+		}
 }`
 
 var mcpInitResponse = `{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": {
-    "protocolVersion": "2024-11-05",
-    "capabilities": {
-      "prompts": {},
-      "resources": {},
-      "tools": {
-        "listChanged": true
-      }
-    },
-    "serverInfo": {
-      "name": "Servflow MCP",
-      "version": "0.1.0"
-    }
-  }
+		"jsonrpc": "2.0",
+		"id": 1,
+		"result": {
+				"protocolVersion": "2024-11-05",
+				"capabilities": {
+						"prompts": {},
+						"resources": {},
+						"tools": {
+								"listChanged": true
+						}
+				},
+				"serverInfo": {
+						"name": "Servflow MCP",
+						"version": "0.1.0"
+				}
+		}
 }`
 
 func TestCreateCustomMuxHandler(t *testing.T) {
@@ -198,16 +175,16 @@ func TestCreateCustomMuxHandler(t *testing.T) {
 		},
 	}
 
-	// Create and initialize test runner
 	runner := NewTestRunner(t, config).Init()
 
-	// Run all test requests
 	var sessionID string
+	req1 := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/mcp", bytes.NewBufferString(mcpInit))
+	req1.Header.Add("Content-Type", "application/json")
+	req1.Header.Add("Accept", "application/json")
+
 	runner.RunRequests(TestRequest{
 		Name:       "successful MCP initialization",
-		Path:       "/mcp",
-		Method:     http.MethodPost,
-		Body:       mcpInit,
+		Request:    req1,
 		WantStatus: http.StatusOK,
 		AssertExtra: func(t *testing.T, w *httptest.ResponseRecorder) {
 			sessionID = w.Header().Get(sessionIDHeader)
@@ -215,97 +192,98 @@ func TestCreateCustomMuxHandler(t *testing.T) {
 		},
 	})
 
+	req2 := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/mcp", bytes.NewBufferString(`{
+			"jsonrpc": "2.0",
+			"id": 1,
+			"method": "tools/list",
+			"params": {
+			}
+}`))
+	req2.Header.Add("Content-Type", "application/json")
+	req2.Header.Add("Accept", "application/json")
+	req2.Header.Add(sessionIDHeader, sessionID)
+
 	runner.RunRequests(TestRequest{
-		Name:   "MCP List tools",
-		Path:   "/mcp",
-		Method: http.MethodPost,
-		Headers: map[string]string{
-			sessionIDHeader: sessionID,
-		},
-		Body: `{
-	  "jsonrpc": "2.0",
-	  "id": 1,
-	  "method": "tools/list",
-	  "params": {
-	  }
-}`,
+		Name:       "MCP List tools",
+		Request:    req2,
 		WantStatus: http.StatusOK,
 		AssertExtra: func(t *testing.T, w *httptest.ResponseRecorder) {
 			assert.JSONEq(t, `
 {
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": {
-    "tools": [
-      {
-        "annotations": {
-          "readOnlyHint": false,
-          "destructiveHint": true,
-          "idempotentHint": false,
-          "openWorldHint": true
-        },
+		"jsonrpc": "2.0",
+		"id": 1,
+		"result": {
+				"tools": [
+						{
+								"annotations": {
+										"readOnlyHint": false,
+										"destructiveHint": true,
+										"idempotentHint": false,
+										"openWorldHint": true
+								},
 		"description" : "Test Endpoint",
-        "inputSchema": {
-          "properties": {
-            "parameter1": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "parameter1"
-          ],
-          "type": "object"
-        },
-        "name": "mcptool"
-      }
-    ]
-  }
+								"inputSchema": {
+										"properties": {
+												"parameter1": {
+														"type": "string"
+												}
+										},
+										"required": [
+												"parameter1"
+										],
+										"type": "object"
+								},
+								"name": "mcptool"
+						}
+				]
+		}
 }`, w.Body.String())
 		},
 	})
-	runner.RunRequests(TestRequest{
-		Name: "Mcp call tool",
-		Path: "/mcp",
-		Headers: map[string]string{
-			sessionIDHeader: sessionID,
-		},
-		Body: `
+
+	req3 := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/mcp", bytes.NewBufferString(`
 {
-  "jsonrpc": "2.0",
-  "id": 2,
-  "method": "tools/call",
-  "params": {
-    "name": "mcptool",
-    "arguments": {
-      "parameter1": "parameter value"
-    }
-  }
-}`,
-		Method:     http.MethodPost,
+		"jsonrpc": "2.0",
+		"id": 2,
+		"method": "tools/call",
+		"params": {
+				"name": "mcptool",
+				"arguments": {
+						"parameter1": "parameter value"
+				}
+		}
+}`))
+	req3.Header.Add("Content-Type", "application/json")
+	req3.Header.Add("Accept", "application/json")
+	req3.Header.Add(sessionIDHeader, sessionID)
+
+	runner.RunRequests(TestRequest{
+		Name:       "Mcp call tool",
+		Request:    req3,
 		WantStatus: http.StatusOK,
 		AssertExtra: func(t *testing.T, w *httptest.ResponseRecorder) {
 			assert.JSONEq(t, `{"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"value"}]}}`, w.Body.String())
 		},
 	})
 
+	req4 := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/mcp", bytes.NewBufferString(`{"invalid": json`))
+	req4.Header.Add("Content-Type", "application/json")
+	req4.Header.Add("Accept", "application/json")
+
+	req5 := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/mcp", bytes.NewBufferString(mcpInit))
+	req5.Header.Add("Content-Type", "application/json")
+	req5.Header.Add("Accept", "application/json")
+	req5.Header.Add("X-Custom-Header", "test-value")
+
 	runner.RunRequests([]TestRequest{
 		{
 			Name:       "invalid JSON request",
-			Path:       "/mcp",
-			Method:     http.MethodPost,
-			Body:       `{"invalid": json`,
+			Request:    req4,
 			WantStatus: http.StatusBadRequest,
 		},
 		{
-			Name:   "custom headers test",
-			Path:   "/mcp",
-			Method: http.MethodPost,
-			Body:   mcpInit,
-			Headers: map[string]string{
-				"Content-Type":    "application/json",
-				"Accept":          "application/json",
-				"X-Custom-Header": "test-value",
-			},
+			Name:       "custom headers test",
+			Request:    req5,
 			WantStatus: http.StatusOK,
 		},
 	}...)
@@ -338,10 +316,62 @@ func TestExtractURLParam(t *testing.T) {
 
 	runner := NewTestRunner(t, config).WithDefaultMocks().Init()
 
+	req := httptest.NewRequestWithContext(context.Background(), "POST", "/test/hello", nil)
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("Accept", "application/json")
+
 	runner.RunRequests(TestRequest{
 		Name:     "extract url param",
-		Method:   "POST",
-		Path:     "/test/hello",
+		Request:  req,
 		WantBody: "hello",
+	})
+}
+
+func TestMultipartFormWithTemplatedAction(t *testing.T) {
+	config := &apiconfig.APIConfig{
+		HttpConfig: apiconfig.HttpConfig{
+			ListenPath: "/api/upload",
+			Method:     "POST",
+			Next:       "action.process_form",
+		},
+		Actions: map[string]apiconfig.Action{
+			"process_form": {
+				Type: "static",
+				Config: map[string]interface{}{
+					"return": `{{ param "testfield" }}`,
+				},
+				Next: "response.success",
+			},
+		},
+		Responses: map[string]apiconfig.ResponseConfig{
+			"success": {
+				Type:     "template",
+				Code:     200,
+				Template: `Field value: {{  .variable_actions_process_form }}`,
+			},
+		},
+	}
+
+	runner := NewTestRunner(t, config).WithDefaultMocks().Init()
+
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+	err := writer.WriteField("testfield", "hello_world")
+	assert.NoError(t, err)
+	fileWriter, err := writer.CreateFormFile("dummyfile", "test.txt")
+	assert.NoError(t, err)
+	_, err = fileWriter.Write([]byte("dummy file content"))
+	assert.NoError(t, err)
+	writer.Close()
+
+	req := httptest.NewRequestWithContext(context.Background(), "POST", "/api/upload", &buf)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Add("Accept", "application/json")
+
+	runner.RunRequests(TestRequest{
+		Name:       "multipart form with templated field",
+		Request:    req,
+		WantStatus: 200,
+		WantBody:   "Field value: hello_world",
 	})
 }

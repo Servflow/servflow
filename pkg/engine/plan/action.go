@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"text/template"
 
 	"github.com/Servflow/servflow/internal/tracing"
@@ -91,8 +92,24 @@ func (a *Action) execute(ctx context.Context) (*stepWrapper, error) {
 	}
 
 	logger.Debug("action executed successfully", zap.Any("resp", resp))
-	if err = requestctx.AddRequestVariables(ctx, map[string]interface{}{a.out: resp}, ""); err != nil {
-		return nil, err
+
+	// Check if response is an io.Reader and store as action file
+	if reader, ok := resp.(io.Reader); ok {
+		fileValue := &requestctx.FileValue{
+			File: io.NopCloser(reader),
+			Name: a.out,
+		}
+		reqCtx, err := requestctx.FromContextOrError(ctx)
+		if err != nil {
+			return nil, err
+		}
+		reqCtx.AddActionFile(a.out, fileValue)
+		logger.Debug("stored action output as file", zap.String("action_output", a.out))
+	} else {
+		if err = requestctx.AddRequestVariables(ctx, map[string]interface{}{a.out: resp}, ""); err != nil {
+			return nil, err
+		}
 	}
+
 	return a.next, nil
 }

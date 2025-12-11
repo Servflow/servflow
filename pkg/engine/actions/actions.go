@@ -1,6 +1,13 @@
 package actions
 
-import "context"
+import (
+	"context"
+	"errors"
+)
+
+// TODO think of how to handle fatal errors
+
+var ErrorFatal = errors.New("fatal error")
 
 type ActionExecutable interface {
 	Config() string

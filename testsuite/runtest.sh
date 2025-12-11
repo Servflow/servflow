@@ -21,7 +21,7 @@ fi
 pushd ./compose || exit
 
 # Build the images and start the services defined in the docker-compose file
-docker compose up --build -d
+docker compose up --build --force-recreate -d
 
 popd
 

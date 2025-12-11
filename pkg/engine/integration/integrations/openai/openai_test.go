@@ -3,11 +3,14 @@ package openai
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/Servflow/servflow/pkg/agent"
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
@@ -307,12 +310,16 @@ func TestConvertAgentRequestToRequest(t *testing.T) {
 				Instructions: "You are a helpful assistant.",
 				Input: []interface{}{
 					MessageInput{
-						Role:    "user",
-						Content: "Hello, how are you?",
+						Role: "user",
+						Content: []ContentInputWrapper{
+							{Type: InputTypeText, Text: "Hello, how are you?"},
+						},
 					},
 					MessageInput{
-						Role:    "assistant",
-						Content: "I'm doing great, thank you!",
+						Role: "assistant",
+						Content: []ContentInputWrapper{
+							{Type: InputTypeText, Text: "I'm doing great, thank you!"},
+						},
 					},
 				},
 				Tools: []ToolsRequestConfig{},
@@ -354,8 +361,10 @@ func TestConvertAgentRequestToRequest(t *testing.T) {
 				Instructions: "You have access to weather tools.",
 				Input: []interface{}{
 					MessageInput{
-						Role:    "user",
-						Content: "What's the weather like?",
+						Role: "user",
+						Content: []ContentInputWrapper{
+							{Type: InputTypeText, Text: "What's the weather like?"},
+						},
 					},
 				},
 				Tools: []ToolsRequestConfig{
@@ -425,8 +434,10 @@ func TestConvertAgentRequestToRequest(t *testing.T) {
 				Instructions: "Handle complete conversation flow.",
 				Input: []interface{}{
 					MessageInput{
-						Role:    "user",
-						Content: "Get weather for NY and LA",
+						Role: "user",
+						Content: []ContentInputWrapper{
+							{Type: InputTypeText, Text: "Get weather for NY and LA"},
+						},
 					},
 					FunctionCall{
 						Type:      FunctionCallType,
@@ -451,8 +462,10 @@ func TestConvertAgentRequestToRequest(t *testing.T) {
 						Output: `{"temperature": 25, "condition": "clear"}`,
 					},
 					MessageInput{
-						Role:    "assistant",
-						Content: "Weather retrieved for both cities.",
+						Role: "assistant",
+						Content: []ContentInputWrapper{
+							{Type: InputTypeText, Text: "Weather retrieved for both cities."},
+						},
 					},
 				},
 				Tools: []ToolsRequestConfig{},
@@ -487,20 +500,28 @@ func TestConvertAgentRequestToRequest(t *testing.T) {
 				Instructions: "You are a development assistant.",
 				Input: []interface{}{
 					MessageInput{
-						Role:    "system",
-						Content: "System message",
+						Role: "system",
+						Content: []ContentInputWrapper{
+							{Type: InputTypeText, Text: "System message"},
+						},
 					},
 					MessageInput{
-						Role:    "user",
-						Content: "User message",
+						Role: "user",
+						Content: []ContentInputWrapper{
+							{Type: InputTypeText, Text: "User message"},
+						},
 					},
 					MessageInput{
-						Role:    "assistant",
-						Content: "Assistant message",
+						Role: "assistant",
+						Content: []ContentInputWrapper{
+							{Type: InputTypeText, Text: "Assistant message"},
+						},
 					},
 					MessageInput{
-						Role:    "developer",
-						Content: "Developer message",
+						Role: "developer",
+						Content: []ContentInputWrapper{
+							{Type: InputTypeText, Text: "Developer message"},
+						},
 					},
 				},
 				Tools: []ToolsRequestConfig{},
@@ -549,8 +570,10 @@ func TestConvertAgentRequestToRequest(t *testing.T) {
 				Instructions: "You have access to multiple tools.",
 				Input: []interface{}{
 					MessageInput{
-						Role:    "user",
-						Content: "Help me with weather and time",
+						Role: "user",
+						Content: []ContentInputWrapper{
+							{Type: InputTypeText, Text: "Help me with weather and time"},
+						},
 					},
 				},
 				Tools: []ToolsRequestConfig{
@@ -644,8 +667,10 @@ func TestConvertAgentRequestToRequest(t *testing.T) {
 				Instructions: "Handle various tool argument scenarios.",
 				Input: []interface{}{
 					MessageInput{
-						Role:    "user",
-						Content: "Process data and get time",
+						Role: "user",
+						Content: []ContentInputWrapper{
+							{Type: InputTypeText, Text: "Process data and get time"},
+						},
 					},
 					FunctionCall{
 						Type:      FunctionCallType,
@@ -664,13 +689,63 @@ func TestConvertAgentRequestToRequest(t *testing.T) {
 				Tools: []ToolsRequestConfig{},
 			},
 		},
+		{
+			name: "request with file content",
+			request: &agent.LLMRequest{
+				SystemMessage: "You can process files.",
+				Messages: []any{
+					agent.MessageContent{
+						Role:        agent.RoleTypeUser,
+						Content:     "Analyze this file",
+						FileContent: requestctx.NewFileValue(io.NopCloser(strings.NewReader("test content")), "test.txt"),
+					},
+				},
+				Tools: []agent.ToolInfo{},
+			},
+			expected: RequestBody{
+				Model:        defaultModel,
+				Instructions: "You can process files.",
+				Input: []interface{}{
+					MessageInput{
+						Role: "user",
+						Content: []ContentInputWrapper{
+							{Type: InputTypeText, Text: "Analyze this file"},
+							{Type: InputTypeImage, ImageURL: ""},
+						},
+					},
+				},
+				Tools: []ToolsRequestConfig{},
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := convertAgentRequestToRequest(logger, tt.request, defaultModel)
 
-			assert.Equal(t, tt.expected, result)
+			if tt.name == "request with file content" {
+				assert.Equal(t, tt.expected.Model, result.Model)
+				assert.Equal(t, tt.expected.Instructions, result.Instructions)
+				assert.Equal(t, len(tt.expected.Input), len(result.Input))
+				assert.Equal(t, tt.expected.Tools, result.Tools)
+
+				if len(result.Input) > 0 {
+					resultMsg, ok := result.Input[0].(MessageInput)
+					assert.True(t, ok)
+					expectedMsg := tt.expected.Input[0].(MessageInput)
+					assert.Equal(t, expectedMsg.Role, resultMsg.Role)
+					assert.Equal(t, len(expectedMsg.Content), len(resultMsg.Content))
+
+					if len(resultMsg.Content) >= 2 {
+						assert.Equal(t, InputTypeText, resultMsg.Content[0].Type)
+						assert.Equal(t, expectedMsg.Content[0].Text, resultMsg.Content[0].Text)
+						assert.Equal(t, InputTypeImage, resultMsg.Content[1].Type)
+						assert.NotEmpty(t, resultMsg.Content[1].ImageURL)
+					}
+				}
+			} else {
+				assert.Equal(t, tt.expected, result)
+			}
 		})
 	}
 }

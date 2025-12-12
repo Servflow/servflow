@@ -5,25 +5,22 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 
+	"github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/gabriel-vasile/mimetype"
-)
-
-type FileInputType int
-
-const (
-	FileInputTypeRequest FileInputType = iota
-	FileInputTypeAction
 )
 
 const (
 	fileKeyActionPrefix  = "action."
 	fileKeyRequestPrefix = "request."
 )
+
+var ErrFileNotFound = errors.New("file not found")
 
 func (rc *RequestContext) LoadRequestFiles(r *http.Request) error {
 	if r == nil {
@@ -48,7 +45,7 @@ func (rc *RequestContext) LoadRequestFiles(r *http.Request) error {
 				if err != nil {
 					continue
 				}
-				rc.availableFiles[fieldName] = NewFileValue(file, fileHeader.Filename)
+				rc.AddRequestFile(fieldName, NewFileValue(file, fileHeader.Filename))
 			}
 		}
 	}
@@ -82,25 +79,25 @@ func (f *FileValue) Close() error {
 	return nil
 }
 
-func GetFileFromContext(ctx context.Context, inputType FileInputType, identifier string) (*FileValue, error) {
+func GetFileFromContext(ctx context.Context, fileInput apiconfig.FileInput) (*FileValue, error) {
 	reqCtx, err := FromContextOrError(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	var key string
-	switch inputType {
-	case FileInputTypeRequest:
-		key = fileKeyRequestPrefix + identifier
-	case FileInputTypeAction:
-		key = fileKeyActionPrefix + identifier
+	switch fileInput.Type {
+	case apiconfig.FileInputTypeRequest:
+		key = fileKeyRequestPrefix + fileInput.Identifier
+	case apiconfig.FileInputTypeAction:
+		key = fileKeyActionPrefix + fileInput.Identifier
 	default:
-		return nil, fmt.Errorf("invalid file input type: %d", inputType)
+		return nil, fmt.Errorf("invalid file input type: %s", fileInput.Type)
 	}
 
 	file, ok := reqCtx.availableFiles[key]
 	if !ok {
-		return nil, fmt.Errorf("file '%s' not found", identifier)
+		return nil, ErrFileNotFound
 	}
 
 	return file, nil

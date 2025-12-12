@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -150,7 +151,10 @@ func TestAction_Execute(t *testing.T) {
 
 			require.NoError(t, err)
 
-			fileValue, err := requestctx.GetFileFromContext(ctx, requestctx.FileInputTypeAction, "file_output")
+			fileValue, err := requestctx.GetFileFromContext(ctx, apiconfig.FileInput{
+				Type:       apiconfig.FileInputTypeAction,
+				Identifier: "file_output",
+			})
 			require.NoError(t, err)
 			require.NotNil(t, fileValue)
 			assert.Equal(t, "file_output", fileValue.Name)

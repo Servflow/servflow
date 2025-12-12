@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/Servflow/servflow/internal/http"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
@@ -72,6 +73,7 @@ func (p *Plan) generateEndValue(ctx context.Context, logger *zap.Logger, endValu
 }
 
 func (p *Plan) Execute(ctx context.Context, id, endValue string) (*http.SfResponse, error) {
+	id = strings.TrimLeft(id, "$")
 	ctx = context.WithValue(ctx, ContextKey, p)
 	step, ok := p.steps[id]
 	if !ok {

@@ -17,8 +17,8 @@ var apiConfigSchema string
 type RequestType string
 
 const (
-	FileTypeRequest = "request"
-	FileTypeAction  = "action"
+	FileInputTypeRequest = "request"
+	FileInputTypeAction  = "action"
 )
 
 type FileInput struct {

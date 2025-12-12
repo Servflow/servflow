@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/Servflow/servflow/pkg/apiconfig"
 )
 
 func TestRequestContext_FileManagement(t *testing.T) {
@@ -33,7 +35,10 @@ func TestRequestContext_FileManagement(t *testing.T) {
 			t.Errorf("Expected file with key '%s' not found in availableFiles", expectedKey)
 		}
 
-		reader, err := GetFileFromContext(ctx, FileInputTypeRequest, "testfile")
+		reader, err := GetFileFromContext(ctx, apiconfig.FileInput{
+			Type:       apiconfig.FileInputTypeRequest,
+			Identifier: "testfile",
+		})
 		if err != nil {
 			t.Fatalf("Failed to retrieve file: %v", err)
 		}
@@ -61,7 +66,10 @@ func TestRequestContext_FileManagement(t *testing.T) {
 			t.Errorf("Expected file with key '%s' not found in availableFiles", expectedKey)
 		}
 
-		reader, err := GetFileFromContext(ctx, FileInputTypeAction, "actionfile")
+		reader, err := GetFileFromContext(ctx, apiconfig.FileInput{
+			Type:       apiconfig.FileInputTypeAction,
+			Identifier: "actionfile",
+		})
 		if err != nil {
 			t.Fatalf("Failed to retrieve action file: %v", err)
 		}
@@ -88,17 +96,20 @@ func TestRequestContext_FileManagement(t *testing.T) {
 		}
 
 		testCases := []struct {
-			inputType  FileInputType
+			inputType  string
 			identifier string
 			expected   string
 		}{
-			{FileInputTypeRequest, "req1", "request file 1"},
-			{FileInputTypeRequest, "req2", "request file 2"},
-			{FileInputTypeAction, "act1", "action file 1"},
+			{apiconfig.FileInputTypeRequest, "req1", "request file 1"},
+			{apiconfig.FileInputTypeRequest, "req2", "request file 2"},
+			{apiconfig.FileInputTypeAction, "act1", "action file 1"},
 		}
 
 		for _, tc := range testCases {
-			reader, err := GetFileFromContext(ctx, tc.inputType, tc.identifier)
+			reader, err := GetFileFromContext(ctx, apiconfig.FileInput{
+				Type:       tc.inputType,
+				Identifier: tc.identifier,
+			})
 			if err != nil {
 				t.Errorf("Failed to retrieve file '%s': %v", tc.identifier, err)
 				continue
@@ -116,7 +127,10 @@ func TestRequestContext_FileManagement(t *testing.T) {
 		reqCtx.AddRequestFile("overwritefile", NewFileValue(io.NopCloser(strings.NewReader("original content")), "original.txt"))
 		reqCtx.AddRequestFile("overwritefile", NewFileValue(io.NopCloser(strings.NewReader("new content")), "new.txt"))
 
-		reader, _ := GetFileFromContext(ctx, FileInputTypeRequest, "overwritefile")
+		reader, _ := GetFileFromContext(ctx, apiconfig.FileInput{
+			Type:       apiconfig.FileInputTypeRequest,
+			Identifier: "overwritefile",
+		})
 		content, _ := io.ReadAll(reader.GetReader())
 
 		if string(content) != "new content" {
@@ -214,7 +228,10 @@ func TestGetFileFromContext_Errors(t *testing.T) {
 	ctx := NewTestContext()
 
 	t.Run("file not found", func(t *testing.T) {
-		_, err := GetFileFromContext(ctx, FileInputTypeRequest, "nonexistent")
+		_, err := GetFileFromContext(ctx, apiconfig.FileInput{
+			Type:       apiconfig.FileInputTypeRequest,
+			Identifier: "nonexistent",
+		})
 		if err == nil {
 			t.Error("Expected error when retrieving non-existent file, got nil")
 		}
@@ -225,7 +242,10 @@ func TestGetFileFromContext_Errors(t *testing.T) {
 	})
 
 	t.Run("invalid input type", func(t *testing.T) {
-		_, err := GetFileFromContext(ctx, FileInputType(999), "somefile")
+		_, err := GetFileFromContext(ctx, apiconfig.FileInput{
+			Type:       "dummy_type",
+			Identifier: "somefile",
+		})
 		if err == nil {
 			t.Error("Expected error for invalid input type, got nil")
 		}

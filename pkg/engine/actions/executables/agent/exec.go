@@ -11,6 +11,7 @@ import (
 	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/integration"
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
 )
 
 type Config struct {
@@ -77,7 +78,11 @@ func (a *Agent) Execute(ctx context.Context, modifiedConfig string) (interface{}
 		return nil, err
 	}
 
-	resp, err := session.Query(ctx, newConfig.UserPrompt)
+	fileInput, err := requestctx.GetFileFromContext(ctx, newConfig.FileUpload)
+	if err != nil && !errors.Is(err, requestctx.ErrFileNotFound) {
+		return nil, fmt.Errorf("%w: %v", actions.ErrorFatal, err)
+	}
+	resp, err := session.Query(ctx, newConfig.UserPrompt, fileInput)
 	if err != nil {
 		return nil, err
 	}

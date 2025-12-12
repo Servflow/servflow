@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/Servflow/servflow/config"
-	apiconfig "github.com/Servflow/servflow/pkg/definitions"
+	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/agent"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/authenticate"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/delete_action"

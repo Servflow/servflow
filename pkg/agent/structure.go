@@ -35,7 +35,7 @@ type MessageContent struct {
 	Message
 	Role        RoleType
 	Content     string
-	FileContent *requestctx.FileValue
+	FileContent *requestctx.FileValue `json:"-"`
 }
 
 func (c *MessageContent) Serialize() ([]byte, error) {

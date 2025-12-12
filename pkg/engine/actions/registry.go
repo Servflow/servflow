@@ -26,6 +26,7 @@ const (
 	FieldTypeIntegration FieldType = "integration"
 	FieldTypeMap         FieldType = "map"
 	FieldTypeBoolean     FieldType = "boolean"
+	FieldTypeFile        FieldType = "file"
 	FieldTypeTextArea    FieldType = "text_area"
 )
 

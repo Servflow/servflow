@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	apiconfig "github.com/Servflow/servflow/pkg/definitions"
+	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"

@@ -127,4 +127,4 @@ require (
 	google.golang.org/protobuf v1.36.6 // indirect
 )
 
-//replace git.servflow.io/servflow/definitions => ../definitions
+//replace git.servflow.io/servflow/apiconfig => ../apiconfig

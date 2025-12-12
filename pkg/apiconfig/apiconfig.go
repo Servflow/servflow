@@ -17,6 +17,16 @@ var apiConfigSchema string
 type RequestType string
 
 const (
+	FileTypeRequest = "request"
+	FileTypeAction  = "action"
+)
+
+type FileInput struct {
+	Type       string `json:"type" yaml:"type"`
+	Identifier string `json:"identifier" yaml:"identifier"`
+}
+
+const (
 	JSON     RequestType = "json"
 	FormData RequestType = "form-data"
 )

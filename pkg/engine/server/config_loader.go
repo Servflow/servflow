@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	apiconfig "github.com/Servflow/servflow/pkg/definitions"
+	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 )

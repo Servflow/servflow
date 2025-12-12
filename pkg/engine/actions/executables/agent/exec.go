@@ -8,17 +8,19 @@ import (
 
 	"github.com/Servflow/servflow/pkg/agent"
 	"github.com/Servflow/servflow/pkg/agent/tools"
+	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/integration"
 )
 
 type Config struct {
-	ToolConfigs       []ToolConfig `json:"toolConfigs" yaml:"toolConfigs"`
-	SystemPrompt      string       `json:"systemPrompt" yaml:"systemPrompt"`
-	UserPrompt        string       `json:"userPrompt" yaml:"userPrompt"`
-	IntegrationID     string       `json:"integrationID" yaml:"integrationID"`
-	ConversationID    string       `json:"conversationID" yaml:"conversationID"`
-	ReturnLastMessage bool         `json:"returnLastMessage" yaml:"returnLastMessage"`
+	ToolConfigs       []ToolConfig        `json:"toolConfigs" yaml:"toolConfigs"`
+	SystemPrompt      string              `json:"systemPrompt" yaml:"systemPrompt"`
+	UserPrompt        string              `json:"userPrompt" yaml:"userPrompt"`
+	IntegrationID     string              `json:"integrationID" yaml:"integrationID"`
+	ConversationID    string              `json:"conversationID" yaml:"conversationID"`
+	ReturnLastMessage bool                `json:"returnLastMessage" yaml:"returnLastMessage"`
+	FileUpload        apiconfig.FileInput `json:"fileUpload" yaml:"fileUpload"`
 }
 type MCPServerConfig struct {
 	Endpoint string   `json:"endpoint" yaml:"endpoint"`
@@ -137,6 +139,11 @@ func init() {
 			Label:       "System Prompt",
 			Placeholder: "System instructions for the agent",
 			Required:    false,
+		},
+		"fileUpload": {
+			Type:     actions.FieldTypeFile,
+			Label:    "File To Upload",
+			Required: false,
 		},
 		"userPrompt": {
 			Type:        actions.FieldTypeString,

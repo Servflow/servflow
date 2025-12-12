@@ -3,7 +3,7 @@ package plan
 import (
 	"testing"
 
-	apiconfig "github.com/Servflow/servflow/pkg/definitions"
+	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	requestctx2 "github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	apiconfig "github.com/Servflow/servflow/pkg/definitions"
+	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/server/middleware"
 	"github.com/justinas/alice"
 )

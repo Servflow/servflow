@@ -7,7 +7,7 @@ import (
 	"text/template"
 	"time"
 
-	apiconfig "github.com/Servflow/servflow/pkg/definitions"
+	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/mark3labs/mcp-go/mcp"

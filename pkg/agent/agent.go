@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/Servflow/servflow/pkg/storage"
 	"go.uber.org/zap"
@@ -125,13 +126,14 @@ type agentOutput struct {
 	response string
 }
 
-func (a *Session) Query(ctx context.Context, query string) (string, error) {
+func (a *Session) Query(ctx context.Context, query string, file *requestctx.FileValue) (string, error) {
 	logger := logging.WithContextEnriched(ctx).With(zap.String("module", "agent"))
 	if query != "" {
 		a.addToMessages(logger, MessageContent{
-			Message: Message{Type: MessageTypeText},
-			Role:    RoleTypeUser,
-			Content: query,
+			Message:     Message{Type: MessageTypeText},
+			Role:        RoleTypeUser,
+			Content:     query,
+			FileContent: file,
 		}, nil)
 	}
 

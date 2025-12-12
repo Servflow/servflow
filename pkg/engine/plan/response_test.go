@@ -3,7 +3,7 @@ package plan
 import (
 	"testing"
 
-	"github.com/Servflow/servflow/pkg/definitions"
+	"github.com/Servflow/servflow/pkg/apiconfig"
 	responsebuilder2 "github.com/Servflow/servflow/pkg/engine/plan/responsebuilder"
 	"github.com/stretchr/testify/assert"
 )

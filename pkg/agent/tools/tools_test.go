@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	apiconfig "github.com/Servflow/servflow/pkg/definitions"
+	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	plan2 "github.com/Servflow/servflow/pkg/engine/plan"
 	requestctx2 "github.com/Servflow/servflow/pkg/engine/requestctx"

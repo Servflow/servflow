@@ -10,7 +10,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	apiconfig "github.com/Servflow/servflow/pkg/definitions"
+	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	plan2 "github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/stretchr/testify/assert"

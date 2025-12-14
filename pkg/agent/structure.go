@@ -2,6 +2,7 @@ package agent
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -65,11 +66,38 @@ func (t *MessageToolCall) Deserialize(bytes []byte) error {
 	return json.Unmarshal(bytes, t)
 }
 
+type ToolResponseType int
+
+const (
+	ToolResponseTypeUnknown ToolResponseType = iota
+	ToolResponseTypeText
+	ToolResponseTypeImage
+)
+
 type MessageToolCallResponse struct {
 	Message
-	ID     string
-	Output string
+	ToolResponseType ToolResponseType
+	ID               string
+	Text             string
+	ImageData        []byte
+	ImageMimeType    string
 }
+
+func (t *MessageToolCallResponse) GenerateContent(imageSupport bool) string {
+	switch t.ToolResponseType {
+	case ToolResponseTypeText:
+		return t.Text
+	case ToolResponseTypeImage:
+		if imageSupport {
+			return fmt.Sprintf("data:%s;base64,%s", t.ImageMimeType, t.ImageData)
+		}
+		return ""
+	default:
+		return ""
+	}
+}
+
+// TODO consider removing image data when serializing for saving, so it won't be included in history
 
 func (t *MessageToolCallResponse) Serialize() ([]byte, error) {
 	return json.Marshal(t)

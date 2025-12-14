@@ -13,6 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
+	mcp "github.com/mark3labs/mcp-go/mcp"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -40,10 +41,10 @@ func (m *MockToolManager) EXPECT() *MockToolManagerMockRecorder {
 }
 
 // CallTool mocks base method.
-func (m *MockToolManager) CallTool(ctx context.Context, toolName string, params map[string]any) (string, error) {
+func (m *MockToolManager) CallTool(ctx context.Context, toolName string, params map[string]any) ([]mcp.Content, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CallTool", ctx, toolName, params)
-	ret0, _ := ret[0].(string)
+	ret0, _ := ret[0].([]mcp.Content)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

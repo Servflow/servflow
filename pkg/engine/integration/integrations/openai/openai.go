@@ -76,8 +76,8 @@ func (c *Client) ProvideResponse(ctx context.Context, agentReq agent.LLMRequest)
 	defer r.Body.Close()
 
 	if r.StatusCode != http.StatusOK {
-		err = fmt.Errorf("expected status OK, got %d", r.StatusCode)
 		body, _ := io.ReadAll(r.Body)
+		err = fmt.Errorf("expected status OK, got %d, message: %s", r.StatusCode, string(body))
 		logger.Error("error from openai", zap.String("response", string(body)))
 		return
 	}

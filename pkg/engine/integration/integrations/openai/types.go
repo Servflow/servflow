@@ -130,10 +130,12 @@ func convertAgentRequestToRequest(logger *zap.Logger, req *agent.LLMRequest, mod
 		switch val := m.(type) {
 		case agent.MessageContent:
 			contents := make([]ContentInputWrapper, 0)
-			contents = append(contents, ContentInputWrapper{
-				Type: InputTypeText,
-				Text: val.Content,
-			})
+			if val.Content != "" {
+				contents = append(contents, ContentInputWrapper{
+					Type: InputTypeText,
+					Text: val.Content,
+				})
+			}
 			if val.FileContent != nil {
 				c, err := val.FileContent.GenerateContentString()
 				if err != nil {
@@ -152,7 +154,7 @@ func convertAgentRequestToRequest(logger *zap.Logger, req *agent.LLMRequest, mod
 			r.Input = append(r.Input, FunctionCallOutput{
 				Type:   FunctionCallOutputType,
 				CallID: val.ID,
-				Output: val.Output,
+				Output: val.GenerateContent(true),
 			})
 		case agent.MessageToolCall:
 			arguments, err := json.Marshal(val.Arguments)

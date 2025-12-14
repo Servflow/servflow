@@ -415,12 +415,14 @@ func TestConvertAgentRequestToRequest(t *testing.T) {
 						},
 					},
 					agent.MessageToolCallResponse{
-						ID:     "call_ny",
-						Output: `{"temperature": 18, "condition": "sunny"}`,
+						ID:               "call_ny",
+						ToolResponseType: agent.ToolResponseTypeText,
+						Text:             `{"temperature": 18, "condition": "sunny"}`,
 					},
 					agent.MessageToolCallResponse{
-						ID:     "call_la",
-						Output: `{"temperature": 25, "condition": "clear"}`,
+						ToolResponseType: agent.ToolResponseTypeText,
+						ID:               "call_la",
+						Text:             `{"temperature": 25, "condition": "clear"}`,
 					},
 					agent.MessageContent{
 						Role:    agent.RoleTypeAssistant,
@@ -977,8 +979,8 @@ func TestClient_ProvideResponse(t *testing.T) {
 						Content: "What's the weather like?",
 					},
 					agent.MessageToolCallResponse{
-						ID:     "call_weather_123",
-						Output: `{"temperature": 22, "condition": "sunny"}`,
+						ID:   "call_weather_123",
+						Text: `{"temperature": 22, "condition": "sunny"}`,
 					},
 				},
 			},

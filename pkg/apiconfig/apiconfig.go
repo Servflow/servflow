@@ -40,6 +40,10 @@ type APIConfig struct {
 	McpTool      MCPToolConfig             `json:"mcpTool" yaml:"mcpTool"`
 }
 
+func (a *APIConfig) IsMCPConfig() bool {
+	return a.McpTool.Enabled || a.McpTool.Name != ""
+}
+
 type HttpConfig struct {
 	ListenPath         string   `json:"listenPath" yaml:"listenPath"`
 	Method             string   `json:"method" yaml:"method"`

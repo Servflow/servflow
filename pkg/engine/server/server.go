@@ -56,7 +56,7 @@ func (e *Engine) createCustomMuxHandler(configs []*apiconfig.APIConfig) http.Han
 			method = "GET"
 		}
 
-		if conf.McpTool.Name != "" {
+		if conf.IsMCPConfig() {
 			err := e.createMCPHandler(conf)
 			if err != nil {
 				logger.Error("error creating mcp handler", zap.Error(err), zap.String("name", conf.McpTool.Name), zap.String("api", conf.ID))

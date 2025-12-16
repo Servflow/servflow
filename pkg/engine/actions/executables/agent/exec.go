@@ -8,17 +8,20 @@ import (
 
 	"github.com/Servflow/servflow/pkg/agent"
 	"github.com/Servflow/servflow/pkg/agent/tools"
+	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/integration"
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
 )
 
 type Config struct {
-	ToolConfigs       []ToolConfig `json:"toolConfigs" yaml:"toolConfigs"`
-	SystemPrompt      string       `json:"systemPrompt" yaml:"systemPrompt"`
-	UserPrompt        string       `json:"userPrompt" yaml:"userPrompt"`
-	IntegrationID     string       `json:"integrationID" yaml:"integrationID"`
-	ConversationID    string       `json:"conversationID" yaml:"conversationID"`
-	ReturnLastMessage bool         `json:"returnLastMessage" yaml:"returnLastMessage"`
+	ToolConfigs       []ToolConfig        `json:"toolConfigs" yaml:"toolConfigs"`
+	SystemPrompt      string              `json:"systemPrompt" yaml:"systemPrompt"`
+	UserPrompt        string              `json:"userPrompt" yaml:"userPrompt"`
+	IntegrationID     string              `json:"integrationID" yaml:"integrationID"`
+	ConversationID    string              `json:"conversationID" yaml:"conversationID"`
+	ReturnLastMessage bool                `json:"returnLastMessage" yaml:"returnLastMessage"`
+	FileUpload        apiconfig.FileInput `json:"fileUpload" yaml:"fileUpload"`
 }
 type MCPServerConfig struct {
 	Endpoint string   `json:"endpoint" yaml:"endpoint"`
@@ -75,7 +78,11 @@ func (a *Agent) Execute(ctx context.Context, modifiedConfig string) (interface{}
 		return nil, err
 	}
 
-	resp, err := session.Query(ctx, newConfig.UserPrompt)
+	fileInput, err := requestctx.GetFileFromContext(ctx, newConfig.FileUpload)
+	if err != nil && !errors.Is(err, requestctx.ErrFileNotFound) {
+		return nil, fmt.Errorf("%w: %v", actions.ErrorFatal, err)
+	}
+	resp, err := session.Query(ctx, newConfig.UserPrompt, fileInput)
 	if err != nil {
 		return nil, err
 	}
@@ -137,6 +144,11 @@ func init() {
 			Label:       "System Prompt",
 			Placeholder: "System instructions for the agent",
 			Required:    false,
+		},
+		"fileUpload": {
+			Type:     actions.FieldTypeFile,
+			Label:    "File To Upload",
+			Required: false,
 		},
 		"userPrompt": {
 			Type:        actions.FieldTypeString,

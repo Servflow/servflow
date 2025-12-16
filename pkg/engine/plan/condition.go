@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/Servflow/servflow/internal/tracing"
-	apiconfig "github.com/Servflow/servflow/pkg/definitions"
+	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	requestctx2 "github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
 	"go.opentelemetry.io/otel/attribute"

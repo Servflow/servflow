@@ -21,7 +21,7 @@ var (
 	errInitializingClient = errors.New("error initializing client")
 )
 
-type functionExec func(ctx context.Context, params map[string]any) (string, error)
+type functionExec func(ctx context.Context, params map[string]any) ([]mcp.Content, error)
 
 type ClientOption func(manager *Manager) error
 type Manager struct {
@@ -107,7 +107,7 @@ func WithWorkflowToolConfig(config WorkflowToolConfig) ClientOption {
 			},
 		}
 
-		manager.toolsExec[config.Name] = func(ctx context.Context, params map[string]any) (string, error) {
+		manager.toolsExec[config.Name] = func(ctx context.Context, params map[string]any) ([]mcp.Content, error) {
 			logging.DebugContext(ctx,
 				"Executing workflow",
 				zap.Any("params", params),
@@ -117,7 +117,7 @@ func WithWorkflowToolConfig(config WorkflowToolConfig) ClientOption {
 			)
 			reqCtx, ok := requestctx.FromContext(ctx)
 			if !ok {
-				return "", errors.New("invalid error")
+				return nil, errors.New("invalid error")
 			}
 			reqCtx.AddRequestTemplateFunctions(template.FuncMap{
 				"tool_param": func(key string) string {
@@ -130,9 +130,9 @@ func WithWorkflowToolConfig(config WorkflowToolConfig) ClientOption {
 			})
 			resp, err := plan.ExecuteFromContext(ctx, config.Start, config.ReturnValue)
 			if err != nil {
-				return "", err
+				return nil, err
 			}
-			return string(resp.Body), nil
+			return []mcp.Content{mcp.NewTextContent(string(resp.Body))}, nil
 		}
 
 		return nil
@@ -177,13 +177,13 @@ func (m *Manager) addFailedConfigs() {
 	}
 }
 
-func (m *Manager) CallTool(ctx context.Context, toolName string, params map[string]any) (string, error) {
+func (m *Manager) CallTool(ctx context.Context, toolName string, params map[string]any) ([]mcp.Content, error) {
 	exec, ok := m.toolsExec[toolName]
 	if !ok {
 		m.addFailedConfigs()
 		exec, ok = m.toolsExec[toolName]
 		if !ok {
-			return "", fmt.Errorf("tool %s not found", toolName)
+			return nil, fmt.Errorf("tool %s not found", toolName)
 		}
 	}
 
@@ -227,8 +227,9 @@ func (m *Manager) addServerConfig(config ServerConfig) error {
 	return nil
 }
 
+// createMCPExecute creates an execute function that executes and calls an mcp server with the specified tool.
 func createMCPExecute(toolName string, mcpClient *client.Client) functionExec {
-	return func(ctx context.Context, params map[string]any) (string, error) {
+	return func(ctx context.Context, params map[string]any) ([]mcp.Content, error) {
 		resp, err := mcpClient.CallTool(ctx, mcp.CallToolRequest{
 			Params: mcp.CallToolParams{
 				Name:      toolName,
@@ -236,21 +237,13 @@ func createMCPExecute(toolName string, mcpClient *client.Client) functionExec {
 			},
 		})
 		if err != nil {
-			return "", fmt.Errorf("call tool %s failed: %v", toolName, err)
+			return nil, fmt.Errorf("call tool %s failed: %v", toolName, err)
 		}
 
 		if resp.IsError {
-			return "", fmt.Errorf("error calling tool %s", toolName)
+			return nil, fmt.Errorf("error calling tool %s", toolName)
 		}
 
-		// only support text response for now
-		for _, content := range resp.Content {
-			textContent, ok := content.(mcp.TextContent)
-			if !ok {
-				continue
-			}
-			return textContent.Text, nil
-		}
-		return "", fmt.Errorf("response content is empty")
+		return resp.Content, nil
 	}
 }

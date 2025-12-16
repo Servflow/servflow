@@ -17,6 +17,16 @@ var apiConfigSchema string
 type RequestType string
 
 const (
+	FileInputTypeRequest = "request"
+	FileInputTypeAction  = "action"
+)
+
+type FileInput struct {
+	Type       string `json:"type" yaml:"type"`
+	Identifier string `json:"identifier" yaml:"identifier"`
+}
+
+const (
 	JSON     RequestType = "json"
 	FormData RequestType = "form-data"
 )
@@ -28,6 +38,10 @@ type APIConfig struct {
 	Responses    map[string]ResponseConfig `json:"responses" yaml:"responses"`
 	HttpConfig   HttpConfig                `json:"http" yaml:"http"`
 	McpTool      MCPToolConfig             `json:"mcpTool" yaml:"mcpTool"`
+}
+
+func (a *APIConfig) IsMCPConfig() bool {
+	return a.McpTool.Enabled || a.McpTool.Name != ""
 }
 
 type HttpConfig struct {

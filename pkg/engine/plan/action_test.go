@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -130,7 +131,7 @@ func TestAction_Execute(t *testing.T) {
 
 			mockExec := NewMockActionExecutable(ctrl)
 			fileContent := "test file content"
-			reader := strings.NewReader(fileContent)
+			reader := io.NopCloser(strings.NewReader(fileContent))
 			mockExec.EXPECT().Execute(gomock.Any(), "").Return(reader, nil)
 
 			nextStep := testStep{id: "next"}
@@ -150,14 +151,17 @@ func TestAction_Execute(t *testing.T) {
 
 			require.NoError(t, err)
 
-			fileValue, err := requestctx.GetFileFromContext(ctx, requestctx.FileInputTypeAction, "file_output")
+			fileValue, err := requestctx.GetFileFromContext(ctx, apiconfig.FileInput{
+				Type:       apiconfig.FileInputTypeAction,
+				Identifier: "file_output",
+			})
 			require.NoError(t, err)
 			require.NotNil(t, fileValue)
 			assert.Equal(t, "file_output", fileValue.Name)
 
 			// Read the file content to verify it was stored correctly
 			var buf bytes.Buffer
-			_, err = io.Copy(&buf, fileValue.File)
+			_, err = io.Copy(&buf, fileValue.GetReader())
 			require.NoError(t, err)
 			assert.Equal(t, fileContent, buf.String())
 		})

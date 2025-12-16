@@ -9,8 +9,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/Servflow/servflow/pkg/storage"
+	"github.com/mark3labs/mcp-go/mcp"
 	"go.uber.org/zap"
 )
 
@@ -20,7 +22,7 @@ var instructions []byte
 const conversationStoragePrefix = "agent_conversation_"
 
 type ToolManager interface {
-	CallTool(ctx context.Context, toolName string, params map[string]any) (string, error)
+	CallTool(ctx context.Context, toolName string, params map[string]any) ([]mcp.Content, error)
 	ToolListDescription() (string, error)
 	ToolList() []ToolInfo
 }
@@ -43,6 +45,7 @@ type Session struct {
 	messages              []any
 	conversationID        string
 	returnOnlyLastMessage bool
+	customInstructions    string
 }
 
 type Option func(*Session) error
@@ -68,15 +71,15 @@ func WithConversationID(id string) Option {
 			}
 			switch msg.Type {
 			case MessageTypeText:
-				var contentMessage ContentMessage
+				var contentMessage MessageContent
 				err = json.Unmarshal(data, &contentMessage)
 				return contentMessage, err
 			case MessageTypeToolResponse:
-				var toolResponse ToolCallOutputMessage
+				var toolResponse MessageToolCallResponse
 				err = json.Unmarshal(data, &toolResponse)
 				return toolResponse, err
 			case MessageTypeToolCall:
-				var toolCall ToolCallMessage
+				var toolCall MessageToolCall
 				err = json.Unmarshal(data, &toolCall)
 				return toolCall, err
 			default:
@@ -99,13 +102,20 @@ func WithReturnOnlyLastMessage() Option {
 	}
 }
 
+func WithInstructions(instructions string) Option {
+	return func(a *Session) error {
+		a.customInstructions = instructions
+		return nil
+	}
+}
+
 func NewSession(developerInstructions string, llm LLmProvider, options ...Option) (*Session, error) {
 	agent := &Session{
 		llm:      llm,
 		messages: make([]any, 0),
 	}
 
-	agent.messages = append(agent.messages, ContentMessage{
+	agent.messages = append(agent.messages, MessageContent{
 		Message: Message{Type: MessageTypeText},
 		Role:    RoleTypeDeveloper,
 		Content: developerInstructions,
@@ -125,13 +135,14 @@ type agentOutput struct {
 	response string
 }
 
-func (a *Session) Query(ctx context.Context, query string) (string, error) {
+func (a *Session) Query(ctx context.Context, query string, file *requestctx.FileValue) (string, error) {
 	logger := logging.WithContextEnriched(ctx).With(zap.String("module", "agent"))
-	if query != "" {
-		a.addToMessages(logger, ContentMessage{
-			Message: Message{Type: MessageTypeText},
-			Role:    RoleTypeUser,
-			Content: query,
+	if query != "" || file != nil {
+		a.addToMessages(logger, MessageContent{
+			Message:     Message{Type: MessageTypeText},
+			Role:        RoleTypeUser,
+			Content:     query,
+			FileContent: file,
 		}, nil)
 	}
 
@@ -166,10 +177,14 @@ func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 	go func() {
 		endTurn := false
 		for !endTurn {
+			systemMessage := string(instructions)
+			if a.customInstructions != "" {
+				systemMessage = a.customInstructions
+			}
 			r, err := a.llm.ProvideResponse(ctx, LLMRequest{
 				Tools:         toolList,
 				Messages:      a.messages,
-				SystemMessage: string(instructions),
+				SystemMessage: systemMessage,
 			})
 			if err != nil {
 				out <- agentOutput{err: fmt.Errorf("error from llm: %w", err)}
@@ -179,7 +194,7 @@ func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 			// process content output
 			for _, c := range r.Content {
 				logger.Info("LLm response: " + c.Text)
-				a.addToMessages(logger, ContentMessage{
+				a.addToMessages(logger, MessageContent{
 					Message: Message{Type: MessageTypeText},
 					Role:    RoleTypeAssistant,
 					Content: c.Text,
@@ -191,7 +206,7 @@ func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 			}
 
 			for _, tool := range r.Tools {
-				a.addToMessages(logger, ToolCallMessage{
+				a.addToMessages(logger, MessageToolCall{
 					Message:   Message{Type: MessageTypeToolCall},
 					ID:        tool.ToolID,
 					Name:      tool.Name,
@@ -204,20 +219,24 @@ func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 				logger.Info("attempting to execute tool: "+tool.Name, zap.Any("params", tool.Input))
 				toolResp, err := a.toolManager.CallTool(ctx, tool.Name, tool.Input)
 				if err != nil {
-					a.addToMessages(logger, ToolCallOutputMessage{
+					a.addToMessages(logger, MessageToolCallResponse{
 						Message: Message{Type: MessageTypeToolResponse},
-						Output:  "error running tool",
+						Text:    "error running tool",
 						ID:      tool.ToolID,
 					}, out)
 					logger.Error("failed to execute tool", zap.String("tool", tool.Name), zap.Error(err))
 					continue
 				}
-				a.addToMessages(logger, ToolCallOutputMessage{
-					Message: Message{Type: MessageTypeToolResponse},
-					Output:  toolResp,
-					ID:      tool.ToolID,
-				}, out)
-				logger.Info("successfully executed tool: "+tool.Name, zap.String("toolResp", toolResp))
+				responses, err := createToolResponseFromMCPContent(tool.ToolID, toolResp)
+				if err != nil {
+					logger.Error("failed to create tool response", zap.String("tool", tool.Name), zap.Error(err))
+					continue
+				}
+				for i := range responses {
+					response := responses[i]
+					a.addToMessages(logger, response, out)
+				}
+				logger.Info("successfully executed tool: " + tool.Name)
 			}
 		}
 		close(out)
@@ -225,6 +244,35 @@ func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 
 	return out
 }
+
+func createToolResponseFromMCPContent(callID string, contentList []mcp.Content) ([]MessageToolCallResponse, error) {
+	resp := make([]MessageToolCallResponse, len(contentList))
+	for i, content := range contentList {
+		switch v := content.(type) {
+		case mcp.TextContent:
+			resp[i] = MessageToolCallResponse{
+				Message:          Message{Type: MessageTypeToolResponse},
+				ToolResponseType: ToolResponseTypeText,
+				ID:               callID,
+				Text:             v.Text,
+			}
+		case mcp.ImageContent:
+			resp[i] = MessageToolCallResponse{
+				Message:          Message{Type: MessageTypeToolResponse},
+				ToolResponseType: ToolResponseTypeImage,
+				ID:               callID,
+				ImageData:        []byte(v.Data),
+				ImageMimeType:    v.MIMEType,
+			}
+		default:
+			return nil, fmt.Errorf("unsupported content type")
+		}
+	}
+
+	return resp, nil
+}
+
+// TODO: think of context management strategy for image responses, they can cause bloat
 
 func (a *Session) addToMessages(logger *zap.Logger, message any, output chan agentOutput) {
 	storageKey := ""
@@ -236,7 +284,7 @@ func (a *Session) addToMessages(logger *zap.Logger, message any, output chan age
 		serializable storage.Serializable
 	)
 	switch message := message.(type) {
-	case ContentMessage:
+	case MessageContent:
 		a.messages = append(a.messages, message)
 		if output != nil {
 			output <- agentOutput{
@@ -245,10 +293,10 @@ func (a *Session) addToMessages(logger *zap.Logger, message any, output chan age
 		}
 
 		serializable = &message
-	case ToolCallMessage:
+	case MessageToolCall:
 		a.messages = append(a.messages, message)
 		serializable = &message
-	case ToolCallOutputMessage:
+	case MessageToolCallResponse:
 		a.messages = append(a.messages, message)
 		serializable = &message
 	default:

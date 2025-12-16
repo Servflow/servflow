@@ -10,7 +10,7 @@ import (
 	"sync"
 	"text/template"
 
-	apiconfig "github.com/Servflow/servflow/pkg/definitions"
+	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/logging"
 	"go.uber.org/zap"
 )

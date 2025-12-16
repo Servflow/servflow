@@ -6,7 +6,7 @@ import (
 
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 
-	"github.com/Servflow/servflow/pkg/definitions"
+	"github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

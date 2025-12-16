@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	apiconfig "github.com/Servflow/servflow/pkg/definitions"
+	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/mark3labs/mcp-go/server"
@@ -56,7 +56,7 @@ func (e *Engine) createCustomMuxHandler(configs []*apiconfig.APIConfig) http.Han
 			method = "GET"
 		}
 
-		if conf.McpTool.Name != "" {
+		if conf.IsMCPConfig() {
 			err := e.createMCPHandler(conf)
 			if err != nil {
 				logger.Error("error creating mcp handler", zap.Error(err), zap.String("name", conf.McpTool.Name), zap.String("api", conf.ID))

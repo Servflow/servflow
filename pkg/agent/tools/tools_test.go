@@ -93,7 +93,9 @@ func TestNewClient(t *testing.T) {
 		t.Run("call valid tool", func(t *testing.T) {
 			resp, err := manager.CallTool(context.Background(), "test-first", map[string]interface{}{"param-1": "hello world"})
 			require.NoError(t, err)
-			assert.Equal(t, "hello world", resp)
+			assert.Equal(t, []mcp.Content{
+				mcp.NewTextContent("hello world"),
+			}, resp)
 		})
 
 		t.Run("call invalid tool", func(t *testing.T) {
@@ -204,7 +206,9 @@ func TestNewClient(t *testing.T) {
 		receivedHeaders = nil // Reset
 		resp, err := manager.CallTool(context.Background(), "test-first", map[string]interface{}{"param-1": "header-test"})
 		require.NoError(t, err)
-		assert.Equal(t, "header-test", resp)
+		assert.Equal(t, []mcp.Content{
+			mcp.NewTextContent("header-test"),
+		}, resp)
 
 		// Verify headers were sent during tool call
 		assert.Equal(t, "Bearer test-token", receivedHeaders.Get("Authorization"))
@@ -225,7 +229,9 @@ func TestNewClient(t *testing.T) {
 		// Should still work without headers
 		resp, err := manager.CallTool(context.Background(), "test-first", map[string]interface{}{"param-1": "no-headers-test"})
 		require.NoError(t, err)
-		assert.Equal(t, "no-headers-test", resp)
+		assert.Equal(t, []mcp.Content{
+			mcp.NewTextContent("no-headers-test"),
+		}, resp)
 
 		// Verify tool description still works
 		description, err := manager.ToolListDescription()
@@ -317,7 +323,9 @@ func TestNewClient(t *testing.T) {
 				"param2": "value2",
 			})
 			require.NoError(t, err)
-			assert.Equal(t, "workflow result:value1", resp)
+			assert.Equal(t, []mcp.Content{
+				mcp.NewTextContent("workflow result:value1"),
+			}, resp)
 		})
 	})
 }

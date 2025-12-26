@@ -9,15 +9,17 @@ import (
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/integration"
 	"github.com/Servflow/servflow/pkg/engine/integration/integrations/filters"
+	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/golang-jwt/jwt/v5"
 )
 
 type Config struct {
-	IntegrationID string `json:"integration_id"`
-	DatabaseField string `json:"database_field"`
-	JWTKey        string `json:"jwt_key"`
-	Token         string `json:"token"`
-	Collection    string `json:"collection"`
+	IntegrationID   string `json:"integrationID" yaml:"integrationID"`
+	DatabaseField   string `json:"databaseField" yaml:"databaseField"`
+	JWTKey          string `json:"jwtKey" yaml:"jwtKey"`
+	Token           string `json:"token" yaml:"token"`
+	Collection      string `json:"collection" yaml:"collection"`
+	FailOnAuthError bool   `json:"failOnAuthError" yaml:"failOnAuthError"`
 }
 
 type fetchImplementation interface {
@@ -87,6 +89,9 @@ func (a *Action) Execute(ctx context.Context, modifiedConfig string) (interface{
 		}
 	}
 	if subject == "" {
+		if cfg.FailOnAuthError {
+			return nil, fmt.Errorf("%w: invalid token subject", plan.ErrFailure)
+		}
 		return nil, errors.New("token subject is invalid")
 	}
 
@@ -99,6 +104,9 @@ func (a *Action) Execute(ctx context.Context, modifiedConfig string) (interface{
 		return nil, err
 	}
 	if len(resp) < 1 {
+		if cfg.FailOnAuthError {
+			return nil, fmt.Errorf("%w: authentication failed - user not found", plan.ErrFailure)
+		}
 		return nil, errors.New("token subject is invalid")
 	}
 
@@ -111,19 +119,19 @@ func (a *Action) Type() string {
 
 func init() {
 	fields := map[string]actions.FieldInfo{
-		"integration_id": {
+		"integrationID": {
 			Type:        actions.FieldTypeIntegration,
 			Label:       "Integration ID",
 			Placeholder: "Database integration identifier",
 			Required:    true,
 		},
-		"database_field": {
+		"databaseField": {
 			Type:        actions.FieldTypeString,
 			Label:       "Database Field",
 			Placeholder: "Field name in database",
 			Required:    true,
 		},
-		"jwt_key": {
+		"jwtKey": {
 			Type:        actions.FieldTypeString,
 			Label:       "JWT Key",
 			Placeholder: "JWT signing key",
@@ -140,6 +148,13 @@ func init() {
 			Label:       "Collection",
 			Placeholder: "Database collection name",
 			Required:    true,
+		},
+		"failOnAuthError": {
+			Type:        actions.FieldTypeBoolean,
+			Label:       "Fail on Auth Error",
+			Placeholder: "Treat authentication failures as workflow failures",
+			Required:    false,
+			Default:     true,
 		},
 	}
 

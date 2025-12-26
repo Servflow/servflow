@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	"github.com/Servflow/servflow/pkg/engine/actions"
+	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/logging"
 	"go.uber.org/zap"
 
@@ -25,11 +26,13 @@ func (h *Http) Type() string {
 }
 
 type Config struct {
-	URL          string            `json:"url"`
-	Method       string            `json:"method"`
-	Headers      map[string]string `json:"headers"`
-	Body         json.RawMessage   `json:"body"`
-	ResponsePath string            `json:"response_path"`
+	URL                  string            `json:"url" yaml:"url"`
+	Method               string            `json:"method" yaml:"method"`
+	Headers              map[string]string `json:"headers" yaml:"headers"`
+	Body                 json.RawMessage   `json:"body" yaml:"body"`
+	ResponsePath         string            `json:"responsePath" yaml:"responsePath"`
+	ExpectedResponseCode string            `json:"expectedResponseCode" yaml:"expectedResponseCode"`
+	FailIfResponseEmpty  bool              `json:"failIfResponseEmpty" yaml:"failIfResponseEmpty"`
 }
 
 func New(cfg Config) *Http {
@@ -47,7 +50,6 @@ func (h *Http) Config() string {
 	return string(configBytes)
 }
 
-// TODO sanitize response if string or query
 func (h *Http) Execute(ctx context.Context, filledInConfig string) (interface{}, error) {
 	logger := logging.FromContext(ctx).With(zap.String("execution_type", h.Type()))
 	ctx = logging.WithLogger(ctx, logger)
@@ -81,11 +83,22 @@ func (h *Http) Execute(ctx context.Context, filledInConfig string) (interface{},
 
 	defer resp.Body.Close()
 
+	if cfg.ExpectedResponseCode != "" && cfg.ExpectedResponseCode != "0" {
+		expectedCode := cfg.ExpectedResponseCode
+		if fmt.Sprintf("%d", resp.StatusCode) != expectedCode {
+			return nil, fmt.Errorf("%w: unexpected response code %d, expected %s", plan.ErrFailure, resp.StatusCode, expectedCode)
+		}
+	}
+
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 	logger.Debug("finished request", zap.String("url", req.URL.String()), zap.Int("status", resp.StatusCode), zap.ByteString("body", bodyBytes))
+
+	if len(bodyBytes) == 0 && cfg.FailIfResponseEmpty {
+		return nil, fmt.Errorf("%w: response body is empty", plan.ErrFailure)
+	}
 
 	if cfg.ResponsePath == "" {
 		var result interface{}
@@ -96,12 +109,12 @@ func (h *Http) Execute(ctx context.Context, filledInConfig string) (interface{},
 	}
 
 	if !gjson.ValidBytes(bodyBytes) {
-		return nil, fmt.Errorf("invalid JSON response: %s", string(bodyBytes))
+		return nil, fmt.Errorf("%w: invalid JSON response", plan.ErrFailure)
 	}
 
 	value := gjson.GetBytes(bodyBytes, cfg.ResponsePath)
 	if !value.Exists() {
-		return nil, fmt.Errorf("path '%s' not found in response: %s", cfg.ResponsePath, string(bodyBytes))
+		return nil, fmt.Errorf("%w: path '%s' not found in response", plan.ErrFailure, cfg.ResponsePath)
 	}
 
 	return value.Value(), nil
@@ -134,11 +147,25 @@ func init() {
 			Placeholder: "Request body data",
 			Required:    false,
 		},
-		"response_path": {
+		"responsePath": {
 			Type:        actions.FieldTypeString,
 			Label:       "Response Path",
 			Placeholder: "JSONPath to extract from response (optional)",
 			Required:    false,
+		},
+		"expectedResponseCode": {
+			Type:        actions.FieldTypeString,
+			Label:       "Expected Response Code",
+			Placeholder: "200",
+			Required:    false,
+			Default:     "",
+		},
+		"failIfResponseEmpty": {
+			Type:        actions.FieldTypeBoolean,
+			Label:       "Fail if Response Empty",
+			Placeholder: "Treat empty response as failure",
+			Required:    false,
+			Default:     true,
 		},
 	}
 

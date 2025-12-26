@@ -8,13 +8,15 @@ import (
 
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/integration"
+	"github.com/Servflow/servflow/pkg/engine/plan"
 )
 
 type Config struct {
-	Collection    string `json:"collection"`
-	FilterQuery   string `json:"filter"`
-	Projection    string `json:"projection"`
-	IntegrationID string `json:"integrationID"`
+	Collection    string `json:"collection" yaml:"collection"`
+	FilterQuery   string `json:"filterQuery" yaml:"filterQuery"`
+	Projection    string `json:"projection" yaml:"projection"`
+	IntegrationID string `json:"integrationID" yaml:"integrationID"`
+	FailIfEmpty   bool   `json:"failIfEmpty" yaml:"failIfEmpty"`
 }
 
 type mongoDBIntegration interface {
@@ -70,6 +72,10 @@ func (m *MGOQuery) Execute(ctx context.Context, modifiedConfig string) (interfac
 		return nil, fmt.Errorf("error executing integration: %v", err)
 	}
 
+	if len(result) == 0 && cfg.FailIfEmpty {
+		return nil, fmt.Errorf("%w: no documents found", plan.ErrFailure)
+	}
+
 	return result, nil
 
 }
@@ -86,7 +92,7 @@ func init() {
 			Placeholder: "MongoDB collection name",
 			Required:    true,
 		},
-		"filter": {
+		"filterQuery": {
 			Type:        actions.FieldTypeString,
 			Label:       "Filter Query",
 			Placeholder: "MongoDB filter query",
@@ -103,6 +109,13 @@ func init() {
 			Label:       "Integration ID",
 			Placeholder: "MongoDB integration identifier",
 			Required:    true,
+		},
+		"failIfEmpty": {
+			Type:        actions.FieldTypeBoolean,
+			Label:       "Fail if Empty",
+			Placeholder: "Treat no results as failure",
+			Required:    false,
+			Default:     true,
 		},
 	}
 

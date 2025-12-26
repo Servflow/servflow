@@ -101,7 +101,7 @@ func init() {
 			Required:    true,
 		},
 		"filters": {
-			Type:        "array",
+			Type:        actions.FieldTypeMap,
 			Label:       "Filters",
 			Placeholder: "Query filters",
 			Required:    false,

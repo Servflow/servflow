@@ -30,7 +30,7 @@ type Action struct {
 }
 
 var (
-	errExecutingAction = errors.New("executing action")
+	errExecutingExecutable = errors.New("error executing executable")
 )
 
 func (a *Action) ID() string {
@@ -88,7 +88,7 @@ func (a *Action) execute(ctx context.Context) (*stepWrapper, error) {
 		if a.fail != nil {
 			return a.fail, nil
 		}
-		return nil, fmt.Errorf("%w: %w", errExecutingAction, err)
+		return nil, fmt.Errorf("%w: %w", errExecutingExecutable, err)
 	}
 
 	logger.Debug("action executed successfully", zap.Any("resp", resp))

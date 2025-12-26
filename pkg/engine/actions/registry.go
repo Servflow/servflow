@@ -28,6 +28,7 @@ const (
 	FieldTypeBoolean     FieldType = "boolean"
 	FieldTypeFile        FieldType = "file"
 	FieldTypeTextArea    FieldType = "text_area"
+	FieldTypeArray       FieldType = "array"
 )
 
 type FieldInfo struct {

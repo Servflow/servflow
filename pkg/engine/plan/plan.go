@@ -20,12 +20,21 @@ type Plan struct {
 	steps map[string]stepWrapper
 }
 
+var (
+	ErrContextCanceled = errors.New("context canceled")
+)
+
 type stepWrapper struct {
 	id   string
 	step Step
 }
 
 func (p *Plan) executeStep(ctx context.Context, step *stepWrapper, endValue string) (*http.SfResponse, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ErrContextCanceled
+	default:
+	}
 	logger := logging.FromContext(ctx).With(zap.String("step_id", step.id))
 	var (
 		next *stepWrapper
@@ -41,7 +50,7 @@ func (p *Plan) executeStep(ctx context.Context, step *stepWrapper, endValue stri
 		logger.Debug("finished execution")
 	}
 	if err != nil {
-		if errors.Is(err, errExecutingAction) {
+		if errors.Is(err, errExecutingExecutable) {
 			return p.generateEndValue(ctx, logger, endValue)
 		}
 		return nil, fmt.Errorf("error executing step: %w", err)

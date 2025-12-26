@@ -26,6 +26,8 @@ type RequestContext struct {
 // TODO move this and dpl together
 const errTag = "error"
 
+// AddValidationErrors gets the validation errors added by the various conditional template functions,
+// then adds the errors under the errTag in the request variable for parsing
 func AddValidationErrors(ctx context.Context) error {
 	reqCtx, err := FromContextOrError(ctx)
 	if err != nil {

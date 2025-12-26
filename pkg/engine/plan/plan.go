@@ -50,9 +50,9 @@ func (p *Plan) executeStep(ctx context.Context, step *stepWrapper, endValue stri
 		logger.Debug("finished execution")
 	}
 	if err != nil {
-		if errors.Is(err, errExecutingExecutable) {
-			return p.generateEndValue(ctx, logger, endValue)
-		}
+		//if errors.Is(err, errExecutingExecutable) {
+		//	return p.generateEndValue(ctx, logger, endValue)
+		//}
 		return nil, fmt.Errorf("error executing step: %w", err)
 	}
 

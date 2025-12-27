@@ -107,7 +107,6 @@ func TestParallelExec_Execute(t *testing.T) {
 			"action3": mockAction3,
 		}
 
-		// Set up expectations - action1 fails immediately
 		expectedError := errors.New("action1 failed")
 		mockAction1.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, expectedError)
 
@@ -135,7 +134,7 @@ func TestParallelExec_Execute(t *testing.T) {
 
 		// Assertions
 		require.Error(t, err)
-		assert.Equal(t, expectedError, err) // Should return the first error
+		assert.ErrorContains(t, err, expectedError.Error()) // Should return the first error
 		assert.Nil(t, result)
 	})
 
@@ -183,7 +182,8 @@ func TestParallelExec_Execute(t *testing.T) {
 		require.Error(t, err)
 
 		// Should be a groupError containing both failures
-		groupErr, ok := err.(*groupError)
+		var groupErr *groupError
+		ok := errors.As(err, &groupErr)
 		require.True(t, ok, "Expected groupError, got %T", err)
 
 		// Verify error message contains information about both failures

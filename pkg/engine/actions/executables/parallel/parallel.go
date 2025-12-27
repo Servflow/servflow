@@ -26,47 +26,60 @@ func (e *Exec) Config() string {
 }
 
 type groupError struct {
-	errors               sync.Map
+	errors               map[string]error
 	count                int
 	firstErrorIdentifier string
+	mutex                sync.Mutex
 }
 
 func (e *groupError) Error() string {
 	var errorsList []string
-	e.errors.Range(func(key, value any) bool {
-		errorsList = append(errorsList, fmt.Sprintf("error in %s: %v", key, value))
-		return true
-	})
+	for step, err := range e.errors {
+		errorsList = append(errorsList, fmt.Sprintf("error in %s: %v", step, err))
+	}
 	return strings.Join(errorsList, ", ")
 }
 
 func (e *groupError) add(step string, err error) {
-	e.errors.Store(step, err)
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+	if e.errors == nil {
+		e.errors = map[string]error{}
+	}
+	e.errors[step] = err
 	if e.count == 0 {
 		e.firstErrorIdentifier = step
 	}
 	e.count++
 }
 
+func (e *groupError) Count() int {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+	return e.count
+}
+
 func (e *groupError) firstError() error {
 	if e.firstErrorIdentifier == "" {
 		return nil
 	}
-	err, ok := e.errors.Load(e.firstErrorIdentifier)
+	err, ok := e.errors[e.firstErrorIdentifier]
 	if !ok {
 		return nil
 	}
-	return err.(error)
+	return err
 }
 
 func (e *Exec) Execute(ctx context.Context, _ string) (interface{}, error) {
 	newCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	type customError struct {
 		err  error
 		step string
 	}
-	// TODO think of changing the length of the buffer to n
-	errChan := make(chan customError, len(e.config.Steps)-1)
+
+	errChan := make(chan customError, len(e.config.Steps))
 	var allErrors groupError
 
 	var wg sync.WaitGroup
@@ -77,14 +90,21 @@ func (e *Exec) Execute(ctx context.Context, _ string) (interface{}, error) {
 			fmt.Printf("Executing step: %s\n", s)
 			_, err := plan.ExecuteFromContext(newCtx, s, "")
 			if err != nil {
-				errChan <- customError{err: err, step: s}
+				select {
+				case errChan <- customError{err: err, step: s}:
+				case <-newCtx.Done():
+					// Context canceled, don't block
+				}
 			}
 		}(step)
 	}
 
+	// Process errors in a separate goroutine
+	errorsDone := make(chan struct{})
 	go func() {
+		defer close(errorsDone)
 		for err := range errChan {
-			if err.err != nil && !errors.Is(err.err, plan.ErrContextCanceled) {
+			if err.err != nil && !isContextCancellationError(err.err) {
 				allErrors.add(err.step, err.err)
 				if e.config.StopOnFailure {
 					cancel()
@@ -92,10 +112,13 @@ func (e *Exec) Execute(ctx context.Context, _ string) (interface{}, error) {
 			}
 		}
 	}()
+
 	wg.Wait()
 	close(errChan)
 
-	if allErrors.count > 0 {
+	<-errorsDone
+
+	if allErrors.Count() > 0 {
 		if e.config.StopOnFailure {
 			return nil, allErrors.firstError()
 		} else {
@@ -107,6 +130,10 @@ func (e *Exec) Execute(ctx context.Context, _ string) (interface{}, error) {
 
 func (e *Exec) Type() string {
 	return "parallel"
+}
+
+func isContextCancellationError(err error) bool {
+	return errors.Is(err, plan.ErrContextCanceled)
 }
 
 func init() {

@@ -91,7 +91,7 @@ func (a *Action) execute(ctx context.Context) (*stepWrapper, error) {
 			return a.fail, nil
 		}
 
-		return nil, fmt.Errorf("error executing action: %v", err)
+		return nil, fmt.Errorf("error executing action: %w", err)
 	}
 
 	logger.Debug("action executed successfully", zap.Any("resp", resp))

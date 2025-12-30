@@ -10,16 +10,18 @@ import (
 	"time"
 
 	"github.com/Servflow/servflow/pkg/engine/actions"
+	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/golang-jwt/jwt/v5"
 	"go.uber.org/zap"
 )
 
 type Config struct {
-	Mode   string                 `json:"mode" yaml:"mode"`
-	Field  string                 `json:"field" yaml:"field"`
-	Key    string                 `json:"key" yaml:"key"`
-	Claims map[string]interface{} `json:"claims" yaml:"claims"`
+	Mode                  string                 `json:"mode" yaml:"mode"`
+	Field                 string                 `json:"field" yaml:"field"`
+	Key                   string                 `json:"key" yaml:"key"`
+	Claims                map[string]interface{} `json:"claims" yaml:"claims"`
+	FailOnValidationError bool                   `json:"failOnValidationError" yaml:"failOnValidationError"`
 }
 
 type JWT struct {
@@ -122,6 +124,9 @@ func (a *JWT) decode(ctx context.Context, tokenString string) (interface{}, erro
 
 			pub, err := x509.ParsePKIXPublicKey(block.Bytes)
 			if err != nil {
+				if a.config.FailOnValidationError {
+					return nil, fmt.Errorf("%w: invalid token - %v", plan.ErrFailure, err)
+				}
 				return nil, err
 			}
 
@@ -143,7 +148,13 @@ func (a *JWT) decode(ctx context.Context, tokenString string) (interface{}, erro
 		if sub, ok := claims["sub"].(string); ok {
 			return sub, nil
 		}
+		if a.config.FailOnValidationError {
+			return nil, fmt.Errorf("%w: sub claim not found", plan.ErrFailure)
+		}
 		return nil, fmt.Errorf("sub claim not found")
+	}
+	if a.config.FailOnValidationError {
+		return nil, fmt.Errorf("%w: invalid token", plan.ErrFailure)
 	}
 	return nil, fmt.Errorf("invalid token")
 }
@@ -173,6 +184,13 @@ func init() {
 			Label:       "Claims",
 			Placeholder: "JWT claims as key-value pairs",
 			Required:    false,
+		},
+		"failOnValidationError": {
+			Type:        actions.FieldTypeBoolean,
+			Label:       "Fail on Validation Error",
+			Placeholder: "Treat JWT validation failures as workflow failures",
+			Required:    false,
+			Default:     true,
 		},
 	}
 

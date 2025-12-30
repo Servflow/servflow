@@ -3,11 +3,13 @@ package http
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/stretchr/testify/require"
@@ -110,6 +112,50 @@ func TestHttp_Execute(t *testing.T) {
 				return srv.URL
 			},
 		},
+		{
+			Name: "Expected Response Code Failure",
+			Config: Config{
+				Method:               http.MethodGet,
+				ExpectedResponseCode: "200",
+			},
+			ShouldError: true,
+			serverSetup: func(t *testing.T) string {
+				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusNotFound)
+					w.Write([]byte(`{"error": "not found"}`))
+				}))
+				return srv.URL
+			},
+		},
+		{
+			Name: "Empty Response Failure",
+			Config: Config{
+				Method:              http.MethodGet,
+				FailIfResponseEmpty: true,
+			},
+			ShouldError: true,
+			serverSetup: func(t *testing.T) string {
+				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusOK)
+				}))
+				return srv.URL
+			},
+		},
+		{
+			Name: "Expected Response Code Success",
+			Config: Config{
+				Method:               http.MethodGet,
+				ExpectedResponseCode: "201",
+			},
+			Expected: map[string]interface{}{"status": "created"},
+			serverSetup: func(t *testing.T) string {
+				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					w.WriteHeader(http.StatusCreated)
+					w.Write([]byte(`{"status": "created"}`))
+				}))
+				return srv.URL
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -128,6 +174,9 @@ func TestHttp_Execute(t *testing.T) {
 			resp, err := h.Execute(context.Background(), string(conf))
 			if c.ShouldError {
 				require.Error(t, err)
+				if c.Name == "Expected Response Code Failure" || c.Name == "Empty Response Failure" || c.Name == "invalid response path" {
+					assert.True(t, errors.Is(err, plan.ErrFailure), "Expected failure error to be wrapped with plan.ErrFailure")
+				}
 				return
 			}
 			require.NoError(t, err)
@@ -151,7 +200,7 @@ func TestHttp_Config(t *testing.T) {
 				Headers: map[string]string{"Content-Type": "application/json"},
 				Body:    json.RawMessage(`{"test": "value"}`),
 			},
-			Expected: `{"url":"https://test.com","method":"GET","headers":{"Content-Type":"application/json"},"body":{"test":"value"}, "response_path": ""}`,
+			Expected: `{"url":"https://test.com","method":"GET","headers":{"Content-Type":"application/json"},"body":{"test":"value"}, "responsePath": "", "expectedResponseCode": "", "failIfResponseEmpty": false}`,
 		},
 	}
 

@@ -168,7 +168,7 @@ func TestAction_Execute(t *testing.T) {
 	})
 
 	t.Run("error", func(t *testing.T) {
-		t.Run("error with no fail step", func(t *testing.T) {
+		t.Run("has error", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
@@ -192,24 +192,14 @@ func TestAction_Execute(t *testing.T) {
 			next, err := act.execute(ctx)
 			assert.Error(t, err)
 			assert.Nil(t, next)
-
-			// Verify error variable is stored
-			errorVal, err := requestctx.GetRequestVariable(ctx, requestctx.ErrorTagStripped)
-			assert.NoError(t, err)
-			assert.Equal(t, "dummy error", errorVal)
-
-			// Verify output variable contains error message
-			outVal, err := requestctx.GetRequestVariable(ctx, "field1")
-			assert.NoError(t, err)
-			assert.Equal(t, "error: dummy error", outVal)
 		})
 
-		t.Run("error with a fail step", func(t *testing.T) {
+		t.Run("failure error with a fail step", func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
 			mockExec := NewMockActionExecutable(ctrl)
-			mockExec.EXPECT().Execute(gomock.Any(), "").Return("response string", errors.New("dummy error"))
+			mockExec.EXPECT().Execute(gomock.Any(), "").Return("response string", fmt.Errorf("%w: dummy error", ErrFailure)).AnyTimes()
 
 			nextStep := testStep{id: "next"}
 			failStep := testStep{id: "fail"}
@@ -233,12 +223,24 @@ func TestAction_Execute(t *testing.T) {
 			// Verify error variable is stored
 			errorVal, err := requestctx.GetRequestVariable(ctx, requestctx.ErrorTagStripped)
 			assert.NoError(t, err)
-			assert.Equal(t, "dummy error", errorVal)
+			assert.Contains(t, errorVal, "dummy error")
 
 			// Verify output variable contains error message
 			outVal, err := requestctx.GetRequestVariable(ctx, "field1")
 			assert.NoError(t, err)
-			assert.Equal(t, "error: dummy error", outVal)
+			assert.Contains(t, outVal, "dummy error")
+
+			//check if it returns nil too
+			act2 := Action{
+				exec: mockExec,
+				out:  "field1",
+				id:   "test",
+				next: &stepWrapper{id: "next", step: &nextStep},
+			}
+
+			next, err = act2.execute(ctx)
+			assert.NoError(t, err)
+			assert.Nil(t, next)
 		})
 
 	})

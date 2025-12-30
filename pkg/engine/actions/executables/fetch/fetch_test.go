@@ -7,6 +7,7 @@ import (
 
 	"github.com/Servflow/servflow/pkg/engine/integration"
 	"github.com/Servflow/servflow/pkg/engine/integration/integrations/filters"
+	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -75,5 +76,35 @@ func TestFetch_Execute(t *testing.T) {
 
 		_, err = fetch.Execute(context.Background(), fetch.Config())
 		require.Error(t, err)
+	})
+
+	t.Run("fail if empty with failure", func(t *testing.T) {
+		ctr := gomock.NewController(t)
+		defer ctr.Finish()
+
+		mockIntegration := NewMockfetchImplementation(ctr)
+		mockIntegration.EXPECT().Fetch(gomock.Any(), map[string]string{"collection": "mock"}, filters.Filter{Field: "id", Comparator: "1"}).
+			Return([]map[string]interface{}{}, nil)
+		integration.ReplaceIntegrationType("mock", func(m map[string]any) (integration.Integration, error) {
+			return mockIntegration, nil
+		})
+		integration.InitializeIntegration("mock", "mockds", nil)
+
+		fetch, err := New(Config{
+			Table:         "mock",
+			IntegrationID: "mockds",
+			FailIfEmpty:   true,
+			Filters: []filters.Filter{
+				{
+					Field:      "id",
+					Comparator: "1",
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		_, err = fetch.Execute(context.Background(), fetch.Config())
+		require.Error(t, err)
+		assert.True(t, errors.Is(err, plan.ErrFailure), "Expected failure error to be wrapped with plan.ErrFailure")
 	})
 }

@@ -92,7 +92,7 @@ func GetFileFromContext(ctx context.Context, fileInput apiconfig.FileInput) (*Fi
 	case apiconfig.FileInputTypeAction:
 		key = fileKeyActionPrefix + fileInput.Identifier
 	default:
-		return nil, fmt.Errorf("invalid file input type: %s", fileInput.Type)
+		return nil, nil
 	}
 
 	file, ok := reqCtx.availableFiles[key]

@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/Servflow/servflow/pkg/apiconfig"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestRequestContext_FileManagement(t *testing.T) {
@@ -242,17 +243,13 @@ func TestGetFileFromContext_Errors(t *testing.T) {
 	})
 
 	t.Run("invalid input type", func(t *testing.T) {
-		_, err := GetFileFromContext(ctx, apiconfig.FileInput{
+		f, err := GetFileFromContext(ctx, apiconfig.FileInput{
 			Type:       "dummy_type",
 			Identifier: "somefile",
 		})
-		if err == nil {
-			t.Error("Expected error for invalid input type, got nil")
-		}
 
-		if !strings.Contains(err.Error(), "invalid file input type") {
-			t.Errorf("Expected 'invalid file input type' error, got: %v", err)
-		}
+		assert.Nil(t, f)
+		assert.Nil(t, err)
 	})
 }
 

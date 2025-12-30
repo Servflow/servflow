@@ -4,10 +4,15 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"git.servflow.io/servflow/definitions/proto"
+	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
+
+//go:embed apiconfig_schema.json
+var apiConfigSchema string
 
 type RequestType string
 
@@ -150,15 +155,21 @@ func (d *IntegrationConfig) UnmarshalYAML(unmarshal func(interface{}) error) err
 }
 
 func (a *APIConfig) Validate() error {
-	return a.schemaValidation()
+	if err := a.schemaValidation(); err != nil {
+		return err
+	}
+	if err := a.validateActions(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (a *APIConfig) schemaValidation() error {
 	compiler := jsonschema.NewCompiler()
 
-	schemaData, err := GenerateAPIConfigSchema()
-	if err != nil {
-		return fmt.Errorf("failed to generate schema: %w", err)
+	var schemaData interface{}
+	if err := json.Unmarshal(json.RawMessage(apiConfigSchema), &schemaData); err != nil {
+		return fmt.Errorf("failed to parse embedded schema: %w", err)
 	}
 
 	if err := compiler.AddResource("apiconfig.json", schemaData); err != nil {
@@ -184,5 +195,76 @@ func (a *APIConfig) schemaValidation() error {
 		return fmt.Errorf("APIConfig validation failed: %w", err)
 	}
 
+	return nil
+}
+
+type ValidationErrors struct {
+	errors []error
+}
+
+func (ve *ValidationErrors) Error() string {
+	if len(ve.errors) == 0 {
+		return ""
+	}
+	var lines []string
+	for _, err := range ve.errors {
+		lines = append(lines, err.Error())
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (ve *ValidationErrors) Add(err error) {
+	ve.errors = append(ve.errors, err)
+}
+
+func (ve *ValidationErrors) HasErrors() bool {
+	return len(ve.errors) > 0
+}
+
+func (a *APIConfig) validateActions() error {
+	var validationErrors ValidationErrors
+	var invalidActions []string
+
+	for i := range a.Actions {
+		action := a.Actions[i]
+		if !actions.HasRegisteredActionType(action.Type) {
+			invalidActions = append(invalidActions, action.Type)
+			continue
+		}
+
+		fields, err := actions.GetFieldsForAction(action.Type)
+		if err != nil {
+			validationErrors.Add(err)
+		} else {
+			if err := validateFields(fields, action.Config); err != nil {
+				validationErrors.Add(err)
+			}
+		}
+	}
+
+	if len(invalidActions) > 0 {
+		validationErrors.Add(fmt.Errorf("invalid actions: %s", strings.Join(invalidActions, ", ")))
+	}
+
+	if validationErrors.HasErrors() {
+		return &validationErrors
+	}
+	return nil
+}
+
+func validateFields(fieldsRequiredMap map[string]actions.FieldInfo, fieldsValues map[string]interface{}) error {
+	for k, v := range fieldsRequiredMap {
+		if !v.Required {
+			continue
+		}
+		if val, ok := fieldsValues[k]; ok {
+			valStr, okStr := val.(string)
+			if okStr && valStr == "" {
+				return fmt.Errorf("field %s is required", k)
+			}
+		} else {
+			return fmt.Errorf("field %s is required", k)
+		}
+	}
 	return nil
 }

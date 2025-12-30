@@ -2,14 +2,12 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"os/signal"
 
 	"github.com/Servflow/servflow/config"
-	"github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/server"
 	"github.com/Servflow/servflow/pkg/storage"
 	"github.com/joho/godotenv"
@@ -183,25 +181,6 @@ func CreateApp() *cli.App {
 					}
 
 					return ValidateConfigs(configFolder, c.Bool("verbose"))
-				},
-			},
-			{
-				Name:        "schema",
-				Usage:       "Generate and output the JSON schema for API configurations",
-				Description: "Outputs the complete JSON schema used for validating API configuration files",
-				Action: func(c *cli.Context) error {
-					schema, err := apiconfig.GenerateAPIConfigSchema()
-					if err != nil {
-						return fmt.Errorf("failed to generate schema: %w", err)
-					}
-
-					jsonOutput, err := json.MarshalIndent(schema, "", "  ")
-					if err != nil {
-						return fmt.Errorf("failed to marshal schema to JSON: %w", err)
-					}
-
-					fmt.Println(string(jsonOutput))
-					return nil
 				},
 			},
 		},

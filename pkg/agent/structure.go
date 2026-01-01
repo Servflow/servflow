@@ -93,7 +93,7 @@ func (t *MessageToolCallResponse) GenerateContent(imageSupport bool) string {
 		}
 		return ""
 	default:
-		return ""
+		return t.Text
 	}
 }
 

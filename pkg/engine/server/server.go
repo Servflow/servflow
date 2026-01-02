@@ -1,7 +1,6 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"net/http/pprof"
@@ -21,11 +20,13 @@ import (
 // TODO only expose profile if debug
 
 func (e *Engine) createServer(apiConfigs []*apiconfig.APIConfig, port string) (*http.Server, error) {
-	if len(apiConfigs) < 1 {
-		return nil, errors.New("no configuration files found")
-	}
+	logger := logging.FromContext(e.ctx)
 
-	logging.FromContext(e.ctx).Info("starting engine on " + port)
+	if len(apiConfigs) == 0 {
+		logger.Info("starting engine with no API configurations", zap.String("port", port))
+	} else {
+		logger.Info("starting engine on " + port)
+	}
 	httpServer := &http.Server{
 		Addr:    ":" + port,
 		Handler: e.createCustomMuxHandler(apiConfigs),

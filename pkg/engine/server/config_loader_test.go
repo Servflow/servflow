@@ -14,11 +14,18 @@ import (
 func TestLoadAPIConfigsFromYAML(t *testing.T) {
 	logger := zap.NewNop()
 
-	t.Run("empty folder returns error", func(t *testing.T) {
+	t.Run("empty folder string returns error", func(t *testing.T) {
 		configs, err := LoadAPIConfigsFromYAML("", false, logger)
 		assert.Error(t, err)
 		assert.Nil(t, configs)
 		assert.Contains(t, err.Error(), "APIs folder not specified")
+	})
+
+	t.Run("empty folder returns empty configs", func(t *testing.T) {
+		tempDir := t.TempDir() // Empty directory
+		configs, err := LoadAPIConfigsFromYAML(tempDir, false, logger)
+		require.NoError(t, err)
+		assert.Len(t, configs, 0)
 	})
 
 	t.Run("non-existent folder returns error", func(t *testing.T) {

@@ -210,10 +210,13 @@ func TestDirectConfigEngine_EmptyConfigs(t *testing.T) {
 	engine, err := New(cfg, WithDirectConfigs(directConfigs))
 	require.NoError(t, err)
 
-	// Should be able to start with empty configs, but createServer will fail
+	// Should be able to start with empty configs
 	err = engine.Start()
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "no configuration files found")
+	assert.NoError(t, err)
+
+	// Stop the engine
+	err = engine.Stop()
+	assert.NoError(t, err)
 }
 
 func TestDirectConfigEngine_ContextCancellation(t *testing.T) {

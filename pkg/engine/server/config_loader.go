@@ -42,7 +42,11 @@ func LoadAPIConfigsFromYAML(apisFolder string, shouldFail bool, logger *zap.Logg
 		configs = append(configs, &cfg)
 	}
 
-	logger.Debug("Successfully loaded API configs", zap.Int("count", len(configs)))
+	if len(configs) == 0 {
+		logger.Info("No API configurations found in folder", zap.String("folder", apisFolder))
+	} else {
+		logger.Debug("Successfully loaded API configs", zap.Int("count", len(configs)))
+	}
 	return configs, nil
 }
 

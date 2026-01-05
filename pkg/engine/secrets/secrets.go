@@ -7,34 +7,57 @@ import (
 )
 
 type SecretStorage interface {
-	Init()
 	FetchSecret(key string) string
 	AddSecret(key string, value string)
 }
 
+type SecretManager struct {
+	storages []SecretStorage
+	mu       sync.RWMutex
+}
+
 var (
-	storage SecretStorage
+	manager *SecretManager
 	once    sync.Once
 )
 
-func SetStorage(s SecretStorage) {
+// GetManager returns the singleton SecretManager instance
+func GetManager() *SecretManager {
 	once.Do(func() {
-		s.Init()
-		storage = s
+		manager = &SecretManager{
+			storages: []SecretStorage{NewEnvStorage()}, // env storage as default
+		}
 	})
+	return manager
 }
 
-func GetStorage() SecretStorage {
-	if storage == nil {
-		SetStorage(NewEnvStorage())
+// AddStorage adds a new secret storage to the manager
+func (m *SecretManager) AddStorage(storage SecretStorage) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.storages = append(m.storages, storage)
+}
+
+// FetchSecret fetches a secret from the registered storages
+// It iterates through all storages (starting with env) and returns the first non-empty value
+func (m *SecretManager) FetchSecret(key string) string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	for _, storage := range m.storages {
+		if value := storage.FetchSecret(key); value != "" {
+			return value
+		}
 	}
-	return storage
+	return ""
 }
 
+// FetchSecret is a convenience function that uses the global manager
 func FetchSecret(key string) string {
-	return GetStorage().FetchSecret(key)
+	return GetManager().FetchSecret(key)
 }
 
+// NewEnvStorage creates a new environment-based secret storage
 func NewEnvStorage() SecretStorage {
 	return &envStorage{
 		localSecrets: make(map[string]string),
@@ -43,19 +66,27 @@ func NewEnvStorage() SecretStorage {
 
 type envStorage struct {
 	localSecrets map[string]string
+	mu           sync.RWMutex
 }
 
 func (e *envStorage) AddSecret(key string, value string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 	e.localSecrets[key] = value
 }
 
-func (e *envStorage) Init() {
-	// init not needed
-}
-
 func (e *envStorage) FetchSecret(key string) string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
 	if value, ok := e.localSecrets[key]; ok {
 		return value
 	}
 	return os.Getenv(key)
+}
+
+// Reset resets the manager (useful for testing)
+func Reset() {
+	manager = nil
+	once = sync.Once{}
 }

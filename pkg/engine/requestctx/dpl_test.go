@@ -256,9 +256,13 @@ func TestBaseParseTextTemplate(t *testing.T) {
 		},
 	}
 
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	secrets.GetStorage().AddSecret("mysecret", "test")
+	// Reset the secrets manager state for this test
+	secrets.Reset()
+
+	// Add a test secret directly to environment storage
+	envStorage := secrets.NewEnvStorage()
+	envStorage.AddSecret("mysecret", "test")
+	secrets.GetManager().AddStorage(envStorage)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

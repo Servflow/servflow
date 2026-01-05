@@ -59,7 +59,7 @@ func now() string {
 }
 
 func secret(key string) string {
-	return secrets.GetStorage().FetchSecret(key)
+	return secrets.FetchSecret(key)
 }
 
 func jsonRaw(val interface{}) string {

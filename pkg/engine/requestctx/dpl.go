@@ -98,11 +98,11 @@ func ReplaceVariableValuesInContext(ctx context.Context, in string) (string, err
 func ReplaceVariableValues(in string, values map[string]interface{}) (string, error) {
 	tmpl, err := createTemplate(in, nil, false)
 	if err != nil {
-		return in, fmt.Errorf("error processing input: %w", err)
+		return in, fmt.Errorf("error processing template: %w", err)
 	}
 	var buff bytes.Buffer
 	if err := tmpl.Execute(&buff, values); err != nil {
-		return "", fmt.Errorf("error processing input: %w", err)
+		return "", fmt.Errorf("error processing template: %w", err)
 	}
 
 	return strings.ReplaceAll(buff.String(), noValue, ""), nil
@@ -169,7 +169,7 @@ func BaseParseTextTemplate(rawString string, funcMap template.FuncMap) (string, 
 	}
 	var buff bytes.Buffer
 	if err := tmpl.Execute(&buff, nil); err != nil {
-		return "", fmt.Errorf("error processing input: %w", err)
+		return "", fmt.Errorf("error processing template: %w", err)
 	}
 	return strings.ReplaceAll(buff.String(), noValue, ""), nil
 }
@@ -182,7 +182,7 @@ func ExecuteTemplateFromContext(ctx context.Context, tmpl *template.Template) (s
 
 	var buff bytes.Buffer
 	if err := tmpl.Execute(&buff, values); err != nil {
-		return "", fmt.Errorf("error processing input: %w", err)
+		return "", fmt.Errorf("error processing template: %w", err)
 	}
 
 	return strings.ReplaceAll(buff.String(), noValue, ""), nil

@@ -64,7 +64,7 @@ actions:
   fetchdone:
     type: fetch
     config:
-      shouldFail: true
+      failIfEmpty: true
       single: true
       integrationID: mongo
       table: users

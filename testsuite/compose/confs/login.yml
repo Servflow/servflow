@@ -23,7 +23,7 @@ actions:
     type: fetch
     config:
       single: true
-      shouldFail: true
+      failIfEmpty: true
       integrationID: mongo
       table: users
       filters:

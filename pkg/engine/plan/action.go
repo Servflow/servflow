@@ -79,7 +79,6 @@ func (a *Action) execute(ctx context.Context) (*stepWrapper, error) {
 
 	resp, err := a.exec.Execute(ctx, cfg)
 	if err != nil {
-		logger.Error("error executing action", zap.Error(err))
 		span.RecordError(err)
 		if errors.Is(err, ErrFailure) {
 			if err := requestctx.AddRequestVariables(ctx, map[string]interface{}{requestctx.ErrorTagStripped: err.Error()}, ""); err != nil {
@@ -90,7 +89,7 @@ func (a *Action) execute(ctx context.Context) (*stepWrapper, error) {
 			}
 			return a.fail, nil
 		}
-
+		logger.Error("error executing action", zap.Error(err))
 		return nil, fmt.Errorf("error executing action: %w", err)
 	}
 

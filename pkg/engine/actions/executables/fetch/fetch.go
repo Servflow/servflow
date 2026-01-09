@@ -34,7 +34,6 @@ type Config struct {
 	Table             string            `json:"table" yaml:"table"`
 	DatasourceOptions map[string]string `json:"datasourceOptions" yaml:"datasourceOptions"`
 	Single            bool              `json:"single" yaml:"single"`
-	ShouldFail        bool              `json:"shouldFail" yaml:"shouldFail"`
 	FailIfEmpty       bool              `json:"failIfEmpty" yaml:"failIfEmpty"`
 }
 

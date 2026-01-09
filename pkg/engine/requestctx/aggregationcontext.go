@@ -52,6 +52,10 @@ func (rc *RequestContext) TemplateFunctions() template.FuncMap {
 	return rc.requestFuncs
 }
 
+func (rc *RequestContext) Variables() map[string]interface{} {
+	return rc.requestVariables
+}
+
 func NewRequestContext(id string) *RequestContext {
 	return &RequestContext{
 		requestID:        id,

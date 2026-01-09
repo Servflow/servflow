@@ -6,11 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"sync"
 	"text/template"
 
 	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
+	"github.com/Servflow/servflow/pkg/engine/secrets"
 	"github.com/Servflow/servflow/pkg/logging"
 	"go.uber.org/zap"
 )
@@ -106,7 +106,7 @@ func RegisterIntegrationsFromConfig(integrationsConfig []apiconfig.IntegrationCo
 				case string:
 					tmpl, err := template.New("config").Funcs(template.FuncMap{
 						"secret": func(key string) string {
-							return os.Getenv(key)
+							return secrets.FetchSecret(key)
 						},
 					}).Parse(v)
 					if err != nil {

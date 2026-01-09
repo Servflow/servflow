@@ -31,6 +31,7 @@ import (
 	_ "github.com/Servflow/servflow/pkg/engine/integration/integrations/openai"
 	_ "github.com/Servflow/servflow/pkg/engine/integration/integrations/qdrant"
 	_ "github.com/Servflow/servflow/pkg/engine/integration/integrations/sql"
+	"github.com/Servflow/servflow/pkg/engine/secrets"
 	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/Servflow/servflow/pkg/storage"
 	"github.com/mark3labs/mcp-go/server"
@@ -55,6 +56,12 @@ func WithDirectConfigs(directConfigs *DirectConfigs) Option {
 func WithIdleTimeout(timeout time.Duration) Option {
 	return func(e *Engine) {
 		e.idleTimeout = timeout
+	}
+}
+
+func WithSecretStorage(storage secrets.SecretStorage) Option {
+	return func(e *Engine) {
+		secrets.GetManager().AddStorage(storage)
 	}
 }
 

@@ -63,15 +63,3 @@ func (mr *MockSecretStorageMockRecorder) FetchSecret(key any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FetchSecret", reflect.TypeOf((*MockSecretStorage)(nil).FetchSecret), key)
 }
-
-// Init mocks base method.
-func (m *MockSecretStorage) Init() {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Init")
-}
-
-// Init indicates an expected call of Init.
-func (mr *MockSecretStorageMockRecorder) Init() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Init", reflect.TypeOf((*MockSecretStorage)(nil).Init))
-}

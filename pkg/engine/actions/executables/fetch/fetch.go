@@ -9,6 +9,7 @@ import (
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/integration"
 	"github.com/Servflow/servflow/pkg/engine/integration/integrations/filters"
+	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/logging"
 	"go.uber.org/zap"
 )
@@ -28,12 +29,12 @@ type fetchImplementation interface {
 }
 
 type Config struct {
-	IntegrationID     string            `json:"integrationID"`
-	Filters           []filters.Filter  `json:"filters"`
-	Table             string            `json:"table"`
-	DatasourceOptions map[string]string `json:"datasourceOptions"`
-	Single            bool              `json:"single"`
-	ShouldFail        bool              `json:"shouldFail"`
+	IntegrationID     string            `json:"integrationID" yaml:"integrationID"`
+	Filters           []filters.Filter  `json:"filters" yaml:"filters"`
+	Table             string            `json:"table" yaml:"table"`
+	DatasourceOptions map[string]string `json:"datasourceOptions" yaml:"datasourceOptions"`
+	Single            bool              `json:"single" yaml:"single"`
+	FailIfEmpty       bool              `json:"failIfEmpty" yaml:"failIfEmpty"`
 }
 
 func New(config Config) (*Fetch, error) {
@@ -81,10 +82,11 @@ func (f *Fetch) Execute(ctx context.Context, modifiedConfig string) (interface{}
 		return "", fmt.Errorf("fetch with filters: %v", err)
 	}
 	ret = resp
-	if len(resp) < 1 && !f.cfg.ShouldFail {
+	if len(resp) < 1 {
+		if f.cfg.FailIfEmpty {
+			return nil, fmt.Errorf("%w: no data found", plan.ErrFailure)
+		}
 		return map[string]interface{}{}, nil
-	} else if len(resp) < 1 && f.cfg.ShouldFail {
-		return nil, fmt.Errorf("no data found")
 	}
 	if f.cfg.Single && len(resp) > 0 {
 		ret = resp[0]
@@ -101,7 +103,7 @@ func init() {
 			Required:    true,
 		},
 		"filters": {
-			Type:        "array",
+			Type:        actions.FieldTypeMap,
 			Label:       "Filters",
 			Placeholder: "Query filters",
 			Required:    false,
@@ -131,6 +133,13 @@ func init() {
 			Placeholder: "Whether the action should fail on error",
 			Required:    false,
 			Default:     false,
+		},
+		"failIfEmpty": {
+			Type:        actions.FieldTypeBoolean,
+			Label:       "Fail if Empty",
+			Placeholder: "Treat no results as failure",
+			Required:    false,
+			Default:     true,
 		},
 	}
 

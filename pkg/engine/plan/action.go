@@ -30,7 +30,9 @@ type Action struct {
 }
 
 var (
-	errExecutingAction = errors.New("executing action")
+	// ErrFailure is a non-fatal action, it should be written to the error message item in the request variable,
+	// and should not interrupt the workflow
+	ErrFailure = errors.New("action failed")
 )
 
 func (a *Action) ID() string {
@@ -77,18 +79,18 @@ func (a *Action) execute(ctx context.Context) (*stepWrapper, error) {
 
 	resp, err := a.exec.Execute(ctx, cfg)
 	if err != nil {
-		logger.Error("error executing action", zap.Error(err))
 		span.RecordError(err)
-		if err2 := requestctx.AddRequestVariables(ctx, map[string]interface{}{requestctx.ErrorTagStripped: err.Error()}, ""); err2 != nil {
-			return nil, err2
-		}
-		if err2 := requestctx.AddRequestVariables(ctx, map[string]interface{}{a.out: fmt.Sprintf("error: %v", err)}, ""); err2 != nil {
-			return nil, err2
-		}
-		if a.fail != nil {
+		if errors.Is(err, ErrFailure) {
+			if err := requestctx.AddRequestVariables(ctx, map[string]interface{}{requestctx.ErrorTagStripped: err.Error()}, ""); err != nil {
+				return nil, err
+			}
+			if err := requestctx.AddRequestVariables(ctx, map[string]interface{}{a.out: fmt.Sprintf("error: %v", err)}, ""); err != nil {
+				return nil, err
+			}
 			return a.fail, nil
 		}
-		return nil, fmt.Errorf("%w: %w", errExecutingAction, err)
+		logger.Error("error executing action", zap.Error(err))
+		return nil, fmt.Errorf("error executing action: %w", err)
 	}
 
 	logger.Debug("action executed successfully", zap.Any("resp", resp))

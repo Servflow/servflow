@@ -15,11 +15,12 @@ actions:
   authenticate:
     type: authenticate
     config:
-      integration_id: mongo
-      database_field: email
-      jwt_key: "test"
+      integrationID: mongo
+      databaseField: email
+      jwtKey: "test"
       token: '{{ header "Authorization" }}'
       collection: "users"
+      failOnAuthError: true
     next: action.deleteItem
     fail: response.invalidAuth
   deleteItem:

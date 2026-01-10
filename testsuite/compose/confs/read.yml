@@ -15,9 +15,10 @@ actions:
   authenticate:
     type: authenticate
     config:
-      integration_id: mongo
-      database_field: email
-      jwt_key: "test"
+      integrationID: mongo
+      databaseField: email
+      failOnAuthError: true
+      jwtKey: "test"
       token: '{{ header "Authorization" }}'
       collection: "users"
     next: action.fetchItem
@@ -28,7 +29,7 @@ actions:
       integrationID: mongo
       table: notes
       single: true
-      shouldFail: true
+      failIfEmpty: true
       filters:
         - field: id
           operation: "=="

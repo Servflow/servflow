@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/Servflow/servflow/internal/tracing"
-	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
-	requestctx2 "github.com/Servflow/servflow/pkg/engine/requestctx"
+	"github.com/Servflow/servflow/pkg/apiconfig"
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -62,26 +62,27 @@ func (c *ConditionStep) execute(ctx context.Context) (*stepWrapper, error) {
 		return c.OnValid, nil
 	}
 
-	reqCtx, ok := requestctx2.FromContext(ctx)
+	reqCtx, ok := requestctx.FromContext(ctx)
 	if !ok {
 		return nil, errors.New("invalid request context")
 	}
 
-	tmpl, err := requestctx2.CreateTextTemplate(ctx, c.exprString, reqCtx.ConditionalTemplateFunctions())
+	tmpl, err := requestctx.CreateTextTemplate(ctx, c.exprString, reqCtx.ConditionalTemplateFunctions())
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 		return nil, fmt.Errorf("error creating template for condition %w template: %s", err, c.exprString)
 	}
 
-	resp, err := requestctx2.ExecuteTemplateFromContext(ctx, tmpl)
+	resp, err := requestctx.ExecuteTemplateFromContext(ctx, tmpl)
 	if err != nil {
 		logger.Error("error executing template: "+c.exprString, zap.Error(err))
+		logger.Debug("error executing template: "+c.exprString, zap.Any("resp", reqCtx.Variables()))
 		span.RecordError(err)
 		return nil, err
 	}
-
-	err = requestctx2.AddValidationErrors(ctx)
+	// add validation errors they should not cause any failures
+	err = requestctx.AddValidationErrors(ctx)
 	if err != nil {
 		logger.Error("error adding validation error", zap.Error(err))
 		return nil, err

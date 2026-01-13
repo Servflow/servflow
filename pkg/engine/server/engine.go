@@ -40,6 +40,10 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+type EngineConfig struct {
+	Integrations map[string]apiconfig.IntegrationConfig `yaml:"integrations"`
+}
+
 type Option func(*Engine)
 
 func WithLogger(core zapcore.Core) Option {
@@ -124,10 +128,11 @@ func (e *Engine) Start() error {
 			return fmt.Errorf("error fetching actions: %w", err)
 		}
 
-		integrationConfigs, err = LoadIntegrationsConfigFromYAML(e.cfg.IntegrationsFile, logging.FromContext(e.ctx))
+		engineConfig, err := LoadEngineConfigFromYAML(e.cfg.EngineConfigFile, logging.FromContext(e.ctx))
 		if err != nil {
-			return fmt.Errorf("error fetching database configs: %w", err)
+			return fmt.Errorf("error fetching engine config: %w", err)
 		}
+		integrationConfigs = engineConfig.GetIntegrationConfigs()
 	}
 
 	return e.startWithConfigs(apiConfigs, integrationConfigs)

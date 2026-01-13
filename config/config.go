@@ -5,5 +5,5 @@ type Config struct {
 	Port string `json:"port" required:"true" default:"8080"`
 
 	ConfigFolder     string `json:"config_folder" envconfig:"configfolder"`
-	IntegrationsFile string `json:"integrations_file" envconfig:"integrations_file"`
+	EngineConfigFile string `json:"engine_config_file" envconfig:"engine_config_file"`
 }

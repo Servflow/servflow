@@ -50,37 +50,42 @@ func LoadAPIConfigsFromYAML(apisFolder string, shouldFail bool, logger *zap.Logg
 	return configs, nil
 }
 
-// LoadIntegrationsConfigFromYAML loads integrations configuration from YAML file
-func LoadIntegrationsConfigFromYAML(integrationsFile string, logger *zap.Logger) ([]apiconfig.IntegrationConfig, error) {
-	logger.Debug("Loading integrations config from YAML file", zap.String("file", integrationsFile))
+// LoadEngineConfigFromYAML loads engine configuration from YAML file
+func LoadEngineConfigFromYAML(engineConfigFile string, logger *zap.Logger) (*EngineConfig, error) {
+	logger.Debug("Loading engine config from YAML file", zap.String("file", engineConfigFile))
 
-	if integrationsFile == "" {
-		logger.Debug("No integrations file specified, returning empty config")
-		return nil, nil
+	if engineConfigFile == "" {
+		logger.Debug("No engine config file specified, returning empty config")
+		return &EngineConfig{}, nil
 	}
 
-	contents, err := os.ReadFile(integrationsFile)
+	contents, err := os.ReadFile(engineConfigFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read integrations config file: %w", err)
+		return nil, fmt.Errorf("failed to read engine config file: %w", err)
 	}
 
-	type confStruct struct {
-		Integrations map[string]apiconfig.IntegrationConfig `yaml:"integrations"`
+	var engineConfig EngineConfig
+	if err := yaml.Unmarshal(contents, &engineConfig); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal engine config: %w", err)
 	}
 
-	var confs confStruct
-	if err := yaml.Unmarshal(contents, &confs); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal integrations config: %w", err)
+	integrationCount := len(engineConfig.Integrations)
+	logger.Debug("Successfully loaded engine config", zap.Int("integrations_count", integrationCount))
+	return &engineConfig, nil
+}
+
+// GetIntegrationConfigs extracts integration configs from EngineConfig as a slice
+func (ec *EngineConfig) GetIntegrationConfigs() []apiconfig.IntegrationConfig {
+	if ec == nil || ec.Integrations == nil {
+		return nil
 	}
 
-	configs := make([]apiconfig.IntegrationConfig, 0, len(confs.Integrations))
-	for id, conf := range confs.Integrations {
+	configs := make([]apiconfig.IntegrationConfig, 0, len(ec.Integrations))
+	for id, conf := range ec.Integrations {
 		conf.ID = id
 		configs = append(configs, conf)
 	}
-
-	logger.Debug("Successfully loaded integrations config", zap.Int("count", len(configs)))
-	return configs, nil
+	return configs
 }
 
 // readYAMLFilesInFolder reads all YAML files from a directory recursively

@@ -33,7 +33,17 @@ func RunServer(cfg *config.Config) error {
 		return err
 	}
 
-	eng, err := server.New(cfg)
+	var logger *zap.Logger
+	if cfg.Env == "production" {
+		logger, _ = zap.NewProduction()
+	} else {
+		logger, _ = zap.NewDevelopment()
+	}
+	eng, err := server.New(
+		cfg.Port,
+		cfg.Env,
+		server.WithFileConfig(cfg.ConfigFolder, cfg.EngineConfigFile, logger),
+	)
 	if err != nil {
 		return err
 	}

@@ -10,23 +10,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Servflow/servflow/config"
-	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
+	"github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestDirectConfigEngine_Integration(t *testing.T) {
-	// Get a random available port
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	port := listener.Addr().(*net.TCPAddr).Port
 	listener.Close()
-
-	cfg := &config.Config{
-		Port: fmt.Sprintf("%d", port),
-		Env:  "test",
-	}
 
 	apiConfigs := []*apiconfig.APIConfig{
 		{
@@ -79,17 +72,14 @@ func TestDirectConfigEngine_Integration(t *testing.T) {
 		},
 	}
 
-	integrationConfigs := []apiconfig.IntegrationConfig{}
-
 	directConfigs := &DirectConfigs{
-		APIConfigs:         apiConfigs,
-		IntegrationConfigs: integrationConfigs,
+		APIConfigs:   apiConfigs,
+		EngineConfig: &EngineConfig{},
 	}
 
-	engine, err := New(cfg, WithDirectConfigs(directConfigs))
+	engine, err := New(fmt.Sprintf("%d", port), "test", WithDirectConfigs(directConfigs))
 	require.NoError(t, err)
 
-	// Start engine in goroutine
 	errChan := make(chan error, 1)
 	go func() {
 		if err := engine.Start(); err != nil {
@@ -97,10 +87,8 @@ func TestDirectConfigEngine_Integration(t *testing.T) {
 		}
 	}()
 
-	// Give the server a moment to start
 	time.Sleep(100 * time.Millisecond)
 
-	// Use the port we allocated
 	baseURL := fmt.Sprintf("http://127.0.0.1:%d", port)
 
 	t.Run("GET /hello endpoint", func(t *testing.T) {
@@ -151,29 +139,20 @@ func TestDirectConfigEngine_Integration(t *testing.T) {
 		assert.Equal(t, "ok", string(body))
 	})
 
-	// Check for any startup errors
 	select {
 	case err := <-errChan:
 		t.Fatalf("Engine startup error: %v", err)
 	case <-time.After(10 * time.Millisecond):
-		// No error, continue
 	}
 
-	// Clean shutdown
 	err = engine.Stop()
 	require.NoError(t, err)
 }
 
 func TestDirectConfigEngine_ValidationError(t *testing.T) {
-	cfg := &config.Config{
-		Port: "8081",
-		Env:  "test",
-	}
-
-	// Create invalid API config (missing required fields)
 	apiConfigs := []*apiconfig.APIConfig{
 		{
-			ID: "", // Invalid: empty ID
+			ID: "",
 			HttpConfig: apiconfig.HttpConfig{
 				ListenPath: "/test",
 				Method:     "GET",
@@ -182,49 +161,34 @@ func TestDirectConfigEngine_ValidationError(t *testing.T) {
 	}
 
 	directConfigs := &DirectConfigs{
-		APIConfigs:         apiConfigs,
-		IntegrationConfigs: []apiconfig.IntegrationConfig{},
+		APIConfigs:   apiConfigs,
+		EngineConfig: &EngineConfig{},
 	}
 
-	engine, err := New(cfg, WithDirectConfigs(directConfigs))
+	engine, err := New("8081", "test", WithDirectConfigs(directConfigs))
 	require.NoError(t, err)
 
-	// Validation should occur during startup, but since we're using stub actions
-	// and the engine doesn't validate configs by default during startup,
-	// this test verifies the engine can be created with invalid configs
 	assert.NotNil(t, engine)
 	assert.Equal(t, directConfigs, engine.directConfigs)
 }
 
 func TestDirectConfigEngine_EmptyConfigs(t *testing.T) {
-	cfg := &config.Config{
-		Port: "8082",
-		Env:  "test",
-	}
-
 	directConfigs := &DirectConfigs{
-		APIConfigs:         []*apiconfig.APIConfig{},
-		IntegrationConfigs: []apiconfig.IntegrationConfig{},
+		APIConfigs:   []*apiconfig.APIConfig{},
+		EngineConfig: &EngineConfig{},
 	}
 
-	engine, err := New(cfg, WithDirectConfigs(directConfigs))
+	engine, err := New("8082", "test", WithDirectConfigs(directConfigs))
 	require.NoError(t, err)
 
-	// Should be able to start with empty configs
 	err = engine.Start()
 	assert.NoError(t, err)
 
-	// Stop the engine
 	err = engine.Stop()
 	assert.NoError(t, err)
 }
 
 func TestDirectConfigEngine_ContextCancellation(t *testing.T) {
-	cfg := &config.Config{
-		Port: "8083",
-		Env:  "test",
-	}
-
 	apiConfigs := []*apiconfig.APIConfig{
 		{
 			ID: "test-cancel",
@@ -253,38 +217,29 @@ func TestDirectConfigEngine_ContextCancellation(t *testing.T) {
 	}
 
 	directConfigs := &DirectConfigs{
-		APIConfigs:         apiConfigs,
-		IntegrationConfigs: []apiconfig.IntegrationConfig{},
+		APIConfigs:   apiConfigs,
+		EngineConfig: &EngineConfig{},
 	}
 
-	engine, err := New(cfg, WithDirectConfigs(directConfigs))
+	engine, err := New("8083", "test", WithDirectConfigs(directConfigs))
 	require.NoError(t, err)
 
 	doneChan := engine.DoneChan()
 
-	// Cancel the context
 	engine.cancel()
 
-	// DoneChan should be closed
 	select {
 	case <-doneChan:
-		// Expected
 	case <-time.After(100 * time.Millisecond):
 		t.Fatal("DoneChan should be closed after context cancellation")
 	}
 }
 
 func TestDirectConfigEngine_IdleTimeout(t *testing.T) {
-	// Get a random available port
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	port := listener.Addr().(*net.TCPAddr).Port
 	listener.Close()
-
-	cfg := &config.Config{
-		Port: fmt.Sprintf("%d", port),
-		Env:  "test",
-	}
 
 	apiConfigs := []*apiconfig.APIConfig{
 		{
@@ -314,15 +269,13 @@ func TestDirectConfigEngine_IdleTimeout(t *testing.T) {
 	}
 
 	directConfigs := &DirectConfigs{
-		APIConfigs:         apiConfigs,
-		IntegrationConfigs: []apiconfig.IntegrationConfig{},
+		APIConfigs:   apiConfigs,
+		EngineConfig: &EngineConfig{},
 	}
 
-	// Test with 200ms idle timeout
-	engine, err := New(cfg, WithDirectConfigs(directConfigs), WithIdleTimeout(200*time.Millisecond))
+	engine, err := New(fmt.Sprintf("%d", port), "test", WithDirectConfigs(directConfigs), WithIdleTimeout(200*time.Millisecond))
 	require.NoError(t, err)
 
-	// Start engine
 	errChan := make(chan error, 1)
 	go func() {
 		if err := engine.Start(); err != nil {
@@ -333,26 +286,21 @@ func TestDirectConfigEngine_IdleTimeout(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	baseURL := fmt.Sprintf("http://127.0.0.1:%d", port)
 
-	// Make a request to reset the timer
 	resp, err := http.Get(baseURL + "/test")
 	require.NoError(t, err)
 	resp.Body.Close()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	// Engine should still be alive after 100ms (less than timeout)
 	time.Sleep(100 * time.Millisecond)
 	select {
 	case <-engine.DoneChan():
 		t.Fatal("Engine should not have timed out yet")
 	default:
-		// Expected - engine still running
 	}
 
-	// Wait for idle timeout to trigger (total 300ms > 200ms timeout)
 	time.Sleep(250 * time.Millisecond)
 	select {
 	case <-engine.DoneChan():
-		// Expected - engine should be shut down due to idle timeout
 	case <-time.After(100 * time.Millisecond):
 		t.Fatal("Engine should have shut down due to idle timeout")
 	}

@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
+	"github.com/Servflow/servflow/pkg/apiconfig"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/agent"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/authenticate"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/delete_action"
@@ -63,19 +63,16 @@ func WithDirectConfigs(directConfigs *DirectConfigs) Option {
 	}
 }
 
-func WithFileConfig(configFolder, engineConfigFile string, logger *zap.Logger) Option {
+func WithFileConfig(configFolder, engineConfigFile string) Option {
 	return func(e *Engine) {
-		if logger == nil {
-			logger = zap.NewNop()
-		}
-		apiConfigs, err := LoadAPIConfigsFromYAML(configFolder, false, logger)
+		apiConfigs, err := LoadAPIConfigsFromYAML(configFolder, false, e.logger)
 		if err != nil {
-			logger.Error("failed to load API configs from YAML", zap.Error(err))
+			e.logger.Error("failed to load API configs from YAML", zap.Error(err))
 			return
 		}
-		engineConfig, err := LoadEngineConfigFromYAML(engineConfigFile, logger)
+		engineConfig, err := LoadEngineConfigFromYAML(engineConfigFile, e.logger)
 		if err != nil {
-			logger.Error("failed to load engine config from YAML", zap.Error(err))
+			e.logger.Error("failed to load engine config from YAML", zap.Error(err))
 			return
 		}
 		e.directConfigs = &DirectConfigs{
@@ -126,12 +123,12 @@ func New(port, env string, opts ...Option) (*Engine, error) {
 		cancel: cancel,
 	}
 
-	for _, opt := range opts {
-		opt(e)
-	}
-
 	if e.logger == nil {
 		e.logger = e.createLogger(env)
+	}
+
+	for _, opt := range opts {
+		opt(e)
 	}
 
 	if e.directConfigs == nil {

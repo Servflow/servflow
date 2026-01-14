@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/MicahParks/keyfunc/v3"
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/logging"
@@ -20,6 +21,7 @@ type Config struct {
 	Mode                  string                 `json:"mode" yaml:"mode"`
 	Field                 string                 `json:"field" yaml:"field"`
 	Key                   string                 `json:"key" yaml:"key"`
+	JwksURL               string                 `json:"jwksURL" yaml:"jwksURL"`
 	Claims                map[string]interface{} `json:"claims" yaml:"claims"`
 	FailOnValidationError bool                   `json:"failOnValidationError" yaml:"failOnValidationError"`
 }
@@ -60,6 +62,10 @@ func (a *JWT) Execute(ctx context.Context, modifiedConfig string) (interface{}, 
 }
 
 func (a *JWT) encode(ctx context.Context, payload string) (interface{}, error) {
+	if a.config.Key == "" {
+		return nil, fmt.Errorf("key is required for encoding JWT")
+	}
+
 	var signingMethod jwt.SigningMethod
 	var key interface{}
 
@@ -100,6 +106,48 @@ func (a *JWT) encode(ctx context.Context, payload string) (interface{}, error) {
 }
 
 func (a *JWT) decode(ctx context.Context, tokenString string) (interface{}, error) {
+	if a.config.JwksURL != "" {
+		return a.decodeWithJwks(ctx, tokenString)
+	}
+
+	if a.config.Key == "" {
+		return nil, fmt.Errorf("either key or jwksURL is required for decoding JWT")
+	}
+
+	return a.decodeWithKey(ctx, tokenString)
+}
+
+func (a *JWT) decodeWithJwks(ctx context.Context, tokenString string) (interface{}, error) {
+	k, err := keyfunc.NewDefaultCtx(ctx, []string{a.config.JwksURL})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create keyfunc from JWKS URL: %w", err)
+	}
+
+	token, err := jwt.Parse(tokenString, k.Keyfunc)
+	if err != nil {
+		if a.config.FailOnValidationError {
+			return nil, fmt.Errorf("%w: %v", plan.ErrFailure, err)
+		}
+		return nil, err
+	}
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		if sub, ok := claims["sub"].(string); ok {
+			return sub, nil
+		}
+		if a.config.FailOnValidationError {
+			return nil, fmt.Errorf("%w: sub claim not found", plan.ErrFailure)
+		}
+		return nil, fmt.Errorf("sub claim not found")
+	}
+
+	if a.config.FailOnValidationError {
+		return nil, fmt.Errorf("%w: invalid token", plan.ErrFailure)
+	}
+	return nil, fmt.Errorf("invalid token")
+}
+
+func (a *JWT) decodeWithKey(ctx context.Context, tokenString string) (interface{}, error) {
 	secret := []byte(a.config.Key)
 
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
@@ -176,8 +224,14 @@ func init() {
 		"key": {
 			Type:        actions.FieldTypeString,
 			Label:       "Key",
-			Placeholder: "JWT signing/verification key",
-			Required:    true,
+			Placeholder: "JWT signing/verification key (PEM or secret)",
+			Required:    false,
+		},
+		"jwksURL": {
+			Type:        actions.FieldTypeString,
+			Label:       "JWKS URL",
+			Placeholder: "URL to fetch JSON Web Key Set for verification",
+			Required:    false,
 		},
 		"claims": {
 			Type:        actions.FieldTypeMap,

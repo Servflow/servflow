@@ -5,10 +5,16 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"math/big"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
+
+	"encoding/base64"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
@@ -391,5 +397,131 @@ func TestJWT_Execute_Decode(t *testing.T) {
 		assert.Equal(t, "write", permissions[1])
 		assert.Equal(t, "admin", permissions[2])
 		assert.NotEqual(t, "shouldNotOverride", claims["exp"])
+	})
+}
+
+func TestJWT_Execute_Decode_WithJwksURL(t *testing.T) {
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	kid := "test-key-id"
+
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
+		"sub": "jwksSubject",
+		"exp": time.Now().Add(time.Hour).Unix(),
+	})
+	token.Header["kid"] = kid
+
+	tokenString, err := token.SignedString(privateKey)
+	require.NoError(t, err)
+
+	jwks := map[string]interface{}{
+		"keys": []map[string]interface{}{
+			{
+				"kty": "RSA",
+				"kid": kid,
+				"use": "sig",
+				"alg": "RS256",
+				"n":   base64.RawURLEncoding.EncodeToString(privateKey.PublicKey.N.Bytes()),
+				"e":   base64.RawURLEncoding.EncodeToString(big.NewInt(int64(privateKey.PublicKey.E)).Bytes()),
+			},
+		},
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(jwks)
+	}))
+	defer server.Close()
+
+	t.Run("DecodeWithJwksURL", func(t *testing.T) {
+		config := Config{
+			Mode:    "decode",
+			Field:   tokenString,
+			JwksURL: server.URL,
+		}
+		jwtAction := New(config)
+
+		result, err := jwtAction.Execute(context.Background(), tokenString)
+		require.NoError(t, err)
+		assert.Equal(t, "jwksSubject", result)
+	})
+
+	t.Run("DecodeWithJwksURL_InvalidToken", func(t *testing.T) {
+		config := Config{
+			Mode:    "decode",
+			Field:   "invalid.token.string",
+			JwksURL: server.URL,
+		}
+		jwtAction := New(config)
+
+		_, err := jwtAction.Execute(context.Background(), "invalid.token.string")
+		require.Error(t, err)
+	})
+
+	t.Run("DecodeWithJwksURL_WrongKey", func(t *testing.T) {
+		otherPrivateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+		require.NoError(t, err)
+
+		otherToken := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
+			"sub": "otherSubject",
+			"exp": time.Now().Add(time.Hour).Unix(),
+		})
+		otherToken.Header["kid"] = "unknown-kid"
+
+		otherTokenString, err := otherToken.SignedString(otherPrivateKey)
+		require.NoError(t, err)
+
+		config := Config{
+			Mode:    "decode",
+			Field:   otherTokenString,
+			JwksURL: server.URL,
+		}
+		jwtAction := New(config)
+
+		_, err = jwtAction.Execute(context.Background(), otherTokenString)
+		require.Error(t, err)
+	})
+
+	t.Run("DecodeWithJwksURL_FailOnValidationError", func(t *testing.T) {
+		config := Config{
+			Mode:                  "decode",
+			Field:                 "invalid.token.string",
+			JwksURL:               server.URL,
+			FailOnValidationError: true,
+		}
+		jwtAction := New(config)
+
+		_, err := jwtAction.Execute(context.Background(), "invalid.token.string")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed")
+	})
+}
+
+func TestJWT_Execute_Decode_RequiresKeyOrJwksURL(t *testing.T) {
+	t.Run("NoKeyOrJwksURL", func(t *testing.T) {
+		config := Config{
+			Mode:  "decode",
+			Field: "some.token.string",
+		}
+		jwtAction := New(config)
+
+		_, err := jwtAction.Execute(context.Background(), "some.token.string")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "either key or jwksURL is required")
+	})
+}
+
+func TestJWT_Execute_Encode_RequiresKey(t *testing.T) {
+	t.Run("NoKey", func(t *testing.T) {
+		config := Config{
+			Mode:  "encode",
+			Field: "testSubject",
+		}
+		jwtAction := New(config)
+
+		_, err := jwtAction.Execute(context.Background(), "testSubject")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "key is required for encoding")
 	})
 }

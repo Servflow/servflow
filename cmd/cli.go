@@ -33,7 +33,17 @@ func RunServer(cfg *config.Config) error {
 		return err
 	}
 
-	eng, err := server.New(cfg)
+	var logger *zap.Logger
+	if cfg.Env == "production" {
+		logger, _ = zap.NewProduction()
+	} else {
+		logger, _ = zap.NewDevelopment()
+	}
+	eng, err := server.New(
+		cfg.Port,
+		cfg.Env,
+		server.WithFileConfig(cfg.ConfigFolder, cfg.EngineConfigFile, logger),
+	)
 	if err != nil {
 		return err
 	}
@@ -120,9 +130,9 @@ func CreateApp() *cli.App {
 				ArgsUsage: "[CONFIG_FOLDER]",
 				Flags: []cli.Flag{
 					&cli.StringFlag{
-						Name:     "integrations",
-						Aliases:  []string{"i"},
-						Usage:    "Path to integrations configuration folder",
+						Name:     "config",
+						Aliases:  []string{"c"},
+						Usage:    "Path to engine configuration file",
 						Required: false,
 					},
 				},
@@ -142,17 +152,17 @@ func CreateApp() *cli.App {
 						cfg.ConfigFolder = configFolder
 					}
 
-					integrations := c.String("integrations")
-					if integrations != "" {
-						cfg.IntegrationsFile = integrations
+					engineConfig := c.String("config")
+					if engineConfig != "" {
+						cfg.EngineConfigFile = engineConfig
 					}
 
 					if cfg.ConfigFolder == "" {
 						return cli.Exit("Config folder for APIs must be specified either via environment variable SERVFLOW_CONFIGFOLDERS_APIS or as the first argument to 'run' command", 1)
 					}
 
-					log.Printf("Starting ServFlow with config folders - APIs: %s, Integrations: %s",
-						cfg.ConfigFolder, cfg.IntegrationsFile)
+					log.Printf("Starting ServFlow with config folders - APIs: %s, Engine Config: %s",
+						cfg.ConfigFolder, cfg.EngineConfigFile)
 
 					return RunServer(&cfg)
 				},

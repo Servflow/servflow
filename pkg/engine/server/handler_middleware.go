@@ -4,14 +4,25 @@ import (
 	"errors"
 	"net/http"
 
-	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
+	"github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/server/middleware"
 	"github.com/justinas/alice"
 )
 
-func (h *APIHandler) CreateChain(config *apiconfig.APIConfig) http.Handler {
+func resolveCORSOrigins(apiCors []string, engineCors *CorsConfig) []string {
+	if len(apiCors) > 0 {
+		return apiCors
+	}
+	if engineCors != nil && len(engineCors.AllowedOrigins) > 0 {
+		return engineCors.AllowedOrigins
+	}
+	return nil
+}
+
+func (h *APIHandler) CreateChain(config *apiconfig.APIConfig, engineCors *CorsConfig) http.Handler {
+	corsOrigins := resolveCORSOrigins(config.HttpConfig.CORSAllowedOrigins, engineCors)
 	chain := alice.New(
-		h.middlewareAdaptor(&middleware.Cors{AllowedOrigins: config.HttpConfig.CORSAllowedOrigins}),
+		h.middlewareAdaptor(&middleware.Cors{AllowedOrigins: corsOrigins}),
 	).Then(h)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		chain.ServeHTTP(w, r)

@@ -104,25 +104,26 @@ invalid_yaml: [unclosed array
 	})
 }
 
-func TestLoadIntegrationsConfigFromYAML(t *testing.T) {
+func TestLoadEngineConfigFromYAML(t *testing.T) {
 	logger := zap.NewNop()
 
 	t.Run("empty file path returns empty config", func(t *testing.T) {
-		configs, err := LoadIntegrationsConfigFromYAML("", logger)
+		engineConfig, err := LoadEngineConfigFromYAML("", logger)
 		require.NoError(t, err)
-		assert.Nil(t, configs)
+		assert.NotNil(t, engineConfig)
+		assert.Nil(t, engineConfig.Integrations)
 	})
 
 	t.Run("non-existent file returns error", func(t *testing.T) {
-		configs, err := LoadIntegrationsConfigFromYAML("/non/existent/file.yaml", logger)
+		engineConfig, err := LoadEngineConfigFromYAML("/non/existent/file.yaml", logger)
 		assert.Error(t, err)
-		assert.Nil(t, configs)
+		assert.Nil(t, engineConfig)
 	})
 
-	t.Run("valid integrations config file", func(t *testing.T) {
-		tempFile := filepath.Join(t.TempDir(), "integrations.yaml")
+	t.Run("valid engine config file with integrations", func(t *testing.T) {
+		tempFile := filepath.Join(t.TempDir(), "engine.yaml")
 
-		integrationsYAML := `
+		engineYAML := `
 integrations:
   db1:
     type: mongo
@@ -135,11 +136,15 @@ integrations:
       driver: "postgres"
       connectionString: "postgres://user:pass@localhost/db"
 `
-		err := os.WriteFile(tempFile, []byte(integrationsYAML), 0644)
+		err := os.WriteFile(tempFile, []byte(engineYAML), 0644)
 		require.NoError(t, err)
 
-		configs, err := LoadIntegrationsConfigFromYAML(tempFile, logger)
+		engineConfig, err := LoadEngineConfigFromYAML(tempFile, logger)
 		require.NoError(t, err)
+		require.NotNil(t, engineConfig)
+		require.Len(t, engineConfig.Integrations, 2)
+
+		configs := engineConfig.GetIntegrationConfigs()
 		require.Len(t, configs, 2)
 
 		// Find configs by ID
@@ -161,7 +166,7 @@ integrations:
 		assert.Equal(t, "sql", db2.Type)
 	})
 
-	t.Run("invalid integrations config file", func(t *testing.T) {
+	t.Run("invalid engine config file", func(t *testing.T) {
 		tempFile := filepath.Join(t.TempDir(), "invalid.yaml")
 
 		invalidYAML := `
@@ -170,10 +175,22 @@ integrations: [unclosed array
 		err := os.WriteFile(tempFile, []byte(invalidYAML), 0644)
 		require.NoError(t, err)
 
-		configs, err := LoadIntegrationsConfigFromYAML(tempFile, logger)
+		engineConfig, err := LoadEngineConfigFromYAML(tempFile, logger)
 		assert.Error(t, err)
+		assert.Nil(t, engineConfig)
+		assert.Contains(t, err.Error(), "failed to unmarshal engine config")
+	})
+
+	t.Run("GetIntegrationConfigs with nil engine config", func(t *testing.T) {
+		var engineConfig *EngineConfig
+		configs := engineConfig.GetIntegrationConfigs()
 		assert.Nil(t, configs)
-		assert.Contains(t, err.Error(), "failed to unmarshal integrations config")
+	})
+
+	t.Run("GetIntegrationConfigs with empty integrations", func(t *testing.T) {
+		engineConfig := &EngineConfig{}
+		configs := engineConfig.GetIntegrationConfigs()
+		assert.Nil(t, configs)
 	})
 }
 

@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Servflow/servflow/config"
 	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/agent"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/authenticate"
@@ -40,6 +39,16 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+type EngineConfig struct {
+	Integrations map[string]apiconfig.IntegrationConfig `yaml:"integrations"`
+	Cors         CorsConfig                             `yaml:"cors"`
+}
+
+type CorsConfig struct {
+	AllowedOrigins []string `yaml:"allowedOrigins"`
+	AllowedMethods []string `yaml:"allowedMethods"`
+}
+
 type Option func(*Engine)
 
 func WithLogger(core zapcore.Core) Option {
@@ -51,6 +60,28 @@ func WithLogger(core zapcore.Core) Option {
 func WithDirectConfigs(directConfigs *DirectConfigs) Option {
 	return func(e *Engine) {
 		e.directConfigs = directConfigs
+	}
+}
+
+func WithFileConfig(configFolder, engineConfigFile string, logger *zap.Logger) Option {
+	return func(e *Engine) {
+		if logger == nil {
+			logger = zap.NewNop()
+		}
+		apiConfigs, err := LoadAPIConfigsFromYAML(configFolder, false, logger)
+		if err != nil {
+			logger.Error("failed to load API configs from YAML", zap.Error(err))
+			return
+		}
+		engineConfig, err := LoadEngineConfigFromYAML(engineConfigFile, logger)
+		if err != nil {
+			logger.Error("failed to load engine config from YAML", zap.Error(err))
+			return
+		}
+		e.directConfigs = &DirectConfigs{
+			APIConfigs:   apiConfigs,
+			EngineConfig: engineConfig,
+		}
 	}
 }
 
@@ -67,13 +98,14 @@ func WithSecretStorage(storage secrets.SecretStorage) Option {
 }
 
 type DirectConfigs struct {
-	APIConfigs         []*apiconfig.APIConfig
-	IntegrationConfigs []apiconfig.IntegrationConfig
+	APIConfigs   []*apiconfig.APIConfig
+	EngineConfig *EngineConfig
 }
 
 type Engine struct {
 	server        *http.Server
-	cfg           *config.Config
+	port          string
+	env           string
 	directConfigs *DirectConfigs
 	mcpServer     *server.MCPServer
 	logger        *zap.Logger
@@ -84,11 +116,12 @@ type Engine struct {
 	timerMutex    sync.Mutex
 }
 
-func New(cfg *config.Config, opts ...Option) (*Engine, error) {
+func New(port, env string, opts ...Option) (*Engine, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	e := &Engine{
-		cfg:    cfg,
+		port:   port,
+		env:    env,
 		ctx:    ctx,
 		cancel: cancel,
 	}
@@ -98,7 +131,14 @@ func New(cfg *config.Config, opts ...Option) (*Engine, error) {
 	}
 
 	if e.logger == nil {
-		e.logger = e.createLogger(cfg.Env)
+		e.logger = e.createLogger(env)
+	}
+
+	if e.directConfigs == nil {
+		e.directConfigs = &DirectConfigs{
+			APIConfigs:   []*apiconfig.APIConfig{},
+			EngineConfig: &EngineConfig{},
+		}
 	}
 
 	return e, nil
@@ -111,35 +151,17 @@ func (e *Engine) DoneChan() <-chan struct{} {
 func (e *Engine) Start() error {
 	e.ctx = logging.WithLogger(e.ctx, e.logger)
 
-	var apiConfigs []*apiconfig.APIConfig
 	var integrationConfigs []apiconfig.IntegrationConfig
-	var err error
-
-	if e.directConfigs != nil {
-		apiConfigs = e.directConfigs.APIConfigs
-		integrationConfigs = e.directConfigs.IntegrationConfigs
-	} else {
-		apiConfigs, err = LoadAPIConfigsFromYAML(e.cfg.ConfigFolder, false, logging.FromContext(e.ctx))
-		if err != nil {
-			return fmt.Errorf("error fetching actions: %w", err)
-		}
-
-		integrationConfigs, err = LoadIntegrationsConfigFromYAML(e.cfg.IntegrationsFile, logging.FromContext(e.ctx))
-		if err != nil {
-			return fmt.Errorf("error fetching database configs: %w", err)
-		}
+	if e.directConfigs.EngineConfig != nil {
+		integrationConfigs = e.directConfigs.EngineConfig.GetIntegrationConfigs()
 	}
 
-	return e.startWithConfigs(apiConfigs, integrationConfigs)
-}
-
-func (e *Engine) startWithConfigs(apiConfigs []*apiconfig.APIConfig, integrationsConfig []apiconfig.IntegrationConfig) error {
 	logging.DebugContext(e.ctx, "Starting integrations...")
-	if err := integration.RegisterIntegrationsFromConfig(integrationsConfig); err != nil {
+	if err := integration.RegisterIntegrationsFromConfig(integrationConfigs); err != nil {
 		return err
 	}
 
-	srv, err := e.createServer(apiConfigs, e.cfg.Port)
+	srv, err := e.createServer(e.directConfigs.APIConfigs, e.port)
 	if err != nil {
 		return fmt.Errorf("error creating server: %w", err)
 	}
@@ -193,6 +215,7 @@ func (e *Engine) ReloadConfigs(newDirectConfigs *DirectConfigs) error {
 	newHandler := e.createCustomMuxHandler(newDirectConfigs.APIConfigs)
 
 	e.server.Handler = newHandler
+	e.directConfigs = newDirectConfigs
 
 	logging.InfoContext(e.ctx, "API configurations reloaded successfully")
 	return nil
@@ -242,4 +265,11 @@ func (e *Engine) resetIdleTimer() {
 	if e.idleTimer != nil {
 		e.idleTimer.Reset(e.idleTimeout)
 	}
+}
+
+func (e *Engine) getCorsConfig() *CorsConfig {
+	if e.directConfigs != nil && e.directConfigs.EngineConfig != nil {
+		return &e.directConfigs.EngineConfig.Cors
+	}
+	return nil
 }

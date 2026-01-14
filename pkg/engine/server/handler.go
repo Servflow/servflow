@@ -49,7 +49,7 @@ func (e *Engine) createBasicHandler(config *apiconfig.APIConfig) (http.Handler, 
 		p:         p,
 	}
 
-	return a.CreateChain(config), nil
+	return a.CreateChain(config, e.getCorsConfig()), nil
 }
 
 type APIHandler struct {

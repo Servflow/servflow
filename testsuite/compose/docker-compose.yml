@@ -13,12 +13,9 @@ services:
     build:
       dockerfile: Dockerfile
       context: ../..
-    command: ["start", "--integrations", "/integrations/mongo.yml", "/confs"]
+    command: ["start", "--config", "/config.yml", "/confs"]
     environment:
       - SERVFLOW_PORT=8080
-      - SERVFLOW_CONFIGFOLDERS_DATABASES=/integrations
-      - SERVFLOW_CONFIGFOLDERS_APIS=/confs
-      - SERVFLOW_APIKEY=test
       - SERVFLOW_LOGLEVEL=debug
       - SERVFLOW_ENV=development
       - MONGODB_STRING=mongodb://mongo:27017/servflow
@@ -26,7 +23,7 @@ services:
       - "8181:8080"
     volumes:
       - ./confs:/confs
-      - ./integrations:/integrations
+      - ./config.yml:/config.yml
     networks:
       - servflow
 

@@ -29,12 +29,11 @@ type fetchImplementation interface {
 }
 
 type Config struct {
-	IntegrationID     string            `json:"integrationID" yaml:"integrationID"`
-	Filters           []filters.Filter  `json:"filters" yaml:"filters"`
-	Table             string            `json:"table" yaml:"table"`
-	DatasourceOptions map[string]string `json:"datasourceOptions" yaml:"datasourceOptions"`
-	Single            bool              `json:"single" yaml:"single"`
-	FailIfEmpty       bool              `json:"failIfEmpty" yaml:"failIfEmpty"`
+	IntegrationID string           `json:"integrationID" yaml:"integrationID"`
+	Filters       []filters.Filter `json:"filters" yaml:"filters"`
+	Table         string           `json:"table" yaml:"table"`
+	Single        bool             `json:"single" yaml:"single"`
+	FailIfEmpty   bool             `json:"failIfEmpty" yaml:"failIfEmpty"`
 }
 
 func New(config Config) (*Fetch, error) {

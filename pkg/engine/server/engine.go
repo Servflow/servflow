@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Servflow/servflow/internal/tracing"
 	"github.com/Servflow/servflow/pkg/apiconfig"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/agent"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/authenticate"
@@ -88,6 +89,18 @@ func WithIdleTimeout(timeout time.Duration) Option {
 	}
 }
 
+type TracingConfig struct {
+	ServiceName       string
+	OrgID             string
+	CollectorEndpoint string
+}
+
+func WithOTELTracing(cfg TracingConfig) Option {
+	return func(e *Engine) {
+		e.tracingConfig = &cfg
+	}
+}
+
 func WithSecretStorage(storage secrets.SecretStorage) Option {
 	return func(e *Engine) {
 		secrets.GetManager().AddStorage(storage)
@@ -100,17 +113,19 @@ type DirectConfigs struct {
 }
 
 type Engine struct {
-	server        *http.Server
-	port          string
-	env           string
-	directConfigs *DirectConfigs
-	mcpServer     *server.MCPServer
-	logger        *zap.Logger
-	ctx           context.Context
-	cancel        func()
-	idleTimeout   time.Duration
-	idleTimer     *time.Timer
-	timerMutex    sync.Mutex
+	server         *http.Server
+	port           string
+	env            string
+	directConfigs  *DirectConfigs
+	mcpServer      *server.MCPServer
+	logger         *zap.Logger
+	ctx            context.Context
+	cancel         func()
+	idleTimeout    time.Duration
+	idleTimer      *time.Timer
+	timerMutex     sync.Mutex
+	tracingConfig  *TracingConfig
+	tracerShutdown func(context.Context) error
 }
 
 func New(port, env string, opts ...Option) (*Engine, error) {
@@ -147,6 +162,21 @@ func (e *Engine) DoneChan() <-chan struct{} {
 
 func (e *Engine) Start() error {
 	e.ctx = logging.WithLogger(e.ctx, e.logger)
+
+	if e.tracingConfig != nil {
+		shutdown, err := tracing.InitTracer(
+			e.ctx,
+			e.tracingConfig.ServiceName,
+			e.tracingConfig.OrgID,
+			e.tracingConfig.CollectorEndpoint,
+		)
+		if err != nil {
+			logging.ErrorContext(e.ctx, "failed to initialize tracer", err)
+		} else {
+			e.tracerShutdown = shutdown
+			logging.InfoContext(e.ctx, "OTEL tracing initialized")
+		}
+	}
 
 	var integrationConfigs []apiconfig.IntegrationConfig
 	if e.directConfigs.EngineConfig != nil {
@@ -225,6 +255,14 @@ func (e *Engine) Stop() error {
 		e.idleTimer = nil
 	}
 	e.timerMutex.Unlock()
+
+	if e.tracerShutdown != nil {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := e.tracerShutdown(shutdownCtx); err != nil {
+			logging.ErrorContext(e.ctx, "failed to shutdown tracer", err)
+		}
+	}
 
 	cl, err := storage.GetClient()
 	if err != nil {

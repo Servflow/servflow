@@ -16,6 +16,7 @@ import (
 )
 
 var tracer = otel.Tracer("servflow")
+var initialized bool
 
 const (
 	OrgIDKey = attribute.Key("org.id")
@@ -30,22 +31,17 @@ func SpanCtxFromContext(ctx context.Context, name string) (context.Context, trac
 }
 
 func OTELEnabled() bool {
-	return tracer != nil
+	return initialized
 }
 
-func InitTracer(ctx context.Context, serviceName, orgID, collectorEndpoint string) error {
-	//exporter, err := stdouttrace.New(stdouttrace.WithPrettyPrint())
-	//if err != nil {
-	//	return err
-	//}
+func InitTracer(ctx context.Context, serviceName, orgID, collectorEndpoint string) (func(context.Context) error, error) {
 	exporter, err := otlptracegrpc.New(ctx,
 		otlptracegrpc.WithInsecure(),
 		otlptracegrpc.WithEndpoint(collectorEndpoint),
-
 		otlptracegrpc.WithTimeout(5*time.Minute),
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create exporter: %w", err)
+		return nil, fmt.Errorf("failed to create exporter: %w", err)
 	}
 
 	res, err := resource.New(ctx,
@@ -55,7 +51,7 @@ func InitTracer(ctx context.Context, serviceName, orgID, collectorEndpoint strin
 		),
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create resource: %w", err)
+		return nil, fmt.Errorf("failed to create resource: %w", err)
 	}
 
 	tp := sdktrace.NewTracerProvider(
@@ -68,5 +64,7 @@ func InitTracer(ctx context.Context, serviceName, orgID, collectorEndpoint strin
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
 
 	tracer = otel.Tracer(serviceName)
-	return nil
+	initialized = true
+
+	return tp.Shutdown, nil
 }

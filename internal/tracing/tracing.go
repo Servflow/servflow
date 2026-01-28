@@ -37,7 +37,7 @@ func OTELEnabled() bool {
 func InitTracer(ctx context.Context, serviceName, orgID, collectorEndpoint string) (func(context.Context) error, error) {
 	exporter, err := otlptracegrpc.New(ctx,
 		otlptracegrpc.WithInsecure(),
-		otlptracegrpc.WithEndpoint(collectorEndpoint),
+		otlptracegrpc.WithEndpointURL(collectorEndpoint),
 		otlptracegrpc.WithTimeout(5*time.Minute),
 	)
 	if err != nil {

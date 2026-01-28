@@ -9,6 +9,7 @@ import (
 	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/plan/responsebuilder"
 	"github.com/Servflow/servflow/pkg/logging"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.uber.org/zap"
 )
@@ -68,7 +69,7 @@ func (r *Response) execute(ctx context.Context) (*stepWrapper, error) {
 }
 
 func (r *Response) WriteResponse(ctx context.Context) (*http.SfResponse, error) {
-	ctx, span := tracing.SpanCtxFromContext(ctx, "response.write."+r.id)
+	ctx, span := tracing.SpanCtxFromContext(ctx, "response."+r.id)
 	defer span.End()
 
 	logger := logging.FromContext(ctx).With(zap.String("response_id", r.id))
@@ -80,6 +81,8 @@ func (r *Response) WriteResponse(ctx context.Context) (*http.SfResponse, error) 
 		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
+
+	span.SetAttributes(attribute.String("result", string(resp.Body)))
 
 	return resp, nil
 }

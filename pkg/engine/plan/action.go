@@ -11,10 +11,10 @@ import (
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	"go.uber.org/zap"
-
 	"go.opentelemetry.io/otel/trace"
+	"go.uber.org/zap"
 )
 
 // TODO deprecate out
@@ -43,7 +43,7 @@ func (a *Action) ID() string {
 
 func (a *Action) execute(ctx context.Context) (*stepWrapper, error) {
 	var span trace.Span
-	ctx, span = tracing.SpanCtxFromContext(ctx, "actions.StartAction."+a.id)
+	ctx, span = tracing.SpanCtxFromContext(ctx, "action."+a.id)
 	defer span.End()
 
 	logger := logging.FromContext(ctx).With(zap.String("action_id", a.id))
@@ -77,6 +77,8 @@ func (a *Action) execute(ctx context.Context) (*stepWrapper, error) {
 		logger.Debug("template evaluated successfully")
 	}
 
+	span.SetAttributes(attribute.String("config", cfg))
+
 	resp, err := a.exec.Execute(ctx, cfg)
 	if err != nil {
 		span.RecordError(err)
@@ -93,6 +95,7 @@ func (a *Action) execute(ctx context.Context) (*stepWrapper, error) {
 		return nil, fmt.Errorf("error executing action: %w", err)
 	}
 
+	span.SetAttributes(attribute.String("result", fmt.Sprintf("%v", resp)))
 	logger.Debug("action executed successfully", zap.Any("resp", resp))
 
 	// Check if response is an io.Reader and store as action file

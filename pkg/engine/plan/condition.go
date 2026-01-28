@@ -54,11 +54,14 @@ func (c *ConditionStep) ID() string {
 func (c *ConditionStep) execute(ctx context.Context) (*stepWrapper, error) {
 	// set up tracer
 	var span trace.Span
-	ctx, span = tracing.SpanCtxFromContext(ctx, "condition.execute."+c.id)
+	ctx, span = tracing.SpanCtxFromContext(ctx, "conditional."+c.id)
 	defer span.End()
+
+	span.SetAttributes(attribute.String("config", c.exprString))
 
 	logger := logging.FromContext(ctx)
 	if c.exprString == "" {
+		span.SetAttributes(attribute.Bool("result", true))
 		return c.OnValid, nil
 	}
 
@@ -90,10 +93,10 @@ func (c *ConditionStep) execute(ctx context.Context) (*stepWrapper, error) {
 
 	logger.Debug("condition evaluated to "+resp, zap.String("condition", c.exprString))
 	if strings.TrimSpace(resp) == "true" {
-		span.SetAttributes(attribute.Bool("condition.isValid", true))
+		span.SetAttributes(attribute.Bool("result", true))
 		return c.OnValid, nil
 	}
-	span.SetAttributes(attribute.Bool("condition.isValid", false))
+	span.SetAttributes(attribute.Bool("result", false))
 	return c.OnInvalid, nil
 }
 

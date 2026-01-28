@@ -19,6 +19,7 @@ import (
 	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -104,8 +105,21 @@ func (h *APIHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	logger.Debug("Handling request")
 	if tracing.OTELEnabled() {
 		var span trace.Span
-		ctx, span = tracing.SpanCtxFromContext(req.Context(), h.apiPath+" Handler")
+		ctx, span = tracing.SpanCtxFromContext(req.Context(), "request")
 		defer span.End()
+
+		span.SetAttributes(
+			attribute.String("method", req.Method),
+			attribute.String("path", req.URL.Path),
+		)
+
+		if req.Body != nil {
+			bodyBytes, err := io.ReadAll(req.Body)
+			if err == nil {
+				span.SetAttributes(attribute.String("body", string(bodyBytes)))
+				req.Body = io.NopCloser(strings.NewReader(string(bodyBytes)))
+			}
+		}
 	}
 
 	rectx, ok := requestctx.FromContext(ctx)

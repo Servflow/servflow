@@ -19,6 +19,7 @@ import (
 	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -100,31 +101,58 @@ func (h *APIHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	start := time.Now()
 	ctx := req.Context()
 
+	var span trace.Span
+	if tracing.OTELEnabled() {
+		ctx, span = tracing.SpanCtxFromContext(req.Context(), "request")
+		defer span.End()
+
+		span.SetAttributes(
+			attribute.String("http.method", req.Method),
+			attribute.String("http.path", req.URL.Path),
+		)
+
+		if req.Body != nil {
+			bodyBytes, err := io.ReadAll(req.Body)
+			if err == nil {
+				span.SetAttributes(attribute.String("body", string(bodyBytes)))
+				req.Body = io.NopCloser(strings.NewReader(string(bodyBytes)))
+			}
+		}
+	}
+
 	logger := logging.FromContext(ctx)
 	logger.Debug("Handling request")
-	if tracing.OTELEnabled() {
-		var span trace.Span
-		ctx, span = tracing.SpanCtxFromContext(req.Context(), h.apiPath+" Handler")
-		defer span.End()
-	}
 
 	rectx, ok := requestctx.FromContext(ctx)
 	if !ok {
 		logger.Error("Could not get request context")
+		if span != nil {
+			span.SetAttributes(attribute.Int("http.status_code", http.StatusInternalServerError))
+		}
 		http.Error(wr, "Error processing request", http.StatusInternalServerError)
 		return
+	}
+
+	if span != nil {
+		span.SetAttributes(attribute.String("request_id", rectx.ID()))
 	}
 	rectx.AddRequestTemplateFunctions(requestTemplateFunctions(req))
 
 	err := rectx.LoadRequestFiles(req)
 	if err != nil {
 		logger.Error("Error storing HTTP request", zap.Error(err))
+		if span != nil {
+			span.SetAttributes(attribute.Int("http.status_code", http.StatusInternalServerError))
+		}
 		http.Error(wr, "Error processing request", http.StatusInternalServerError)
 		return
 	}
 
 	resp, err := h.p.Execute(ctx, h.planStart, "")
 	if err != nil || resp == nil {
+		if span != nil {
+			span.SetAttributes(attribute.Int("http.status_code", http.StatusInternalServerError))
+		}
 		if err != nil {
 			h.logAndWriteInternalServerError(wr, err, logger)
 		} else {
@@ -133,6 +161,9 @@ func (h *APIHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	if span != nil {
+		span.SetAttributes(attribute.Int("http.status_code", resp.Code))
+	}
 	for key := range resp.Headers {
 		wr.Header().Set(key, resp.Headers.Get(key))
 	}

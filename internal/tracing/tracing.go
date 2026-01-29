@@ -13,6 +13,8 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 	"go.opentelemetry.io/otel/trace"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 var tracer = otel.Tracer("servflow")
@@ -35,9 +37,17 @@ func OTELEnabled() bool {
 }
 
 func InitTracer(ctx context.Context, serviceName, orgID, collectorEndpoint string) (func(context.Context) error, error) {
+	// Create and warm the gRPC connection
+	conn, err := grpc.NewClient(collectorEndpoint,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create gRPC connection: %w", err)
+	}
+	conn.Connect()
+
 	exporter, err := otlptracegrpc.New(ctx,
-		otlptracegrpc.WithInsecure(),
-		otlptracegrpc.WithEndpointURL(collectorEndpoint),
+		otlptracegrpc.WithGRPCConn(conn),
 		otlptracegrpc.WithTimeout(5*time.Minute),
 	)
 	if err != nil {

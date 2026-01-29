@@ -101,16 +101,14 @@ func (h *APIHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	start := time.Now()
 	ctx := req.Context()
 
-	logger := logging.FromContext(ctx)
-	logger.Debug("Handling request")
+	var span trace.Span
 	if tracing.OTELEnabled() {
-		var span trace.Span
 		ctx, span = tracing.SpanCtxFromContext(req.Context(), "request")
 		defer span.End()
 
 		span.SetAttributes(
-			attribute.String("method", req.Method),
-			attribute.String("path", req.URL.Path),
+			attribute.String("http.method", req.Method),
+			attribute.String("http.path", req.URL.Path),
 		)
 
 		if req.Body != nil {
@@ -122,23 +120,39 @@ func (h *APIHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 		}
 	}
 
+	logger := logging.FromContext(ctx)
+	logger.Debug("Handling request")
+
 	rectx, ok := requestctx.FromContext(ctx)
 	if !ok {
 		logger.Error("Could not get request context")
+		if span != nil {
+			span.SetAttributes(attribute.Int("http.status_code", http.StatusInternalServerError))
+		}
 		http.Error(wr, "Error processing request", http.StatusInternalServerError)
 		return
+	}
+
+	if span != nil {
+		span.SetAttributes(attribute.String("request_id", rectx.ID()))
 	}
 	rectx.AddRequestTemplateFunctions(requestTemplateFunctions(req))
 
 	err := rectx.LoadRequestFiles(req)
 	if err != nil {
 		logger.Error("Error storing HTTP request", zap.Error(err))
+		if span != nil {
+			span.SetAttributes(attribute.Int("http.status_code", http.StatusInternalServerError))
+		}
 		http.Error(wr, "Error processing request", http.StatusInternalServerError)
 		return
 	}
 
 	resp, err := h.p.Execute(ctx, h.planStart, "")
 	if err != nil || resp == nil {
+		if span != nil {
+			span.SetAttributes(attribute.Int("http.status_code", http.StatusInternalServerError))
+		}
 		if err != nil {
 			h.logAndWriteInternalServerError(wr, err, logger)
 		} else {
@@ -147,6 +161,9 @@ func (h *APIHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	if span != nil {
+		span.SetAttributes(attribute.Int("http.status_code", resp.Code))
+	}
 	for key := range resp.Headers {
 		wr.Header().Set(key, resp.Headers.Get(key))
 	}

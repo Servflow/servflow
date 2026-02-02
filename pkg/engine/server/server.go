@@ -93,6 +93,14 @@ func (e *Engine) wrapMiddlewareWithReqIDLogger(logger *zap.Logger, handler http.
 		ctx := requestctx.WithAggregationContext(r.Context(), aggCtx)
 		logger := logger.With(zap.String("request_id", requestID), zap.String("method", r.Method), zap.String("path", r.URL.Path))
 		ctx = logging.WithLogger(ctx, logger)
-		handler.ServeHTTP(w, r.WithContext(ctx))
+		r = r.WithContext(ctx)
+
+		if e.requestHook != nil {
+			if !e.requestHook(w, r) {
+				return
+			}
+		}
+
+		handler.ServeHTTP(w, r)
 	})
 }

@@ -50,6 +50,11 @@ type CorsConfig struct {
 	AllowedMethods []string `yaml:"allowedMethods"`
 }
 
+// RequestHook is a function that runs before each request.
+// It receives the response writer and request, returning true to continue
+// processing or false to halt (the hook is responsible for writing the response).
+type RequestHook func(http.ResponseWriter, *http.Request) bool
+
 type Option func(*Engine)
 
 func WithLogger(core zapcore.Core) Option {
@@ -107,6 +112,12 @@ func WithSecretStorage(storage secrets.SecretStorage) Option {
 	}
 }
 
+func WithRequestHook(hook RequestHook) Option {
+	return func(e *Engine) {
+		e.requestHook = hook
+	}
+}
+
 type DirectConfigs struct {
 	APIConfigs   []*apiconfig.APIConfig
 	EngineConfig *EngineConfig
@@ -126,6 +137,7 @@ type Engine struct {
 	timerMutex     sync.Mutex
 	tracingConfig  *TracingConfig
 	tracerShutdown func(context.Context) error
+	requestHook    RequestHook
 }
 
 func New(port, env string, opts ...Option) (*Engine, error) {

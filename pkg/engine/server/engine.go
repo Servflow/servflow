@@ -110,7 +110,18 @@ type TracingConfig struct {
 
 func WithOTELTracing(cfg TracingConfig) Option {
 	return func(e *Engine) {
-		e.tracingConfig = &cfg
+		shutdown, err := tracing.InitTracer(
+			e.ctx,
+			cfg.ServiceName,
+			cfg.OrgID,
+			cfg.CollectorEndpoint,
+		)
+		if err != nil {
+			logging.ErrorContext(e.ctx, "failed to initialize tracer", err)
+		} else {
+			e.tracerShutdown = shutdown
+			logging.InfoContext(e.ctx, "OTEL tracing initialized")
+		}
 	}
 }
 
@@ -131,8 +142,6 @@ type DirectConfigs struct {
 	EngineConfig *EngineConfig
 }
 
-// TODO: remove tracing config from engine for memory
-
 type Engine struct {
 	server         *http.Server
 	port           string
@@ -145,7 +154,6 @@ type Engine struct {
 	idleTimeout    time.Duration
 	idleTimer      *time.Timer
 	timerMutex     sync.Mutex
-	tracingConfig  *TracingConfig
 	tracerShutdown func(context.Context) error
 	requestHook    RequestHook
 	externalMode   bool
@@ -190,21 +198,6 @@ func (e *Engine) DoneChan() <-chan struct{} {
 
 func (e *Engine) Start() error {
 	e.ctx = logging.WithLogger(e.ctx, e.logger)
-
-	if e.tracingConfig != nil {
-		shutdown, err := tracing.InitTracer(
-			e.ctx,
-			e.tracingConfig.ServiceName,
-			e.tracingConfig.OrgID,
-			e.tracingConfig.CollectorEndpoint,
-		)
-		if err != nil {
-			logging.ErrorContext(e.ctx, "failed to initialize tracer", err)
-		} else {
-			e.tracerShutdown = shutdown
-			logging.InfoContext(e.ctx, "OTEL tracing initialized")
-		}
-	}
 
 	var integrationConfigs []apiconfig.IntegrationConfig
 	if e.directConfigs.EngineConfig != nil {

@@ -1,6 +1,8 @@
 package server
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -260,6 +262,173 @@ func TestEngine_ReloadConfigs_EmptyAPIConfigs(t *testing.T) {
 	err = engine.ReloadConfigs(emptyConfigs)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "at least one API config is required")
+}
+
+func TestWithExternalMode(t *testing.T) {
+	tests := []struct {
+		name         string
+		externalMode bool
+		want         bool
+	}{
+		{
+			name:         "external mode set to true",
+			externalMode: true,
+			want:         true,
+		},
+		{
+			name:         "external mode set to false",
+			externalMode: false,
+			want:         false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			engine, err := New("8080", "test", WithExternalMode(tt.externalMode))
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, engine.externalMode)
+		})
+	}
+}
+
+func TestWithExternalMode_DefaultIsFalse(t *testing.T) {
+	engine, err := New("8080", "test")
+	require.NoError(t, err)
+	assert.False(t, engine.externalMode)
+}
+
+func TestEngine_Start_ExternalMode(t *testing.T) {
+	tests := []struct {
+		name          string
+		externalMode  bool
+		expectServer  bool
+		expectHandler bool
+	}{
+		{
+			name:          "external mode true - no server created",
+			externalMode:  true,
+			expectServer:  false,
+			expectHandler: true,
+		},
+		{
+			name:          "external mode false - server created",
+			externalMode:  false,
+			expectServer:  true,
+			expectHandler: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			directConfigs := &DirectConfigs{
+				APIConfigs: []*apiconfig.APIConfig{
+					{
+						ID: "test-api",
+						HttpConfig: apiconfig.HttpConfig{
+							ListenPath: "/test",
+							Method:     "GET",
+						},
+					},
+				},
+				EngineConfig: &EngineConfig{},
+			}
+
+			engine, err := New("0", "test", WithDirectConfigs(directConfigs), WithExternalMode(tt.externalMode))
+			require.NoError(t, err)
+
+			err = engine.Start()
+			require.NoError(t, err)
+			defer engine.Stop()
+
+			if tt.expectServer {
+				assert.NotNil(t, engine.server)
+			} else {
+				assert.Nil(t, engine.server)
+			}
+
+			if tt.expectHandler {
+				assert.NotNil(t, engine.handler)
+				assert.NotNil(t, engine.Handler())
+			}
+		})
+	}
+}
+
+func TestEngine_Handler_AccessibleInExternalMode(t *testing.T) {
+	directConfigs := &DirectConfigs{
+		APIConfigs: []*apiconfig.APIConfig{
+			{
+				ID: "health-api",
+				HttpConfig: apiconfig.HttpConfig{
+					ListenPath: "/health",
+					Method:     "GET",
+				},
+			},
+		},
+		EngineConfig: &EngineConfig{},
+	}
+
+	engine, err := New("8080", "test", WithDirectConfigs(directConfigs), WithExternalMode(true))
+	require.NoError(t, err)
+
+	err = engine.Start()
+	require.NoError(t, err)
+	defer engine.Stop()
+
+	handler := engine.Handler()
+	require.NotNil(t, handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	w := httptest.NewRecorder()
+
+	handler.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "ok", w.Body.String())
+}
+
+func TestEngine_ReloadConfigs_ExternalMode(t *testing.T) {
+	initialConfigs := &DirectConfigs{
+		APIConfigs: []*apiconfig.APIConfig{
+			{
+				ID: "initial-api",
+				HttpConfig: apiconfig.HttpConfig{
+					ListenPath: "/initial",
+					Method:     "GET",
+				},
+			},
+		},
+		EngineConfig: &EngineConfig{},
+	}
+
+	engine, err := New("8080", "test", WithDirectConfigs(initialConfigs), WithExternalMode(true))
+	require.NoError(t, err)
+
+	err = engine.Start()
+	require.NoError(t, err)
+	defer engine.Stop()
+
+	assert.Nil(t, engine.server)
+
+	newConfigs := &DirectConfigs{
+		APIConfigs: []*apiconfig.APIConfig{
+			{
+				ID: "reloaded-api",
+				HttpConfig: apiconfig.HttpConfig{
+					ListenPath: "/reloaded",
+					Method:     "POST",
+				},
+			},
+		},
+		EngineConfig: &EngineConfig{},
+	}
+
+	err = engine.ReloadConfigs(newConfigs)
+	require.NoError(t, err)
+
+	assert.Equal(t, newConfigs, engine.directConfigs)
+	assert.Nil(t, engine.server)
+	assert.NotNil(t, engine.Handler())
 }
 
 func TestEngine_GetCorsConfig(t *testing.T) {

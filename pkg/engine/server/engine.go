@@ -69,6 +69,14 @@ func WithDirectConfigs(directConfigs *DirectConfigs) Option {
 	}
 }
 
+// WithExternalMode prevents the engine from creating a server if set to true.
+// The engines handler can be accessed via .Handler()
+func WithExternalMode(externalMode bool) Option {
+	return func(e *Engine) {
+		e.externalMode = externalMode
+	}
+}
+
 func WithFileConfig(configFolder, engineConfigFile string) Option {
 	return func(e *Engine) {
 		apiConfigs, err := LoadAPIConfigsFromYAML(configFolder, false, e.logger)
@@ -123,6 +131,8 @@ type DirectConfigs struct {
 	EngineConfig *EngineConfig
 }
 
+// TODO: remove tracing config from engine for memory
+
 type Engine struct {
 	server         *http.Server
 	port           string
@@ -138,6 +148,8 @@ type Engine struct {
 	tracingConfig  *TracingConfig
 	tracerShutdown func(context.Context) error
 	requestHook    RequestHook
+	externalMode   bool
+	handler        http.HandlerFunc
 }
 
 func New(port, env string, opts ...Option) (*Engine, error) {
@@ -166,6 +178,10 @@ func New(port, env string, opts ...Option) (*Engine, error) {
 	}
 
 	return e, nil
+}
+
+func (e *Engine) Handler() http.HandlerFunc {
+	return e.handler
 }
 
 func (e *Engine) DoneChan() <-chan struct{} {
@@ -200,17 +216,23 @@ func (e *Engine) Start() error {
 		return err
 	}
 
-	srv, err := e.createServer(e.directConfigs.APIConfigs, e.port)
-	if err != nil {
-		return fmt.Errorf("error creating server: %w", err)
+	e.handler = e.createHandler()
+
+	if !e.externalMode {
+		logging.DebugContext(e.ctx, "Starting HTTP server...")
+		srv, err := e.createServer(e.port)
+		if err != nil {
+			return fmt.Errorf("error creating server: %w", err)
+		}
+		e.server = srv
+
+		e.initIdleTimer()
+
+		logging.InfoContext(e.ctx, "starting engine...")
+		e.startServer()
+		logging.InfoContext(e.ctx, "engine started")
 	}
-	e.server = srv
 
-	e.initIdleTimer()
-
-	logging.InfoContext(e.ctx, "starting engine...")
-	e.startServer()
-	logging.InfoContext(e.ctx, "engine started")
 	return nil
 }
 
@@ -251,10 +273,13 @@ func (e *Engine) ReloadConfigs(newDirectConfigs *DirectConfigs) error {
 
 	logging.DebugContext(e.ctx, "Reloading API configurations...")
 
-	newHandler := e.createCustomMuxHandler(newDirectConfigs.APIConfigs)
+	newHandler := e.createMuxHandler(newDirectConfigs.APIConfigs)
 
-	e.server.Handler = newHandler
+	e.handler = newHandler.ServeHTTP
 	e.directConfigs = newDirectConfigs
+	if !e.externalMode && e.server != nil {
+		e.server.Handler = newHandler
+	}
 
 	logging.InfoContext(e.ctx, "API configurations reloaded successfully")
 	return nil
@@ -284,7 +309,12 @@ func (e *Engine) Stop() error {
 	if err := cl.Close(); err != nil {
 		return err
 	}
-	return e.server.Shutdown(e.ctx)
+	if e.server != nil {
+		if err := e.server.Shutdown(e.ctx); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (e *Engine) initIdleTimer() {

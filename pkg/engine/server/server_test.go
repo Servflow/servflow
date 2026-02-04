@@ -71,7 +71,7 @@ func (r *TestRunner) Init() *TestRunner {
 	eng := Engine{
 		logger: devLogger,
 	}
-	r.handler = eng.createCustomMuxHandler([]*apiconfig.APIConfig{r.apiConfig})
+	r.handler = eng.createMuxHandler([]*apiconfig.APIConfig{r.apiConfig})
 	return r
 }
 

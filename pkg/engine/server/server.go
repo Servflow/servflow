@@ -19,24 +19,28 @@ import (
 // TODO move stuff and test engine easily
 // TODO only expose profile if debug
 
-func (e *Engine) createServer(apiConfigs []*apiconfig.APIConfig, port string) (*http.Server, error) {
+func (e *Engine) createServer(port string) (*http.Server, error) {
 	logger := logging.FromContext(e.ctx)
 
-	if len(apiConfigs) == 0 {
-		logger.Info("starting engine with no API configurations", zap.String("port", port))
-	} else {
-		logger.Info("starting engine on " + port)
-	}
+	logger.Info("starting engine on " + port)
 	httpServer := &http.Server{
 		Addr:    ":" + port,
-		Handler: e.createCustomMuxHandler(apiConfigs),
+		Handler: e.handler,
 	}
 
 	return httpServer, nil
 }
 
-func (e *Engine) createCustomMuxHandler(configs []*apiconfig.APIConfig) http.Handler {
+func (e *Engine) createHandler() http.HandlerFunc {
+	handler := e.createMuxHandler(e.directConfigs.APIConfigs)
+	return handler.ServeHTTP
+}
+
+func (e *Engine) createMuxHandler(configs []*apiconfig.APIConfig) http.Handler {
 	logger := logging.FromContext(e.ctx)
+	if len(configs) == 0 {
+		logger.Info("no api configurations")
+	}
 	r := mux.NewRouter()
 
 	// Add pprof routes

@@ -57,11 +57,32 @@ func (s *SQL) Type() string {
 }
 
 func init() {
-	if err := integration.RegisterFactory("sql", func(m map[string]any) (integration.Integration, error) {
-		return newWrapper(Config{
-			Type:             m["type"].(string),
-			ConnectionString: m["connectionString"].(string),
-		})
+	fields := map[string]integration.FieldInfo{
+		"type": {
+			Type:        integration.FieldTypeSelect,
+			Label:       "Database Type",
+			Placeholder: "Select database type",
+			Required:    true,
+			Values:      supportedDrivers,
+		},
+		"connectionString": {
+			Type:        integration.FieldTypePassword,
+			Label:       "Connection String",
+			Placeholder: "postgres://user:pass@localhost:5432/dbname",
+			Required:    true,
+		},
+	}
+
+	if err := integration.RegisterIntegration("sql", integration.IntegrationRegistrationInfo{
+		Name:        "SQL Database",
+		Description: "SQL database integration supporting PostgreSQL and MySQL",
+		Fields:      fields,
+		Constructor: func(m map[string]any) (integration.Integration, error) {
+			return newWrapper(Config{
+				Type:             m["type"].(string),
+				ConnectionString: m["connectionString"].(string),
+			})
+		},
 	}); err != nil {
 		panic(err)
 	}

@@ -98,16 +98,37 @@ func (c *Client) ProvideResponse(ctx context.Context, agentReq agent.LLMRequest)
 }
 
 func init() {
-	if err := integration.RegisterFactory("openai", func(m map[string]any) (integration.Integration, error) {
-		apikey, ok := m["api_key"].(string)
-		if !ok {
-			return nil, errors.New("api_key required in config")
-		}
-		model, ok := m["model"].(string)
-		if !ok {
-			model = defaultModel
-		}
-		return New(apikey, model)
+	fields := map[string]integration.FieldInfo{
+		"api_key": {
+			Type:        integration.FieldTypePassword,
+			Label:       "API Key",
+			Placeholder: "sk-...",
+			Required:    true,
+		},
+		"model": {
+			Type:        integration.FieldTypeString,
+			Label:       "Model",
+			Placeholder: "gpt-4.1",
+			Required:    false,
+			Default:     defaultModel,
+		},
+	}
+
+	if err := integration.RegisterIntegration("openai", integration.IntegrationRegistrationInfo{
+		Name:        "OpenAI",
+		Description: "OpenAI LLM provider for AI agent capabilities",
+		Fields:      fields,
+		Constructor: func(m map[string]any) (integration.Integration, error) {
+			apikey, ok := m["api_key"].(string)
+			if !ok {
+				return nil, errors.New("api_key required in config")
+			}
+			model, ok := m["model"].(string)
+			if !ok {
+				model = defaultModel
+			}
+			return New(apikey, model)
+		},
 	}); err != nil {
 		panic(err)
 	}

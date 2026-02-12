@@ -15,13 +15,39 @@ import (
 	"go.uber.org/zap"
 )
 
+type FieldType string
+
+const (
+	FieldTypeString   FieldType = "string"
+	FieldTypeBoolean  FieldType = "boolean"
+	FieldTypeNumber   FieldType = "number"
+	FieldTypePassword FieldType = "password"
+	FieldTypeSelect   FieldType = "select"
+)
+
+type FieldInfo struct {
+	Type        FieldType `json:"type"`
+	Label       string    `json:"label"`
+	Placeholder string    `json:"placeholder"`
+	Required    bool      `json:"required"`
+	Default     any       `json:"default,omitempty"`
+	Values      []string  `json:"values,omitempty"`
+}
+
+type IntegrationRegistrationInfo struct {
+	Name        string               `json:"name"`
+	Description string               `json:"description"`
+	Fields      map[string]FieldInfo `json:"fields"`
+	Constructor factoryFunc          `json:"-"`
+}
+
 type Manager struct {
 	integrations          sync.Map
-	availableConstructors map[string]factoryFunc
+	availableConstructors map[string]IntegrationRegistrationInfo
 }
 
 var integrationManager = &Manager{
-	availableConstructors: make(map[string]factoryFunc),
+	availableConstructors: make(map[string]IntegrationRegistrationInfo),
 	integrations:          sync.Map{},
 }
 
@@ -31,26 +57,50 @@ type Integration interface {
 
 type factoryFunc func(map[string]any) (Integration, error)
 
-func RegisterFactory(integrationType string, constructor factoryFunc) error {
+func RegisterIntegration(integrationType string, info IntegrationRegistrationInfo) error {
 	_, ok := integrationManager.availableConstructors[integrationType]
 	if ok {
 		return fmt.Errorf("integration type %s already registered", integrationType)
 	}
-	integrationManager.availableConstructors[integrationType] = constructor
+	integrationManager.availableConstructors[integrationType] = info
 	return nil
 }
 
 func ReplaceIntegrationType(integrationType string, constructor factoryFunc) {
-	integrationManager.availableConstructors[integrationType] = constructor
+	existing, ok := integrationManager.availableConstructors[integrationType]
+	if !ok {
+		integrationManager.availableConstructors[integrationType] = IntegrationRegistrationInfo{
+			Constructor: constructor,
+		}
+		return
+	}
+	existing.Constructor = constructor
+	integrationManager.availableConstructors[integrationType] = existing
+}
+
+func GetRegisteredIntegrationTypes() []string {
+	types := make([]string, 0, len(integrationManager.availableConstructors))
+	for integrationType := range integrationManager.availableConstructors {
+		types = append(types, integrationType)
+	}
+	return types
+}
+
+func GetInfoForIntegration(integrationType string) (IntegrationRegistrationInfo, error) {
+	info, ok := integrationManager.availableConstructors[integrationType]
+	if !ok {
+		return IntegrationRegistrationInfo{}, fmt.Errorf("integration type %s not registered", integrationType)
+	}
+	return info, nil
 }
 
 func InitializeIntegration(integrationType, id string, config map[string]any) error {
-	constructor, ok := integrationManager.availableConstructors[integrationType]
+	info, ok := integrationManager.availableConstructors[integrationType]
 	if !ok {
 		return fmt.Errorf("integration type %s not registered", integrationType)
 	}
 
-	integration, err := constructor(config)
+	integration, err := info.Constructor(config)
 	if err != nil {
 		return err
 	}
@@ -66,8 +116,6 @@ func GetIntegration(id string) (Integration, error) {
 	}
 	return integration.(Integration), nil
 }
-
-// TODO depreciate config completely and use map[string]interface
 
 func RegisterIntegrationsFromConfig(integrationsConfig []apiconfig.IntegrationConfig) error {
 	wg := &sync.WaitGroup{}

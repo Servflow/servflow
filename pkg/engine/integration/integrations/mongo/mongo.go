@@ -86,11 +86,31 @@ var (
 )
 
 func init() {
-	if err := integration.RegisterFactory("mongo", func(m map[string]any) (integration.Integration, error) {
-		return newWrapper(Config{
-			ConnectionString: m["connectionString"].(string),
-			DBName:           m["dbName"].(string),
-		})
+	fields := map[string]integration.FieldInfo{
+		"connectionString": {
+			Type:        integration.FieldTypePassword,
+			Label:       "Connection String",
+			Placeholder: "mongodb://localhost:27017",
+			Required:    true,
+		},
+		"dbName": {
+			Type:        integration.FieldTypeString,
+			Label:       "Database Name",
+			Placeholder: "mydb",
+			Required:    true,
+		},
+	}
+
+	if err := integration.RegisterIntegration("mongo", integration.IntegrationRegistrationInfo{
+		Name:        "MongoDB",
+		Description: "MongoDB database integration for document storage and retrieval",
+		Fields:      fields,
+		Constructor: func(m map[string]any) (integration.Integration, error) {
+			return newWrapper(Config{
+				ConnectionString: m["connectionString"].(string),
+				DBName:           m["dbName"].(string),
+			})
+		},
 	}); err != nil {
 		panic(err)
 	}

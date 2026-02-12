@@ -42,12 +42,26 @@ func parseHostPort(url string) (string, int) {
 }
 
 func init() {
-	if err := integration.RegisterFactory("qdrant", func(m map[string]any) (integration.Integration, error) {
-		host, port := parseHostPort(m["url"].(string))
-		return New(&Config{
-			Host: host,
-			Port: port,
-		})
+	fields := map[string]integration.FieldInfo{
+		"url": {
+			Type:        integration.FieldTypeString,
+			Label:       "URL",
+			Placeholder: "localhost:6334",
+			Required:    true,
+		},
+	}
+
+	if err := integration.RegisterIntegration("qdrant", integration.IntegrationRegistrationInfo{
+		Name:        "Qdrant",
+		Description: "Qdrant vector database for similarity search and vector storage",
+		Fields:      fields,
+		Constructor: func(m map[string]any) (integration.Integration, error) {
+			host, port := parseHostPort(m["url"].(string))
+			return New(&Config{
+				Host: host,
+				Port: port,
+			})
+		},
 	}); err != nil {
 		panic(err)
 	}

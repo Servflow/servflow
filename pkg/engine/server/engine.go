@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Servflow/servflow/internal/tracing"
 	"github.com/Servflow/servflow/pkg/apiconfig"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/agent"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/authenticate"
@@ -35,6 +34,7 @@ import (
 	"github.com/Servflow/servflow/pkg/engine/secrets"
 	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/Servflow/servflow/pkg/storage"
+	"github.com/Servflow/servflow/pkg/tracing"
 	"github.com/mark3labs/mcp-go/server"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"

@@ -11,11 +11,11 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/Servflow/servflow/internal/tracing"
 	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
+	"github.com/Servflow/servflow/pkg/tracing"
 	"github.com/gorilla/mux"
 	"github.com/tidwall/gjson"
 	"go.uber.org/zap"

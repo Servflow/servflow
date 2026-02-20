@@ -34,20 +34,21 @@ type FieldInfo struct {
 	Values      []string  `json:"values,omitempty"`
 }
 
-type IntegrationRegistrationInfo struct {
+type RegistrationInfo struct {
 	Name        string               `json:"name"`
 	Description string               `json:"description"`
 	Fields      map[string]FieldInfo `json:"fields"`
 	Constructor factoryFunc          `json:"-"`
+	ImageURL    string               `json:"image_url"`
 }
 
 type Manager struct {
 	integrations          sync.Map
-	availableConstructors map[string]IntegrationRegistrationInfo
+	availableConstructors map[string]RegistrationInfo
 }
 
 var integrationManager = &Manager{
-	availableConstructors: make(map[string]IntegrationRegistrationInfo),
+	availableConstructors: make(map[string]RegistrationInfo),
 	integrations:          sync.Map{},
 }
 
@@ -57,7 +58,7 @@ type Integration interface {
 
 type factoryFunc func(map[string]any) (Integration, error)
 
-func RegisterIntegration(integrationType string, info IntegrationRegistrationInfo) error {
+func RegisterIntegration(integrationType string, info RegistrationInfo) error {
 	_, ok := integrationManager.availableConstructors[integrationType]
 	if ok {
 		return fmt.Errorf("integration type %s already registered", integrationType)
@@ -69,7 +70,7 @@ func RegisterIntegration(integrationType string, info IntegrationRegistrationInf
 func ReplaceIntegrationType(integrationType string, constructor factoryFunc) {
 	existing, ok := integrationManager.availableConstructors[integrationType]
 	if !ok {
-		integrationManager.availableConstructors[integrationType] = IntegrationRegistrationInfo{
+		integrationManager.availableConstructors[integrationType] = RegistrationInfo{
 			Constructor: constructor,
 		}
 		return
@@ -86,10 +87,10 @@ func GetRegisteredIntegrationTypes() []string {
 	return types
 }
 
-func GetInfoForIntegration(integrationType string) (IntegrationRegistrationInfo, error) {
+func GetInfoForIntegration(integrationType string) (RegistrationInfo, error) {
 	info, ok := integrationManager.availableConstructors[integrationType]
 	if !ok {
-		return IntegrationRegistrationInfo{}, fmt.Errorf("integration type %s not registered", integrationType)
+		return RegistrationInfo{}, fmt.Errorf("integration type %s not registered", integrationType)
 	}
 	return info, nil
 }

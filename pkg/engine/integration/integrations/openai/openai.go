@@ -114,9 +114,10 @@ func init() {
 		},
 	}
 
-	if err := integration.RegisterIntegration("openai", integration.IntegrationRegistrationInfo{
+	if err := integration.RegisterIntegration("openai", integration.RegistrationInfo{
 		Name:        "OpenAI",
 		Description: "OpenAI LLM provider for AI agent capabilities",
+		ImageURL:    "https://d2ojax9k5fldtt.cloudfront.net/openai.png",
 		Fields:      fields,
 		Constructor: func(m map[string]any) (integration.Integration, error) {
 			apikey, ok := m["api_key"].(string)

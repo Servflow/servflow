@@ -73,9 +73,10 @@ func init() {
 		},
 	}
 
-	if err := integration.RegisterIntegration("sql", integration.IntegrationRegistrationInfo{
+	if err := integration.RegisterIntegration("sql", integration.RegistrationInfo{
 		Name:        "SQL Database",
 		Description: "SQL database integration supporting PostgreSQL and MySQL",
+		ImageURL:    "https://d2ojax9k5fldtt.cloudfront.net/sql_logo.svg",
 		Fields:      fields,
 		Constructor: func(m map[string]any) (integration.Integration, error) {
 			return newWrapper(Config{

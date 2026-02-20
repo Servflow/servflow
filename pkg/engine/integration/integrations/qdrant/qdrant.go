@@ -51,9 +51,10 @@ func init() {
 		},
 	}
 
-	if err := integration.RegisterIntegration("qdrant", integration.IntegrationRegistrationInfo{
+	if err := integration.RegisterIntegration("qdrant", integration.RegistrationInfo{
 		Name:        "Qdrant",
 		Description: "Qdrant vector database for similarity search and vector storage",
+		ImageURL:    "https://d2ojax9k5fldtt.cloudfront.net/qdrant.svg",
 		Fields:      fields,
 		Constructor: func(m map[string]any) (integration.Integration, error) {
 			host, port := parseHostPort(m["url"].(string))

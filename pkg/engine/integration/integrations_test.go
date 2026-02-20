@@ -8,20 +8,20 @@ import (
 
 func TestIntegrationManager(t *testing.T) {
 	integrationManager = &Manager{
-		availableConstructors: make(map[string]IntegrationRegistrationInfo),
+		availableConstructors: make(map[string]RegistrationInfo),
 	}
 	mockConstructor := func(config map[string]any) (Integration, error) {
 		return &mockIntegration{name: "MockIntegration"}, nil
 	}
 
-	err := RegisterIntegration("mock", IntegrationRegistrationInfo{
+	err := RegisterIntegration("mock", RegistrationInfo{
 		Name:        "Mock",
 		Description: "Mock integration for testing",
 		Constructor: mockConstructor,
 	})
 	require.NoError(t, err, "registering mock integration")
 
-	err = RegisterIntegration("mock", IntegrationRegistrationInfo{
+	err = RegisterIntegration("mock", RegistrationInfo{
 		Name:        "Mock",
 		Description: "Mock integration for testing",
 		Constructor: mockConstructor,

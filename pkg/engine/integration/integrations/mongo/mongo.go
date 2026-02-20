@@ -101,9 +101,10 @@ func init() {
 		},
 	}
 
-	if err := integration.RegisterIntegration("mongo", integration.IntegrationRegistrationInfo{
+	if err := integration.RegisterIntegration("mongo", integration.RegistrationInfo{
 		Name:        "MongoDB",
 		Description: "MongoDB database integration for document storage and retrieval",
+		ImageURL:    "https://d2ojax9k5fldtt.cloudfront.net/mongo.svg",
 		Fields:      fields,
 		Constructor: func(m map[string]any) (integration.Integration, error) {
 			return newWrapper(Config{

@@ -261,7 +261,7 @@ func (e *Engine) ReloadConfigs(newDirectConfigs *DirectConfigs) error {
 	}
 
 	if len(newDirectConfigs.APIConfigs) == 0 {
-		return fmt.Errorf("at least one API config is required")
+		logging.WarnContext(e.ctx, "Reloading with no API configurations - engine will run with no API endpoints")
 	}
 
 	logging.DebugContext(e.ctx, "Reloading API configurations...")

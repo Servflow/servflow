@@ -39,7 +39,7 @@ func (e *Engine) createHandler() http.HandlerFunc {
 func (e *Engine) createMuxHandler(configs []*apiconfig.APIConfig) http.Handler {
 	logger := logging.FromContext(e.ctx)
 	if len(configs) == 0 {
-		logger.Info("no api configurations")
+		logger.Warn("no API configurations - engine will run with no API endpoints")
 	}
 	r := mux.NewRouter()
 

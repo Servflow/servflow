@@ -260,8 +260,7 @@ func TestEngine_ReloadConfigs_EmptyAPIConfigs(t *testing.T) {
 	}
 
 	err = engine.ReloadConfigs(emptyConfigs)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "at least one API config is required")
+	require.NoError(t, err)
 }
 
 func TestWithExternalMode(t *testing.T) {

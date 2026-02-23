@@ -54,6 +54,57 @@ func Test_wrapWithFunction(t *testing.T) {
 	}
 }
 
+func TestNormalizeActionVariables(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "replaces variable_actions_ prefix",
+			input:    "{{ .variable_actions_greet }}",
+			expected: "{{ .greet }}",
+		},
+		{
+			name:     "replaces nested access",
+			input:    "{{ .variable_actions_greet.message }}",
+			expected: "{{ .greet.message }}",
+		},
+		{
+			name:     "replaces multiple occurrences",
+			input:    "{{ .variable_actions_action1 }} and {{ .variable_actions_action2 }}",
+			expected: "{{ .action1 }} and {{ .action2 }}",
+		},
+		{
+			name:     "leaves other variables unchanged",
+			input:    "{{ .variable_request }} and {{ .variable_actions_test }}",
+			expected: "{{ .variable_request }} and {{ .test }}",
+		},
+		{
+			name:     "no change when no prefix",
+			input:    "{{ .greet }}",
+			expected: "{{ .greet }}",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := normalizeActionVariables(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestBackwardCompatibility(t *testing.T) {
+	ctx := NewTestContext()
+	err := AddRequestVariables(ctx, map[string]interface{}{"greet": map[string]interface{}{"message": "hello"}}, "")
+	require.NoError(t, err)
+
+	result, err := ReplaceVariableValuesInContext(ctx, "{{ .variable_actions_greet.message }}")
+	require.NoError(t, err)
+	assert.Equal(t, "hello", result)
+}
+
 func TestReplaceVariableValuesInContext(t *testing.T) {
 	tests := []struct {
 		name     string

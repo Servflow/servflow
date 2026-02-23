@@ -169,7 +169,7 @@ func (p *PlannerV2) generateActionStep(id string) (*Action, error) {
 
 	}
 
-	out := fmt.Sprintf("%s%s", requestctx.VariableActionPrefix, id)
+	out := id
 
 	return &Action{
 		configStr: exec.Config(),

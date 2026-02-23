@@ -1,7 +1,6 @@
 package plan
 
 import (
-	"fmt"
 	"testing"
 
 	requestctx2 "github.com/Servflow/servflow/pkg/engine/requestctx"
@@ -13,11 +12,11 @@ func TestEndStep_Execute(t *testing.T) {
 	t.Run("write successfully", func(t *testing.T) {
 		endStep := &EndStep{
 			destinationKey: "groupid",
-			lookupKey:      fmt.Sprintf("%s%s", requestctx2.VariableActionPrefix, "testaction"),
+			lookupKey:      "testaction",
 		}
 
 		ctx := requestctx2.NewTestContext()
-		err := requestctx2.AddRequestVariables(ctx, map[string]interface{}{endStep.lookupKey: "testvalue"}, "")
+		err := requestctx2.AddRequestVariables(ctx, map[string]interface{}{"testaction": "testvalue"}, "")
 		require.NoError(t, err)
 
 		v, err := endStep.execute(ctx)

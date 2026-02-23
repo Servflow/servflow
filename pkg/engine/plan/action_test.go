@@ -51,14 +51,14 @@ func TestAction_Execute(t *testing.T) {
 				exec:      mockExec,
 				id:        "test",
 				next:      &stepWrapper{id: "next", step: &nextStep},
-				out:       fmt.Sprintf("%stest", requestctx.VariableActionPrefix),
+				out:       "test",
 			}
 
 			next, err := act.execute(ctx)
 			assert.NoError(t, err)
 			assert.Equal(t, &stepWrapper{id: "next", step: &nextStep}, next)
 
-			field, err := requestctx.ReplaceVariableValuesInContext(ctx, fmt.Sprintf("{{ .%stest }}", requestctx.VariableActionPrefix))
+			field, err := requestctx.ReplaceVariableValuesInContext(ctx, "{{ .test }}")
 			require.NoError(t, err)
 			assert.Equal(t, "response string", field)
 		})
@@ -86,14 +86,14 @@ func TestAction_Execute(t *testing.T) {
 				exec:      mockExec,
 				id:        "test",
 				next:      &stepWrapper{id: "next", step: &nextStep},
-				out:       fmt.Sprintf("%stest", requestctx.VariableActionPrefix),
+				out:       "test",
 			}
 
 			next, err := act.execute(ctx)
 			assert.NoError(t, err)
 			assert.Equal(t, &stepWrapper{id: "next", step: &nextStep}, next)
 
-			field, err := requestctx.ReplaceVariableValuesInContext(ctx, fmt.Sprintf("{{ .%stest }}", requestctx.VariableActionPrefix))
+			field, err := requestctx.ReplaceVariableValuesInContext(ctx, "{{ .test }}")
 			require.NoError(t, err)
 			assert.Equal(t, "response string", field)
 		})

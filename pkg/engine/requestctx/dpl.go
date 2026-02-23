@@ -111,10 +111,15 @@ func ReplaceVariableValues(in string, values map[string]interface{}) (string, er
 func createTemplate(in string, funcMap template.FuncMap, wrapJSON bool) (*template.Template, error) {
 	funcMap = getFuncMap(funcMap)
 	replaced := replaceEscapedQuotes(in)
+	replaced = normalizeActionVariables(replaced)
 	if wrapJSON {
 		replaced = wrapWithJSON(replaced)
 	}
 	return template.New("input").Option("missingkey=zero").Funcs(funcMap).Parse(replaced)
+}
+
+func normalizeActionVariables(in string) string {
+	return strings.ReplaceAll(in, "."+VariableActionPrefix, ".")
 }
 
 // DEPRECATED jsonout will be added in action generation

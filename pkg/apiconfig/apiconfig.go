@@ -3,12 +3,13 @@ package apiconfig
 import (
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
 	"git.servflow.io/servflow/definitions/proto"
 	"github.com/Servflow/servflow/pkg/engine/actions"
-	"github.com/santhosh-tekuri/jsonschema/v6"
+	"github.com/xeipuuv/gojsonschema"
 )
 
 //go:embed apiconfig_schema.json
@@ -155,47 +156,60 @@ func (d *IntegrationConfig) UnmarshalYAML(unmarshal func(interface{}) error) err
 }
 
 func (a *APIConfig) Validate() error {
-	if err := a.schemaValidation(); err != nil {
-		return err
-	}
-	if err := a.validateActions(); err != nil {
-		return err
+	var validationErrors ValidationErrors
+
+	a.collectSchemaErrors(&validationErrors)
+	a.collectActionErrors(&validationErrors)
+
+	if validationErrors.HasErrors() {
+		return &validationErrors
 	}
 	return nil
 }
 
-func (a *APIConfig) schemaValidation() error {
-	compiler := jsonschema.NewCompiler()
-
-	var schemaData interface{}
-	if err := json.Unmarshal(json.RawMessage(apiConfigSchema), &schemaData); err != nil {
-		return fmt.Errorf("failed to parse embedded schema: %w", err)
-	}
-
-	if err := compiler.AddResource("apiconfig.json", schemaData); err != nil {
-		return fmt.Errorf("failed to add schema resource: %w", err)
-	}
-
-	schema, err := compiler.Compile("apiconfig.json")
-	if err != nil {
-		return fmt.Errorf("failed to compile schema: %w", err)
-	}
+func (a *APIConfig) collectSchemaErrors(validationErrors *ValidationErrors) {
+	schemaLoader := gojsonschema.NewStringLoader(apiConfigSchema)
 
 	configJSON, err := json.Marshal(a)
 	if err != nil {
-		return fmt.Errorf("failed to marshal APIConfig to JSON: %w", err)
+		validationErrors.Add(fmt.Errorf("failed to marshal APIConfig to JSON: %w", err))
+		return
 	}
 
-	var configData interface{}
-	if err := json.Unmarshal(configJSON, &configData); err != nil {
-		return fmt.Errorf("failed to unmarshal APIConfig JSON: %w", err)
+	documentLoader := gojsonschema.NewBytesLoader(configJSON)
+
+	result, err := gojsonschema.Validate(schemaLoader, documentLoader)
+	if err != nil {
+		validationErrors.Add(fmt.Errorf("failed to validate schema: %w", err))
+		return
 	}
 
-	if err := schema.Validate(configData); err != nil {
-		return fmt.Errorf("APIConfig validation failed: %w", err)
+	if !result.Valid() {
+		for _, desc := range result.Errors() {
+			validationErrors.Add(&SchemaValidationError{
+				Path:    desc.Field(),
+				Message: desc.Description(),
+			})
+		}
 	}
+}
 
-	return nil
+type ActionConfigError struct {
+	ActionID string
+	Message  string
+}
+
+func (e *ActionConfigError) Error() string {
+	return fmt.Sprintf("action '%s': %s", e.ActionID, e.Message)
+}
+
+type SchemaValidationError struct {
+	Path    string
+	Message string
+}
+
+func (e *SchemaValidationError) Error() string {
+	return fmt.Sprintf("path '%s': %s", e.Path, e.Message)
 }
 
 type ValidationErrors struct {
@@ -221,38 +235,56 @@ func (ve *ValidationErrors) HasErrors() bool {
 	return len(ve.errors) > 0
 }
 
-func (a *APIConfig) validateActions() error {
-	var validationErrors ValidationErrors
-	var invalidActions []string
+func (ve *ValidationErrors) GetActionConfigErrors() []*ActionConfigError {
+	var actionErrors []*ActionConfigError
+	for _, err := range ve.errors {
+		var actionErr *ActionConfigError
+		if errors.As(err, &actionErr) {
+			actionErrors = append(actionErrors, actionErr)
+		}
+	}
+	return actionErrors
+}
 
-	for i := range a.Actions {
-		action := a.Actions[i]
+func (ve *ValidationErrors) GetSchemaValidationErrors() []*SchemaValidationError {
+	var schemaErrors []*SchemaValidationError
+	for _, err := range ve.errors {
+		var schemaErr *SchemaValidationError
+		if errors.As(err, &schemaErr) {
+			schemaErrors = append(schemaErrors, schemaErr)
+		}
+	}
+	return schemaErrors
+}
+
+func (a *APIConfig) collectActionErrors(validationErrors *ValidationErrors) {
+	for actionID, action := range a.Actions {
 		if !actions.HasRegisteredActionType(action.Type) {
-			invalidActions = append(invalidActions, action.Type)
+			validationErrors.Add(&ActionConfigError{
+				ActionID: actionID,
+				Message:  fmt.Sprintf("invalid action type: %s", action.Type),
+			})
 			continue
 		}
 
 		fields, err := actions.GetFieldsForAction(action.Type)
 		if err != nil {
-			validationErrors.Add(err)
+			validationErrors.Add(&ActionConfigError{
+				ActionID: actionID,
+				Message:  err.Error(),
+			})
 		} else {
-			if err := validateFields(fields, action.Config); err != nil {
-				validationErrors.Add(err)
+			if err := validateFields(actionID, fields, action.Config); err != nil {
+				validationErrors.Add(&ActionConfigError{
+					ActionID: actionID,
+					Message:  err.Error(),
+				})
 			}
 		}
 	}
-
-	if len(invalidActions) > 0 {
-		validationErrors.Add(fmt.Errorf("invalid actions: %s", strings.Join(invalidActions, ", ")))
-	}
-
-	if validationErrors.HasErrors() {
-		return &validationErrors
-	}
-	return nil
 }
 
-func validateFields(fieldsRequiredMap map[string]actions.FieldInfo, fieldsValues map[string]interface{}) error {
+func validateFields(actionID string, fieldsRequiredMap map[string]actions.FieldInfo, fieldsValues map[string]interface{}) error {
 	for k, v := range fieldsRequiredMap {
 		if !v.Required {
 			continue

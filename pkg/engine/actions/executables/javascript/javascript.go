@@ -104,6 +104,9 @@ func init() {
 			Label:       "Script",
 			Placeholder: "JavaScript code containing servflowRun function",
 			Required:    true,
+			Metadata: map[string]string{
+				"language": "javascript",
+			},
 		},
 		"dependencies": {
 			Type:        actions.FieldTypeTextArea,

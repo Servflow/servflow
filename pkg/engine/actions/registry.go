@@ -32,12 +32,13 @@ const (
 )
 
 type FieldInfo struct {
-	Type        FieldType `json:"type"`
-	Label       string    `json:"label"`
-	Placeholder string    `json:"placeholder"`
-	Required    bool      `json:"required"`
-	Default     any       `json:"default"`
-	Values      []string  `json:"values"`
+	Type        FieldType         `json:"type"`
+	Label       string            `json:"label"`
+	Placeholder string            `json:"placeholder"`
+	Required    bool              `json:"required"`
+	Default     any               `json:"default"`
+	Values      []string          `json:"values"`
+	Metadata    map[string]string `json:"metadata"`
 }
 
 func NewRegistry() *Registry {

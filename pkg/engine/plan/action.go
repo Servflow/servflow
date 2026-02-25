@@ -2,6 +2,7 @@ package plan
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -95,7 +96,11 @@ func (a *Action) execute(ctx context.Context) (*stepWrapper, error) {
 		return nil, fmt.Errorf("error executing action: %w", err)
 	}
 
-	span.SetAttributes(attribute.String("result", fmt.Sprintf("%v", resp)))
+	b, err := json.MarshalIndent(resp, "", "  ")
+	if err != nil {
+		logger.Error("error marshalling action response", zap.Error(err))
+	}
+	span.SetAttributes(attribute.String("result", string(b)))
 	logger.Debug("action executed successfully", zap.Any("resp", resp))
 
 	// Check if response is an io.Reader and store as action file

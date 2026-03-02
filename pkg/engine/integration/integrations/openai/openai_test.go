@@ -318,7 +318,7 @@ func TestConvertAgentRequestToRequest(t *testing.T) {
 					MessageInput{
 						Role: "assistant",
 						Content: []ContentInputWrapper{
-							{Type: InputTypeText, Text: "I'm doing great, thank you!"},
+							{Type: InputTypeOutputText, Text: "I'm doing great, thank you!"},
 						},
 					},
 				},
@@ -466,7 +466,7 @@ func TestConvertAgentRequestToRequest(t *testing.T) {
 					MessageInput{
 						Role: "assistant",
 						Content: []ContentInputWrapper{
-							{Type: InputTypeText, Text: "Weather retrieved for both cities."},
+							{Type: InputTypeOutputText, Text: "Weather retrieved for both cities."},
 						},
 					},
 				},
@@ -516,7 +516,7 @@ func TestConvertAgentRequestToRequest(t *testing.T) {
 					MessageInput{
 						Role: "assistant",
 						Content: []ContentInputWrapper{
-							{Type: InputTypeText, Text: "Assistant message"},
+							{Type: InputTypeOutputText, Text: "Assistant message"},
 						},
 					},
 					MessageInput{
@@ -723,7 +723,7 @@ func TestConvertAgentRequestToRequest(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := convertAgentRequestToRequest(logger, tt.request, defaultModel)
+			result := convertAgentRequestToOpenAIRequest(logger, tt.request, defaultModel)
 
 			if tt.name == "request with file content" {
 				assert.Equal(t, tt.expected.Model, result.Model)

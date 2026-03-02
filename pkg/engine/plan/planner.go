@@ -198,6 +198,14 @@ func (p *PlannerV2) generateConditionalStep(id string) (*ConditionStep, error) {
 		return nil, err
 	}
 
+	if condition.Type == "" {
+		if len(condition.Structure) > 0 {
+			condition.Type = ConditionalTypeStructured
+		} else {
+			condition.Type = ConditionalTypeTemplate
+		}
+	}
+
 	var exprString string
 	switch condition.Type {
 	case ConditionalTypeStructured:

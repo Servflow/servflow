@@ -60,8 +60,9 @@ const (
 
 	ToolTypeFunction = "function"
 
-	InputTypeText  = "input_text"
-	InputTypeImage = "input_image"
+	InputTypeText       = "input_text"
+	InputTypeImage      = "input_image"
+	InputTypeOutputText = "output_text"
 )
 
 var agentRoleToRoleMapping = map[agent.RoleType]string{
@@ -118,7 +119,7 @@ func convertResponseToAgentResponse(resp *Response, logger *zap.Logger) agent.LL
 	return r
 }
 
-func convertAgentRequestToRequest(logger *zap.Logger, req *agent.LLMRequest, model string) RequestBody {
+func convertAgentRequestToOpenAIRequest(logger *zap.Logger, req *agent.LLMRequest, model string) RequestBody {
 	r := RequestBody{
 		Model:        model,
 		Instructions: req.SystemMessage,
@@ -131,10 +132,14 @@ func convertAgentRequestToRequest(logger *zap.Logger, req *agent.LLMRequest, mod
 		case agent.MessageContent:
 			contents := make([]ContentInputWrapper, 0)
 			if val.Content != "" {
-				contents = append(contents, ContentInputWrapper{
+				w := ContentInputWrapper{
 					Type: InputTypeText,
 					Text: val.Content,
-				})
+				}
+				if val.Role == agent.RoleTypeAssistant {
+					w.Type = InputTypeOutputText
+				}
+				contents = append(contents, w)
 			}
 			if val.FileContent != nil {
 				c, err := val.FileContent.GenerateContentString()

@@ -56,7 +56,7 @@ func TestNewResponse(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			gotten, err := newResponse(tc.id, tc.config)
+			gotten, err := newResponse(tc.id, tc.id, tc.config)
 			if tc.expectedErr {
 				assert.Error(t, err)
 				return

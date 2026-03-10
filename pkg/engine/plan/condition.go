@@ -40,6 +40,7 @@ const (
 
 type ConditionStep struct {
 	id         string
+	name       string
 	OnValid    *stepWrapper
 	OnInvalid  *stepWrapper
 	exprString string
@@ -49,17 +50,32 @@ func (c *ConditionStep) ID() string {
 	return c.id
 }
 
+func (c *ConditionStep) DisplayName() string {
+	if c.name != "" {
+		return c.name
+	}
+	return c.id
+}
+
 // Execute will execute the conditions and generate error messages for conditions that use
 // request variables
 func (c *ConditionStep) execute(ctx context.Context) (*stepWrapper, error) {
 	// set up tracer
 	var span trace.Span
-	ctx, span = tracing.SpanCtxFromContext(ctx, "conditional."+c.id)
+	ctx, span = tracing.SpanCtxFromContext(ctx, "conditional."+c.DisplayName())
 	defer span.End()
 
-	span.SetAttributes(attribute.String("config", c.exprString))
+	span.SetAttributes(
+		attribute.String("conditional_id", c.id),
+		attribute.String("conditional_name", c.name),
+		attribute.String("config", c.exprString),
+	)
 
-	logger := logging.FromContext(ctx)
+	logger := logging.FromContext(ctx).With(
+		zap.String("conditional_id", c.id),
+		zap.String("conditional_name", c.name),
+	)
+	ctx = logging.WithLogger(ctx, logger)
 	if c.exprString == "" {
 		span.SetAttributes(attribute.Bool("result", true))
 		return c.OnValid, nil

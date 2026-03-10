@@ -18,10 +18,18 @@ import (
 
 type Response struct {
 	id              string
+	name            string
 	responseBuilder ResponseBuilder
 }
 
 func (r *Response) ID() string {
+	return r.id
+}
+
+func (r *Response) DisplayName() string {
+	if r.name != "" {
+		return r.name
+	}
 	return r.id
 }
 
@@ -34,7 +42,7 @@ const (
 	builderTypeObject   = "json_object"
 )
 
-func newResponse(id string, resp apiconfig.ResponseConfig) (*Response, error) {
+func newResponse(id, name string, resp apiconfig.ResponseConfig) (*Response, error) {
 	if resp.Code < 100 || resp.Code > 999 {
 		return nil, fmt.Errorf("invalid response code: %d", resp.Code)
 	}
@@ -59,6 +67,7 @@ func newResponse(id string, resp apiconfig.ResponseConfig) (*Response, error) {
 
 	return &Response{
 		id:              id,
+		name:            name,
 		responseBuilder: responseBuilder,
 	}, nil
 
@@ -69,10 +78,10 @@ func (r *Response) execute(ctx context.Context) (*stepWrapper, error) {
 }
 
 func (r *Response) WriteResponse(ctx context.Context) (*http.SfResponse, error) {
-	ctx, span := tracing.SpanCtxFromContext(ctx, "response."+r.id)
+	ctx, span := tracing.SpanCtxFromContext(ctx, "response."+r.DisplayName())
 	defer span.End()
 
-	logger := logging.FromContext(ctx).With(zap.String("response_id", r.id))
+	logger := logging.FromContext(ctx).With(zap.String("response_id", r.id), zap.String("response_name", r.DisplayName()))
 	ctx = logging.WithLogger(ctx, logger)
 
 	resp, err := r.responseBuilder.BuildResponse(ctx)

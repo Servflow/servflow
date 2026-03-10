@@ -171,9 +171,15 @@ func (p *PlannerV2) generateActionStep(id string) (*Action, error) {
 
 	out := id
 
+	name := a.Name
+	if name == "" {
+		name = id
+	}
+
 	return &Action{
 		configStr: exec.Config(),
 		id:        id,
+		name:      name,
 		next:      nextStep,
 		fail:      failStep,
 		out:       out,
@@ -225,8 +231,14 @@ func (p *PlannerV2) generateConditionalStep(id string) (*ConditionStep, error) {
 		return nil, fmt.Errorf("unsupported condition type: %s", condition.Type)
 	}
 
+	name := condition.Name
+	if name == "" {
+		name = id
+	}
+
 	return &ConditionStep{
 		id:         id,
+		name:       name,
 		OnValid:    validStep,
 		OnInvalid:  invalidStep,
 		exprString: exprString,
@@ -240,5 +252,10 @@ func (p *PlannerV2) generateResponseStep(id string) (*Response, error) {
 		return nil, fmt.Errorf("response not found: %s", id)
 	}
 
-	return newResponse(id, response)
+	name := response.Name
+	if name == "" {
+		name = id
+	}
+
+	return newResponse(id, name, response)
 }

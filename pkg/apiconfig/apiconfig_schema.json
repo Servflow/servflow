@@ -119,6 +119,9 @@
     "Action": {
       "type": "object",
       "properties": {
+        "name": {
+          "type": "string"
+        },
         "type": {
           "type": "string",
           "minLength": 1
@@ -140,6 +143,9 @@
       "type": "object",
       "required": ["expression"],
       "properties": {
+        "name": {
+          "type": "string"
+        },
         "onTrue": {
           "type": "string"
         },
@@ -169,6 +175,9 @@
       "type": "object",
       "required": ["code"],
       "properties": {
+        "name": {
+          "type": "string"
+        },
         "code": {
           "type": "integer",
           "minimum": 100,
@@ -206,6 +215,9 @@
       "type": "object",
       "required": ["content", "function"],
       "properties": {
+        "name": {
+          "type": "string"
+        },
         "content": {
           "type": "string"
         },

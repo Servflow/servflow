@@ -28,6 +28,7 @@ type Action struct {
 	exec      actions.ActionExecutable
 	out       string
 	id        string
+	name      string
 }
 
 var (
@@ -40,14 +41,21 @@ func (a *Action) ID() string {
 	return a.id
 }
 
+func (a *Action) DisplayName() string {
+	if a.name != "" {
+		return a.name
+	}
+	return a.id
+}
+
 // TODO think of having actions manage their own executables
 
 func (a *Action) execute(ctx context.Context) (*stepWrapper, error) {
 	var span trace.Span
-	ctx, span = tracing.SpanCtxFromContext(ctx, "action."+a.id)
+	ctx, span = tracing.SpanCtxFromContext(ctx, "action."+a.DisplayName())
 	defer span.End()
 
-	logger := logging.FromContext(ctx).With(zap.String("action_id", a.id))
+	logger := logging.FromContext(ctx).With(zap.String("action_id", a.id), zap.String("action_name", a.DisplayName()))
 	ctx = logging.WithLogger(ctx, logger)
 
 	var (

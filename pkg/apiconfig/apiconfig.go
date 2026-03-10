@@ -80,6 +80,7 @@ type RequestConfig struct {
 }
 
 type Action struct {
+	Name   string                 `json:"name,omitempty" yaml:"name,omitempty"`
 	Type   string                 `json:"type" yaml:"type"`
 	Config map[string]interface{} `json:"config" yaml:"config"`
 	Next   string                 `json:"next" yaml:"next"`
@@ -87,6 +88,7 @@ type Action struct {
 }
 
 type Conditional struct {
+	Name       string            `json:"name,omitempty" yaml:"name,omitempty"`
 	OnTrue     string            `json:"onTrue" yaml:"onTrue"`
 	OnFalse    string            `json:"onFalse" yaml:"onFalse"`
 	Expression string            `json:"expression" yaml:"expression"`
@@ -102,6 +104,7 @@ type ConditionItem struct {
 }
 
 type ResponseConfig struct {
+	Name     string         `json:"name,omitempty" yaml:"name,omitempty"`
 	Code     int            `json:"code" yaml:"code"`
 	Template string         `json:"template" yaml:"template"`
 	Type     string         `json:"type" yaml:"type"`

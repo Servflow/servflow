@@ -12,19 +12,19 @@ import (
 )
 
 type Client struct {
-	db *badger.DB
+	db   *badger.DB
+	once sync.Once
+	mu   sync.Mutex
 }
 
 var client *Client
-var clientMutex sync.Mutex
+var clientMu sync.Mutex
 
 const (
 	servflowPrefix = "servflow"
 	kvPrefix       = "kv"
 	envStorageKey  = "SERVFLOW_STORAGE_PATH"
 )
-
-var getClientOnce sync.Once
 
 func openDB() (*badger.DB, error) {
 	path := os.Getenv(envStorageKey)
@@ -37,54 +37,65 @@ func openDB() (*badger.DB, error) {
 }
 
 func GetClient() (*Client, error) {
-	getClientOnce.Do(func() {
-		clientMutex.Lock()
-		defer clientMutex.Unlock()
+	clientMu.Lock()
+	defer clientMu.Unlock()
 
-		if client != nil {
-			return
-		}
+	if client == nil {
+		client = &Client{}
+	}
 
-		db, err := openDB()
-		if err != nil {
-			client = &Client{db: nil}
-			return
-		}
-
-		client = &Client{db: db}
-	})
-
-	clientMutex.Lock()
-	defer clientMutex.Unlock()
-
-	if client == nil || client.db == nil {
-		return nil, errors.New("failed to initialize client")
+	if err := client.ensureOpen(); err != nil {
+		return nil, err
 	}
 
 	return client, nil
+}
+
+func (c *Client) ensureOpen() error {
+	var openErr error
+
+	c.once.Do(func() {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+
+		db, err := openDB()
+		if err != nil {
+			openErr = err
+			return
+		}
+		c.db = db
+	})
+
+	if openErr != nil {
+		return openErr
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.db == nil {
+		return errors.New("failed to initialize client")
+	}
+
+	return nil
 }
 
 func isDBClosedError(err error) bool {
 	return errors.Is(err, badger.ErrDBClosed)
 }
 
-func resetClient() error {
-	clientMutex.Lock()
-	defer clientMutex.Unlock()
+func (c *Client) reset() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
-	if client != nil && client.db != nil {
-		client.db.Close()
-	}
-
-	client = nil
-	getClientOnce = sync.Once{}
+	c.db = nil
+	c.once = sync.Once{}
 
 	db, err := openDB()
 	if err != nil {
 		return err
 	}
 
-	client = &Client{db: db}
+	c.db = db
 	return nil
 }
 
@@ -93,15 +104,20 @@ type Serializable interface {
 }
 
 func (c *Client) Close() error {
-	return c.db.Close()
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.db == nil {
+		return nil
+	}
+
+	err := c.db.Close()
+	c.db = nil
+	c.once = sync.Once{}
+	return err
 }
 
 func WriteToLog(key string, value []Serializable) error {
-	c, err := GetClient()
-	if err != nil {
-		return err
-	}
-
 	for _, v := range value {
 		b, err := v.Serialize()
 		if err != nil {
@@ -111,8 +127,11 @@ func WriteToLog(key string, value []Serializable) error {
 		ts := time.Now().UnixNano()
 		k := []byte(fmt.Sprintf("%s:%s:%d", servflowPrefix, strings.Trim(key, ":"), ts))
 
-		err = c.db.Update(func(txn *badger.Txn) error {
-			return txn.Set(k, b)
+		_, err = withRetryOnClose(func(c *Client) (struct{}, error) {
+			err := c.db.Update(func(txn *badger.Txn) error {
+				return txn.Set(k, b)
+			})
+			return struct{}{}, err
 		})
 		if err != nil {
 			return err
@@ -129,34 +148,32 @@ func GetLogEntriesByPrefix(prefix string, deserializeFunc func([]byte) (any, err
 	}
 	bPrefix := []byte(fmt.Sprintf("%s:%s:", servflowPrefix, prefix))
 
-	c, err := GetClient()
-	if err != nil {
-		return nil, err
-	}
+	return withRetryOnClose(func(c *Client) ([]any, error) {
+		result := make([]any, 0)
+		err := c.db.View(func(txn *badger.Txn) error {
+			opts := badger.DefaultIteratorOptions
+			opts.PrefetchSize = 10
+			it := txn.NewIterator(opts)
+			defer it.Close()
+			for it.Seek(bPrefix); it.ValidForPrefix(bPrefix); it.Next() {
+				if len(result) >= maxSIze {
+					return nil
+				}
 
-	result := make([]any, 0)
-	err = c.db.View(func(txn *badger.Txn) error {
-		opts := badger.DefaultIteratorOptions
-		opts.PrefetchSize = 10
-		it := txn.NewIterator(opts)
-		defer it.Close()
-		for it.Seek(bPrefix); it.ValidForPrefix(bPrefix); it.Next() {
-			if len(result) >= maxSIze {
-				return nil
+				var item interface{}
+				if err := it.Item().Value(func(val []byte) error {
+					var err error
+					item, err = deserializeFunc(val)
+					return err
+				}); err != nil {
+					return err
+				}
+				result = append(result, item)
 			}
-
-			var item interface{}
-			if err := it.Item().Value(func(val []byte) error {
-				item, err = deserializeFunc(val)
-				return err
-			}); err != nil {
-				return err
-			}
-			result = append(result, item)
-		}
-		return nil
+			return nil
+		})
+		return result, err
 	})
-	return result, err
 }
 
 func withRetryOnClose[T any](operation func(*Client) (T, error)) (T, error) {
@@ -169,13 +186,8 @@ func withRetryOnClose[T any](operation func(*Client) (T, error)) (T, error) {
 
 	result, err := operation(c)
 	if isDBClosedError(err) {
-		if resetErr := resetClient(); resetErr != nil {
+		if resetErr := c.reset(); resetErr != nil {
 			return zero, resetErr
-		}
-
-		c, err = GetClient()
-		if err != nil {
-			return zero, err
 		}
 
 		result, err = operation(c)
@@ -184,7 +196,6 @@ func withRetryOnClose[T any](operation func(*Client) (T, error)) (T, error) {
 	return result, err
 }
 
-// Set stores a key-value pair in the database
 func Set(key string, value string) error {
 	if key == "" {
 		return errors.New("key cannot be empty")
@@ -207,8 +218,6 @@ type GetResult struct {
 	Found bool
 }
 
-// Get retrieves a value by key from the database
-// Returns value and true if key exists, empty string and false if key doesn't exist
 func Get(key string) (string, bool, error) {
 	if key == "" {
 		return "", false, errors.New("key cannot be empty")

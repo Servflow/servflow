@@ -109,7 +109,7 @@ func (a *Action) execute(ctx context.Context) (*stepWrapper, error) {
 		logger.Error("error marshalling action response", zap.Error(err))
 	}
 	span.SetAttributes(attribute.String("result", string(b)))
-	logger.Debug("action executed successfully", zap.Any("resp", resp))
+	logger.Debug("action executed successfully. Response: " + string(b))
 
 	// Check if response is an io.Reader and store as action file
 	if f, ok := resp.(io.ReadCloser); ok {

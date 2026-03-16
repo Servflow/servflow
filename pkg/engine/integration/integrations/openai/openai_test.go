@@ -294,11 +294,11 @@ func TestConvertAgentRequestToRequest(t *testing.T) {
 			request: &agent.LLMRequest{
 				SystemMessage: "You are a helpful assistant.",
 				Messages: []any{
-					agent.MessageContent{
+					agent.MessageTypeContent{
 						Role:    agent.RoleTypeUser,
 						Content: "Hello, how are you?",
 					},
-					agent.MessageContent{
+					agent.MessageTypeContent{
 						Role:    agent.RoleTypeAssistant,
 						Content: "I'm doing great, thank you!",
 					},
@@ -330,7 +330,7 @@ func TestConvertAgentRequestToRequest(t *testing.T) {
 			request: &agent.LLMRequest{
 				SystemMessage: "You have access to weather tools.",
 				Messages: []any{
-					agent.MessageContent{
+					agent.MessageTypeContent{
 						Role:    agent.RoleTypeUser,
 						Content: "What's the weather like?",
 					},
@@ -395,7 +395,7 @@ func TestConvertAgentRequestToRequest(t *testing.T) {
 			request: &agent.LLMRequest{
 				SystemMessage: "Handle complete conversation flow.",
 				Messages: []any{
-					agent.MessageContent{
+					agent.MessageTypeContent{
 						Role:    agent.RoleTypeUser,
 						Content: "Get weather for NY and LA",
 					},
@@ -424,7 +424,7 @@ func TestConvertAgentRequestToRequest(t *testing.T) {
 						ID:               "call_la",
 						Text:             `{"temperature": 25, "condition": "clear"}`,
 					},
-					agent.MessageContent{
+					agent.MessageTypeContent{
 						Role:    agent.RoleTypeAssistant,
 						Content: "Weather retrieved for both cities.",
 					},
@@ -478,19 +478,19 @@ func TestConvertAgentRequestToRequest(t *testing.T) {
 			request: &agent.LLMRequest{
 				SystemMessage: "You are a development assistant.",
 				Messages: []any{
-					agent.MessageContent{
+					agent.MessageTypeContent{
 						Role:    agent.RoleTypeSystem,
 						Content: "System message",
 					},
-					agent.MessageContent{
+					agent.MessageTypeContent{
 						Role:    agent.RoleTypeUser,
 						Content: "User message",
 					},
-					agent.MessageContent{
+					agent.MessageTypeContent{
 						Role:    agent.RoleTypeAssistant,
 						Content: "Assistant message",
 					},
-					agent.MessageContent{
+					agent.MessageTypeContent{
 						Role:    agent.RoleTypeDeveloper,
 						Content: "Developer message",
 					},
@@ -534,7 +534,7 @@ func TestConvertAgentRequestToRequest(t *testing.T) {
 			request: &agent.LLMRequest{
 				SystemMessage: "You have access to multiple tools.",
 				Messages: []any{
-					agent.MessageContent{
+					agent.MessageTypeContent{
 						Role:    agent.RoleTypeUser,
 						Content: "Help me with weather and time",
 					},
@@ -628,7 +628,7 @@ func TestConvertAgentRequestToRequest(t *testing.T) {
 			request: &agent.LLMRequest{
 				SystemMessage: "Handle various tool argument scenarios.",
 				Messages: []any{
-					agent.MessageContent{
+					agent.MessageTypeContent{
 						Role:    agent.RoleTypeUser,
 						Content: "Process data and get time",
 					},
@@ -696,7 +696,7 @@ func TestConvertAgentRequestToRequest(t *testing.T) {
 			request: &agent.LLMRequest{
 				SystemMessage: "You can process files.",
 				Messages: []any{
-					agent.MessageContent{
+					agent.MessageTypeContent{
 						Role:        agent.RoleTypeUser,
 						Content:     "Analyze this file",
 						FileContent: requestctx.NewFileValue(io.NopCloser(strings.NewReader("test content")), "test.txt"),
@@ -798,7 +798,7 @@ func TestClient_ProvideResponse(t *testing.T) {
 			request: agent.LLMRequest{
 				SystemMessage: "You are a helpful assistant.",
 				Messages: []any{
-					agent.MessageContent{
+					agent.MessageTypeContent{
 						Role:    agent.RoleTypeUser,
 						Content: "Hello",
 					},
@@ -834,7 +834,7 @@ func TestClient_ProvideResponse(t *testing.T) {
 			request: agent.LLMRequest{
 				SystemMessage: "You have access to weather tools.",
 				Messages: []any{
-					agent.MessageContent{
+					agent.MessageTypeContent{
 						Role:    agent.RoleTypeUser,
 						Content: "What's the weather in New York?",
 					},
@@ -899,7 +899,7 @@ func TestClient_ProvideResponse(t *testing.T) {
 			request: agent.LLMRequest{
 				SystemMessage: "You are a helpful weather assistant.",
 				Messages: []any{
-					agent.MessageContent{
+					agent.MessageTypeContent{
 						Role:    agent.RoleTypeUser,
 						Content: "What's the weather in London?",
 					},
@@ -974,7 +974,7 @@ func TestClient_ProvideResponse(t *testing.T) {
 			request: agent.LLMRequest{
 				SystemMessage: "Process tool responses and provide helpful information.",
 				Messages: []any{
-					agent.MessageContent{
+					agent.MessageTypeContent{
 						Role:    agent.RoleTypeUser,
 						Content: "What's the weather like?",
 					},
@@ -1001,7 +1001,7 @@ func TestClient_ProvideResponse(t *testing.T) {
 			request: agent.LLMRequest{
 				SystemMessage: "You are a helpful assistant.",
 				Messages: []any{
-					agent.MessageContent{
+					agent.MessageTypeContent{
 						Role:    agent.RoleTypeUser,
 						Content: "Hello",
 					},
@@ -1018,7 +1018,7 @@ func TestClient_ProvideResponse(t *testing.T) {
 			request: agent.LLMRequest{
 				SystemMessage: "You are a helpful assistant.",
 				Messages: []any{
-					agent.MessageContent{
+					agent.MessageTypeContent{
 						Role:    agent.RoleTypeUser,
 						Content: "Hello",
 					},
@@ -1036,7 +1036,7 @@ func TestClient_ProvideResponse(t *testing.T) {
 			request: agent.LLMRequest{
 				SystemMessage: "You are a helpful assistant.",
 				Messages: []any{
-					agent.MessageContent{
+					agent.MessageTypeContent{
 						Role:    agent.RoleTypeUser,
 						Content: "Hello",
 					},
@@ -1065,7 +1065,7 @@ func TestClient_ProvideResponse(t *testing.T) {
 			request: agent.LLMRequest{
 				SystemMessage: "You have access to weather tools.",
 				Messages: []any{
-					agent.MessageContent{
+					agent.MessageTypeContent{
 						Role:    agent.RoleTypeUser,
 						Content: "What's the weather?",
 					},

@@ -32,18 +32,18 @@ type LLMRequest struct {
 	Tools         []ToolInfo `json:"tools"`
 }
 
-type MessageContent struct {
+type MessageTypeContent struct {
 	Message
 	Role        RoleType
 	Content     string
 	FileContent *requestctx.FileValue `json:"-"`
 }
 
-func (c *MessageContent) Serialize() ([]byte, error) {
+func (c *MessageTypeContent) Serialize() ([]byte, error) {
 	return json.Marshal(c)
 }
 
-func (c *MessageContent) Deserialize(bytes []byte) error {
+func (c *MessageTypeContent) Deserialize(bytes []byte) error {
 	return json.Unmarshal(bytes, c)
 }
 

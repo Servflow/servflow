@@ -71,7 +71,7 @@ func WithConversationID(id string) Option {
 			}
 			switch msg.Type {
 			case MessageTypeText:
-				var contentMessage MessageContent
+				var contentMessage MessageTypeContent
 				err = json.Unmarshal(data, &contentMessage)
 				return contentMessage, err
 			case MessageTypeToolResponse:
@@ -115,7 +115,7 @@ func NewSession(developerInstructions string, llm LLmProvider, options ...Option
 		messages: make([]any, 0),
 	}
 
-	agent.messages = append(agent.messages, MessageContent{
+	agent.messages = append(agent.messages, MessageTypeContent{
 		Message: Message{Type: MessageTypeText},
 		Role:    RoleTypeDeveloper,
 		Content: developerInstructions,
@@ -138,7 +138,7 @@ type agentOutput struct {
 func (a *Session) Query(ctx context.Context, query string, file *requestctx.FileValue) (string, error) {
 	logger := logging.WithContextEnriched(ctx).With(zap.String("module", "agent"))
 	if query != "" || file != nil {
-		a.addToMessages(logger, MessageContent{
+		a.addToMessages(logger, MessageTypeContent{
 			Message:     Message{Type: MessageTypeText},
 			Role:        RoleTypeUser,
 			Content:     query,
@@ -194,7 +194,7 @@ func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 			// process content output
 			for _, c := range r.Content {
 				logger.Info("LLm response: " + c.Text)
-				a.addToMessages(logger, MessageContent{
+				a.addToMessages(logger, MessageTypeContent{
 					Message: Message{Type: MessageTypeText},
 					Role:    RoleTypeAssistant,
 					Content: c.Text,
@@ -284,7 +284,7 @@ func (a *Session) addToMessages(logger *zap.Logger, message any, output chan age
 		serializable storage.Serializable
 	)
 	switch message := message.(type) {
-	case MessageContent:
+	case MessageTypeContent:
 		a.messages = append(a.messages, message)
 		if output != nil {
 			output <- agentOutput{

@@ -8,6 +8,7 @@ import (
 	"text/template"
 
 	"github.com/Servflow/servflow/pkg/agent"
+	"github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
@@ -37,11 +38,12 @@ type ServerConfig struct {
 }
 
 type WorkflowToolConfig struct {
-	Name        string   `json:"name"`
-	Description string   `json:"description"`
-	Params      []string `json:"params"`
-	ReturnValue string   `json:"returnValue"`
-	Start       string   `json:"start"`
+	Name        string              `json:"name"`
+	Description string              `json:"description"`
+	Params      []string            `json:"params"`
+	ReturnValue string              `json:"returnValue"`
+	ReturnFile  apiconfig.FileInput `json:"returnFile"`
+	Start       string              `json:"start"`
 }
 
 type toolDescription struct {

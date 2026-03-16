@@ -129,7 +129,7 @@ func convertAgentRequestToOpenAIRequest(logger *zap.Logger, req *agent.LLMReques
 
 	for _, m := range req.Messages {
 		switch val := m.(type) {
-		case agent.MessageContent:
+		case agent.MessageTypeContent:
 			contents := make([]ContentInputWrapper, 0)
 			if val.Content != "" {
 				w := ContentInputWrapper{

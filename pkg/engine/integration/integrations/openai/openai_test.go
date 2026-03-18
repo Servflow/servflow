@@ -12,742 +12,647 @@ import (
 	"github.com/Servflow/servflow/pkg/agent"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/option"
+	"github.com/openai/openai-go/v3/responses"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
 
 func TestNew(t *testing.T) {
 	tests := []struct {
 		name    string
-		cfg     Config
+		apiKey  string
+		model   string
 		wantErr bool
 	}{
 		{
-			name: "valid config",
-			cfg: Config{
-				APIKey: "test-key",
-			},
+			name:    "valid config with model",
+			apiKey:  "test-key",
+			model:   "gpt-4",
 			wantErr: false,
 		},
 		{
-			name: "missing API key",
-			cfg: Config{
-				APIKey: "",
-			},
+			name:    "valid config without model uses default",
+			apiKey:  "test-key",
+			model:   "",
+			wantErr: false,
+		},
+		{
+			name:    "missing API key",
+			apiKey:  "",
+			model:   "",
 			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client, err := New(tt.cfg.APIKey, "")
-			if (err != nil) != tt.wantErr {
-				t.Errorf("New() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !tt.wantErr && client == nil {
-				t.Error("New() returned nil client for valid config")
+			client, err := New(tt.apiKey, tt.model)
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Nil(t, client)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, client)
+				if tt.model == "" {
+					assert.Equal(t, defaultModel, client.model)
+				} else {
+					assert.Equal(t, tt.model, client.model)
+				}
 			}
 		})
 	}
 }
 
-func TestConvertResponseToAgentResponse(t *testing.T) {
-	logger := zap.NewNop()
-
-	// Helper functions for building test data
-	createMessage := func(text string) OutputObject {
-		return OutputObject{
-			Type:    OutputTypeMessage,
-			Content: []ContentObject{{Type: "text", Text: text}},
-		}
-	}
-
-	createFunctionCall := func(name, arguments, callID string) OutputObject {
-		return OutputObject{
-			Type:      OutputTypeFunctionCall,
-			Name:      name,
-			Arguments: arguments,
-			CallID:    callID,
-		}
-	}
-
-	createExpectedContent := func(texts ...string) []agent.ContentResponse {
-		content := make([]agent.ContentResponse, len(texts))
-		for i, text := range texts {
-			content[i] = agent.ContentResponse{Text: text}
-		}
-		return content
-	}
-
-	createExpectedTool := func(name, toolID string, input map[string]interface{}) agent.ToolResponseObject {
-		return agent.ToolResponseObject{
-			Name:   name,
-			ToolID: toolID,
-			Input:  input,
-		}
-	}
-
-	t.Run("message responses", func(t *testing.T) {
-		tests := []struct {
-			name     string
-			response *Response
-			expected agent.LLMResponse
-		}{
-			{
-				name: "single message",
-				response: &Response{
-					Output: []OutputObject{createMessage("Hello, how can I help you?")},
-				},
-				expected: agent.LLMResponse{
-					Content: createExpectedContent("Hello, how can I help you?"),
-					Tools:   []agent.ToolResponseObject{},
-				},
-			},
-			{
-				name: "multiple messages",
-				response: &Response{
-					Output: []OutputObject{
-						createMessage("First message"),
-						createMessage("Second message"),
-					},
-				},
-				expected: agent.LLMResponse{
-					Content: createExpectedContent("First message", "Second message"),
-					Tools:   []agent.ToolResponseObject{},
-				},
-			},
-			{
-				name: "message with empty content",
-				response: &Response{
-					Output: []OutputObject{{Type: OutputTypeMessage, Content: []ContentObject{}}},
-				},
-				expected: agent.LLMResponse{
-					Content: []agent.ContentResponse{},
-					Tools:   []agent.ToolResponseObject{},
-				},
-			},
-		}
-
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				result := convertResponseToAgentResponse(tt.response, logger)
-				assert.Equal(t, tt.expected, result)
-			})
-		}
-	})
-
-	t.Run("function call responses", func(t *testing.T) {
-		tests := []struct {
-			name     string
-			response *Response
-			expected agent.LLMResponse
-		}{
-			{
-				name: "single function call",
-				response: &Response{
-					Output: []OutputObject{
-						createFunctionCall("get_weather", `{"location": "New York", "unit": "celsius"}`, "call_123"),
-					},
-				},
-				expected: agent.LLMResponse{
-					Content: []agent.ContentResponse{},
-					Tools: []agent.ToolResponseObject{
-						createExpectedTool("get_weather", "call_123", map[string]interface{}{
-							"location": "New York",
-							"unit":     "celsius",
-						}),
-					},
-				},
-			},
-			{
-				name: "multiple function calls",
-				response: &Response{
-					Output: []OutputObject{
-						createFunctionCall("get_weather", `{"location": "Paris"}`, "call_789"),
-						createFunctionCall("get_time", `{"timezone": "UTC"}`, "call_101112"),
-					},
-				},
-				expected: agent.LLMResponse{
-					Content: []agent.ContentResponse{},
-					Tools: []agent.ToolResponseObject{
-						createExpectedTool("get_weather", "call_789", map[string]interface{}{"location": "Paris"}),
-						createExpectedTool("get_time", "call_101112", map[string]interface{}{"timezone": "UTC"}),
-					},
-				},
-			},
-			{
-				name: "complex function arguments",
-				response: &Response{
-					Output: []OutputObject{
-						createFunctionCall("complex_function", `{"nested": {"key": "value"}, "array": [1, 2, 3], "boolean": true, "number": 42}`, "call_complex"),
-					},
-				},
-				expected: agent.LLMResponse{
-					Content: []agent.ContentResponse{},
-					Tools: []agent.ToolResponseObject{
-						createExpectedTool("complex_function", "call_complex", map[string]interface{}{
-							"nested":  map[string]interface{}{"key": "value"},
-							"array":   []interface{}{1.0, 2.0, 3.0},
-							"boolean": true,
-							"number":  42.0,
-						}),
-					},
-				},
-			},
-		}
-
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				result := convertResponseToAgentResponse(tt.response, logger)
-				assert.Equal(t, tt.expected, result)
-			})
-		}
-	})
-
-	t.Run("mixed responses", func(t *testing.T) {
-		t.Run("message and function call", func(t *testing.T) {
-			response := &Response{
-				Output: []OutputObject{
-					createMessage("I'll get the weather for you."),
-					createFunctionCall("get_weather", `{"location": "London"}`, "call_456"),
-				},
-			}
-			expected := agent.LLMResponse{
-				Content: createExpectedContent("I'll get the weather for you."),
-				Tools: []agent.ToolResponseObject{
-					createExpectedTool("get_weather", "call_456", map[string]interface{}{"location": "London"}),
-				},
-			}
-
-			result := convertResponseToAgentResponse(response, logger)
-			assert.Equal(t, expected, result)
-		})
-	})
-
-	t.Run("edge cases", func(t *testing.T) {
-		tests := []struct {
-			name     string
-			response *Response
-			expected agent.LLMResponse
-		}{
-			{
-				name:     "empty response",
-				response: &Response{Output: []OutputObject{}},
-				expected: agent.LLMResponse{
-					Content: []agent.ContentResponse{},
-					Tools:   []agent.ToolResponseObject{},
-				},
-			},
-			{
-				name: "invalid JSON arguments - should skip invalid, keep valid",
-				response: &Response{
-					Output: []OutputObject{
-						createFunctionCall("invalid_function", `{invalid json}`, "call_invalid"),
-						createFunctionCall("valid_function", `{"valid": "json"}`, "call_valid"),
-					},
-				},
-				expected: agent.LLMResponse{
-					Content: []agent.ContentResponse{},
-					Tools: []agent.ToolResponseObject{
-						createExpectedTool("valid_function", "call_valid", map[string]interface{}{"valid": "json"}),
-					},
-				},
-			},
-			{
-				name: "unknown output type - should ignore unknown, process known",
-				response: &Response{
-					Output: []OutputObject{
-						{
-							Type:    "unknown_type",
-							Content: []ContentObject{{Type: "text", Text: "This should be ignored"}},
-						},
-						createMessage("This should be included"),
-					},
-				},
-				expected: agent.LLMResponse{
-					Content: createExpectedContent("This should be included"),
-					Tools:   []agent.ToolResponseObject{},
-				},
-			},
-		}
-
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				result := convertResponseToAgentResponse(tt.response, logger)
-				assert.Equal(t, tt.expected, result)
-			})
-		}
-	})
-}
-
-func TestConvertAgentRequestToRequest(t *testing.T) {
+func TestConvertSDKResponseToAgentResponse(t *testing.T) {
 	logger := zap.NewNop()
 
 	tests := []struct {
 		name     string
-		request  *agent.LLMRequest
-		expected RequestBody
+		response string
+		expected agent.LLMResponse
 	}{
 		{
-			name: "basic request with text messages",
-			request: &agent.LLMRequest{
-				SystemMessage: "You are a helpful assistant.",
-				Messages: []any{
-					agent.MessageTypeContent{
-						Role:    agent.RoleTypeUser,
-						Content: "Hello, how are you?",
-					},
-					agent.MessageTypeContent{
-						Role:    agent.RoleTypeAssistant,
-						Content: "I'm doing great, thank you!",
-					},
-				},
-				Tools: []agent.ToolInfo{},
-			},
-			expected: RequestBody{
-				Model:        defaultModel,
-				Instructions: "You are a helpful assistant.",
-				Input: []interface{}{
-					MessageInput{
-						Role: "user",
-						Content: []ContentInputWrapper{
-							{Type: InputTypeText, Text: "Hello, how are you?"},
-						},
-					},
-					MessageInput{
-						Role: "assistant",
-						Content: []ContentInputWrapper{
-							{Type: InputTypeOutputText, Text: "I'm doing great, thank you!"},
-						},
-					},
-				},
-				Tools: []ToolsRequestConfig{},
-			},
-		},
-		{
-			name: "request with tools",
-			request: &agent.LLMRequest{
-				SystemMessage: "You have access to weather tools.",
-				Messages: []any{
-					agent.MessageTypeContent{
-						Role:    agent.RoleTypeUser,
-						Content: "What's the weather like?",
-					},
-				},
-				Tools: []agent.ToolInfo{
+			name: "single message response",
+			response: `{
+				"output": [
 					{
-						Name:        "get_weather",
-						Description: "Get the current weather for a location",
-						InputSchema: mcp.ToolInputSchema{
-							Type: "object",
-							Properties: map[string]interface{}{
-								"location": map[string]interface{}{
-									"type":        "string",
-									"description": "The city and state, e.g. San Francisco, CA",
-								},
-								"unit": map[string]interface{}{
-									"type": "string",
-									"enum": []string{"celsius", "fahrenheit"},
-								},
-							},
-							Required: []string{"location"},
-						},
-					},
-				},
+						"type": "message",
+						"content": [{"type": "output_text", "text": "Hello, how can I help you?"}]
+					}
+				]
+			}`,
+			expected: agent.LLMResponse{
+				Content: []agent.ContentResponse{{Text: "Hello, how can I help you?"}},
+				Tools:   []agent.ToolResponseObject{},
 			},
-			expected: RequestBody{
-				Model:        defaultModel,
-				Instructions: "You have access to weather tools.",
-				Input: []interface{}{
-					MessageInput{
-						Role: "user",
-						Content: []ContentInputWrapper{
-							{Type: InputTypeText, Text: "What's the weather like?"},
-						},
-					},
-				},
-				Tools: []ToolsRequestConfig{
+		},
+		{
+			name: "multiple messages response",
+			response: `{
+				"output": [
 					{
-						Name:        "get_weather",
-						Description: "Get the current weather for a location",
-						Parameters: mcp.ToolInputSchema{
-							Type: "object",
-							Properties: map[string]interface{}{
-								"location": map[string]interface{}{
-									"type":        "string",
-									"description": "The city and state, e.g. San Francisco, CA",
-								},
-								"unit": map[string]interface{}{
-									"type": "string",
-									"enum": []string{"celsius", "fahrenheit"},
-								},
-							},
-							Required: []string{"location"},
-						},
-						Type: ToolTypeFunction,
-					},
-				},
-			},
-		},
-		{
-			name: "complete conversation with all message types",
-			request: &agent.LLMRequest{
-				SystemMessage: "Handle complete conversation flow.",
-				Messages: []any{
-					agent.MessageTypeContent{
-						Role:    agent.RoleTypeUser,
-						Content: "Get weather for NY and LA",
-					},
-					agent.MessageToolCall{
-						ID:   "call_ny",
-						Name: "get_weather",
-						Arguments: map[string]interface{}{
-							"location": "New York",
-							"unit":     "celsius",
-						},
-					},
-					agent.MessageToolCall{
-						ID:   "call_la",
-						Name: "get_weather",
-						Arguments: map[string]interface{}{
-							"location": "Los Angeles",
-						},
-					},
-					agent.MessageToolCallResponse{
-						ID:               "call_ny",
-						ToolResponseType: agent.ToolResponseTypeText,
-						Text:             `{"temperature": 18, "condition": "sunny"}`,
-					},
-					agent.MessageToolCallResponse{
-						ToolResponseType: agent.ToolResponseTypeText,
-						ID:               "call_la",
-						Text:             `{"temperature": 25, "condition": "clear"}`,
-					},
-					agent.MessageTypeContent{
-						Role:    agent.RoleTypeAssistant,
-						Content: "Weather retrieved for both cities.",
-					},
-				},
-				Tools: []agent.ToolInfo{},
-			},
-			expected: RequestBody{
-				Model:        defaultModel,
-				Instructions: "Handle complete conversation flow.",
-				Input: []interface{}{
-					MessageInput{
-						Role: "user",
-						Content: []ContentInputWrapper{
-							{Type: InputTypeText, Text: "Get weather for NY and LA"},
-						},
-					},
-					FunctionCall{
-						Type:      FunctionCallType,
-						CallID:    "call_ny",
-						Name:      "get_weather",
-						Arguments: `{"location":"New York","unit":"celsius"}`,
-					},
-					FunctionCall{
-						Type:      FunctionCallType,
-						CallID:    "call_la",
-						Name:      "get_weather",
-						Arguments: `{"location":"Los Angeles"}`,
-					},
-					FunctionCallOutput{
-						Type:   FunctionCallOutputType,
-						CallID: "call_ny",
-						Output: `{"temperature": 18, "condition": "sunny"}`,
-					},
-					FunctionCallOutput{
-						Type:   FunctionCallOutputType,
-						CallID: "call_la",
-						Output: `{"temperature": 25, "condition": "clear"}`,
-					},
-					MessageInput{
-						Role: "assistant",
-						Content: []ContentInputWrapper{
-							{Type: InputTypeOutputText, Text: "Weather retrieved for both cities."},
-						},
-					},
-				},
-				Tools: []ToolsRequestConfig{},
-			},
-		},
-		{
-			name: "request with all role types",
-			request: &agent.LLMRequest{
-				SystemMessage: "You are a development assistant.",
-				Messages: []any{
-					agent.MessageTypeContent{
-						Role:    agent.RoleTypeSystem,
-						Content: "System message",
-					},
-					agent.MessageTypeContent{
-						Role:    agent.RoleTypeUser,
-						Content: "User message",
-					},
-					agent.MessageTypeContent{
-						Role:    agent.RoleTypeAssistant,
-						Content: "Assistant message",
-					},
-					agent.MessageTypeContent{
-						Role:    agent.RoleTypeDeveloper,
-						Content: "Developer message",
-					},
-				},
-				Tools: []agent.ToolInfo{},
-			},
-			expected: RequestBody{
-				Model:        defaultModel,
-				Instructions: "You are a development assistant.",
-				Input: []interface{}{
-					MessageInput{
-						Role: "system",
-						Content: []ContentInputWrapper{
-							{Type: InputTypeText, Text: "System message"},
-						},
-					},
-					MessageInput{
-						Role: "user",
-						Content: []ContentInputWrapper{
-							{Type: InputTypeText, Text: "User message"},
-						},
-					},
-					MessageInput{
-						Role: "assistant",
-						Content: []ContentInputWrapper{
-							{Type: InputTypeOutputText, Text: "Assistant message"},
-						},
-					},
-					MessageInput{
-						Role: "developer",
-						Content: []ContentInputWrapper{
-							{Type: InputTypeText, Text: "Developer message"},
-						},
-					},
-				},
-				Tools: []ToolsRequestConfig{},
-			},
-		},
-		{
-			name: "request with multiple tools",
-			request: &agent.LLMRequest{
-				SystemMessage: "You have access to multiple tools.",
-				Messages: []any{
-					agent.MessageTypeContent{
-						Role:    agent.RoleTypeUser,
-						Content: "Help me with weather and time",
-					},
-				},
-				Tools: []agent.ToolInfo{
-					{
-						Name:        "get_weather",
-						Description: "Get weather information",
-						InputSchema: mcp.ToolInputSchema{
-							Type: "object",
-							Properties: map[string]interface{}{
-								"location": map[string]interface{}{
-									"type": "string",
-								},
-							},
-							Required: []string{"location"},
-						},
+						"type": "message",
+						"content": [{"type": "output_text", "text": "First message"}]
 					},
 					{
-						Name:        "get_time",
-						Description: "Get current time",
-						InputSchema: mcp.ToolInputSchema{
-							Type: "object",
-							Properties: map[string]interface{}{
-								"timezone": map[string]interface{}{
-									"type": "string",
-								},
-							},
-						},
-					},
+						"type": "message",
+						"content": [{"type": "output_text", "text": "Second message"}]
+					}
+				]
+			}`,
+			expected: agent.LLMResponse{
+				Content: []agent.ContentResponse{
+					{Text: "First message"},
+					{Text: "Second message"},
 				},
+				Tools: []agent.ToolResponseObject{},
 			},
-			expected: RequestBody{
-				Model:        defaultModel,
-				Instructions: "You have access to multiple tools.",
-				Input: []interface{}{
-					MessageInput{
-						Role: "user",
-						Content: []ContentInputWrapper{
-							{Type: InputTypeText, Text: "Help me with weather and time"},
-						},
-					},
-				},
-				Tools: []ToolsRequestConfig{
+		},
+		{
+			name: "single function call response",
+			response: `{
+				"output": [
 					{
-						Name:        "get_weather",
-						Description: "Get weather information",
-						Parameters: mcp.ToolInputSchema{
-							Type: "object",
-							Properties: map[string]interface{}{
-								"location": map[string]interface{}{
-									"type": "string",
-								},
-							},
-							Required: []string{"location"},
-						},
-						Type: ToolTypeFunction,
+						"type": "function_call",
+						"name": "get_weather",
+						"arguments": "{\"location\": \"New York\", \"unit\": \"celsius\"}",
+						"call_id": "call_123"
+					}
+				]
+			}`,
+			expected: agent.LLMResponse{
+				Content: []agent.ContentResponse{},
+				Tools: []agent.ToolResponseObject{
+					{
+						Name:   "get_weather",
+						ToolID: "call_123",
+						Input:  map[string]interface{}{"location": "New York", "unit": "celsius"},
+					},
+				},
+			},
+		},
+		{
+			name: "multiple function calls response",
+			response: `{
+				"output": [
+					{
+						"type": "function_call",
+						"name": "get_weather",
+						"arguments": "{\"location\": \"Paris\"}",
+						"call_id": "call_789"
 					},
 					{
-						Name:        "get_time",
-						Description: "Get current time",
-						Parameters: mcp.ToolInputSchema{
-							Type: "object",
-							Properties: map[string]interface{}{
-								"timezone": map[string]interface{}{
-									"type": "string",
-								},
-							},
-						},
-						Type: ToolTypeFunction,
+						"type": "function_call",
+						"name": "get_time",
+						"arguments": "{\"timezone\": \"UTC\"}",
+						"call_id": "call_101112"
+					}
+				]
+			}`,
+			expected: agent.LLMResponse{
+				Content: []agent.ContentResponse{},
+				Tools: []agent.ToolResponseObject{
+					{
+						Name:   "get_weather",
+						ToolID: "call_789",
+						Input:  map[string]interface{}{"location": "Paris"},
+					},
+					{
+						Name:   "get_time",
+						ToolID: "call_101112",
+						Input:  map[string]interface{}{"timezone": "UTC"},
 					},
 				},
 			},
 		},
 		{
-			name: "empty request",
-			request: &agent.LLMRequest{
-				SystemMessage: "",
-				Messages:      []any{},
-				Tools:         []agent.ToolInfo{},
-			},
-			expected: RequestBody{
-				Model:        defaultModel,
-				Instructions: "",
-				Input:        []interface{}{},
-				Tools:        []ToolsRequestConfig{},
+			name: "mixed message and function call response",
+			response: `{
+				"output": [
+					{
+						"type": "message",
+						"content": [{"type": "output_text", "text": "I'll check the weather for you."}]
+					},
+					{
+						"type": "function_call",
+						"name": "get_weather",
+						"arguments": "{\"location\": \"London\"}",
+						"call_id": "call_456"
+					}
+				]
+			}`,
+			expected: agent.LLMResponse{
+				Content: []agent.ContentResponse{
+					{Text: "I'll check the weather for you."},
+				},
+				Tools: []agent.ToolResponseObject{
+					{
+						Name:   "get_weather",
+						ToolID: "call_456",
+						Input:  map[string]interface{}{"location": "London"},
+					},
+				},
 			},
 		},
 		{
-			name: "tool calls with complex and edge case arguments",
-			request: &agent.LLMRequest{
-				SystemMessage: "Handle various tool argument scenarios.",
-				Messages: []any{
-					agent.MessageTypeContent{
-						Role:    agent.RoleTypeUser,
-						Content: "Process data and get time",
-					},
-					agent.MessageToolCall{
-						ID:   "call_complex",
-						Name: "process_data",
-						Arguments: map[string]interface{}{
-							"data": map[string]interface{}{
-								"items": []interface{}{
-									map[string]interface{}{"id": 1, "active": true},
-									map[string]interface{}{"id": 2, "active": false},
-								},
-								"filters": map[string]interface{}{
-									"status": "active",
-									"count":  10,
-								},
-							},
-							"format": "json",
-						},
-					},
-					agent.MessageToolCall{
-						ID:        "call_empty",
-						Name:      "get_time",
-						Arguments: map[string]interface{}{},
-					},
-					agent.MessageToolCall{
-						ID:   "call_invalid",
-						Name: "bad_call",
-						Arguments: map[string]interface{}{
-							"invalid": func() {}, // This should be skipped due to marshal error
-						},
-					},
-				},
-				Tools: []agent.ToolInfo{},
-			},
-			expected: RequestBody{
-				Model:        defaultModel,
-				Instructions: "Handle various tool argument scenarios.",
-				Input: []interface{}{
-					MessageInput{
-						Role: "user",
-						Content: []ContentInputWrapper{
-							{Type: InputTypeText, Text: "Process data and get time"},
-						},
-					},
-					FunctionCall{
-						Type:      FunctionCallType,
-						CallID:    "call_complex",
-						Name:      "process_data",
-						Arguments: `{"data":{"filters":{"count":10,"status":"active"},"items":[{"active":true,"id":1},{"active":false,"id":2}]},"format":"json"}`,
-					},
-					FunctionCall{
-						Type:      FunctionCallType,
-						CallID:    "call_empty",
-						Name:      "get_time",
-						Arguments: `{}`,
-					},
-					// Note: call_invalid should be skipped due to marshal error
-				},
-				Tools: []ToolsRequestConfig{},
+			name: "empty output response",
+			response: `{
+				"output": []
+			}`,
+			expected: agent.LLMResponse{
+				Content: []agent.ContentResponse{},
+				Tools:   []agent.ToolResponseObject{},
 			},
 		},
 		{
-			name: "request with file content",
-			request: &agent.LLMRequest{
-				SystemMessage: "You can process files.",
-				Messages: []any{
-					agent.MessageTypeContent{
-						Role:        agent.RoleTypeUser,
-						Content:     "Analyze this file",
-						FileContent: requestctx.NewFileValue(io.NopCloser(strings.NewReader("test content")), "test.txt"),
+			name: "invalid function arguments returns empty map",
+			response: `{
+				"output": [
+					{
+						"type": "function_call",
+						"name": "get_weather",
+						"arguments": "{invalid json}",
+						"call_id": "call_invalid"
+					}
+				]
+			}`,
+			expected: agent.LLMResponse{
+				Content: []agent.ContentResponse{},
+				Tools: []agent.ToolResponseObject{
+					{
+						Name:   "get_weather",
+						ToolID: "call_invalid",
+						Input:  map[string]interface{}{},
 					},
 				},
-				Tools: []agent.ToolInfo{},
-			},
-			expected: RequestBody{
-				Model:        defaultModel,
-				Instructions: "You can process files.",
-				Input: []interface{}{
-					MessageInput{
-						Role: "user",
-						Content: []ContentInputWrapper{
-							{Type: InputTypeText, Text: "Analyze this file"},
-							{Type: InputTypeImage, ImageURL: ""},
-						},
-					},
-				},
-				Tools: []ToolsRequestConfig{},
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := convertAgentRequestToOpenAIRequest(logger, tt.request, defaultModel)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				w.Write([]byte(tt.response))
+			}))
+			defer server.Close()
 
-			if tt.name == "request with file content" {
-				assert.Equal(t, tt.expected.Model, result.Model)
-				assert.Equal(t, tt.expected.Instructions, result.Instructions)
-				assert.Equal(t, len(tt.expected.Input), len(result.Input))
-				assert.Equal(t, tt.expected.Tools, result.Tools)
+			client := openai.NewClient(
+				option.WithAPIKey("test-key"),
+				option.WithBaseURL(server.URL),
+			)
 
-				if len(result.Input) > 0 {
-					resultMsg, ok := result.Input[0].(MessageInput)
-					assert.True(t, ok)
-					expectedMsg := tt.expected.Input[0].(MessageInput)
-					assert.Equal(t, expectedMsg.Role, resultMsg.Role)
-					assert.Equal(t, len(expectedMsg.Content), len(resultMsg.Content))
+			resp, err := client.Responses.New(context.Background(), responses.ResponseNewParams{
+				Model: "gpt-4",
+				Input: responses.ResponseNewParamsInputUnion{
+					OfString: openai.String("test"),
+				},
+			})
+			require.NoError(t, err)
 
-					if len(resultMsg.Content) >= 2 {
-						assert.Equal(t, InputTypeText, resultMsg.Content[0].Type)
-						assert.Equal(t, expectedMsg.Content[0].Text, resultMsg.Content[0].Text)
-						assert.Equal(t, InputTypeImage, resultMsg.Content[1].Type)
-						assert.NotEmpty(t, resultMsg.Content[1].ImageURL)
-					}
-				}
-			} else {
-				assert.Equal(t, tt.expected, result)
-			}
+			result := convertSDKResponseToAgentResponse(resp, logger)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestConvertAgentRequestToSDKParams(t *testing.T) {
+	logger := zap.NewNop()
+
+	t.Run("basic request with text messages", func(t *testing.T) {
+		req := &agent.LLMRequest{
+			SystemMessage: "You are a helpful assistant.",
+			Messages: []any{
+				agent.MessageTypeContent{
+					Role:    agent.RoleTypeUser,
+					Content: "Hello, how are you?",
+				},
+			},
+			Tools: []agent.ToolInfo{},
+		}
+
+		params := convertAgentRequestToSDKParams(logger, req, "gpt-4")
+
+		assert.Equal(t, "gpt-4", params.Model)
+		assert.Equal(t, "You are a helpful assistant.", params.Instructions.Value)
+		require.Len(t, params.Input.OfInputItemList, 1)
+		inputItem := params.Input.OfInputItemList[0]
+		require.NotNil(t, inputItem.OfMessage)
+		assert.Equal(t, responses.EasyInputMessageRole("user"), inputItem.OfMessage.Role)
+		require.Len(t, inputItem.OfMessage.Content.OfInputItemContentList, 1)
+		assert.Equal(t, "Hello, how are you?", inputItem.OfMessage.Content.OfInputItemContentList[0].OfInputText.Text)
+	})
+
+	t.Run("request with tools", func(t *testing.T) {
+		req := &agent.LLMRequest{
+			SystemMessage: "You have access to weather tools.",
+			Messages: []any{
+				agent.MessageTypeContent{
+					Role:    agent.RoleTypeUser,
+					Content: "What's the weather like?",
+				},
+			},
+			Tools: []agent.ToolInfo{
+				{
+					Name:        "get_weather",
+					Description: "Get the current weather for a location",
+					InputSchema: mcp.ToolInputSchema{
+						Type: "object",
+						Properties: map[string]interface{}{
+							"location": map[string]interface{}{
+								"type":        "string",
+								"description": "The city and state, e.g. San Francisco, CA",
+							},
+						},
+						Required: []string{"location"},
+					},
+				},
+			},
+		}
+
+		params := convertAgentRequestToSDKParams(logger, req, "gpt-4")
+
+		assert.Equal(t, "gpt-4", params.Model)
+		require.Len(t, params.Tools, 1)
+		tool := params.Tools[0]
+		require.NotNil(t, tool.OfFunction)
+		assert.Equal(t, "get_weather", tool.OfFunction.Name)
+		assert.Equal(t, "Get the current weather for a location", tool.OfFunction.Description.Value)
+		assert.Equal(t, "object", tool.OfFunction.Parameters["type"])
+		props := tool.OfFunction.Parameters["properties"].(map[string]interface{})
+		locProp := props["location"].(map[string]interface{})
+		assert.Equal(t, "string", locProp["type"])
+	})
+
+	t.Run("request with multiple tools", func(t *testing.T) {
+		req := &agent.LLMRequest{
+			SystemMessage: "You have access to multiple tools.",
+			Messages: []any{
+				agent.MessageTypeContent{
+					Role:    agent.RoleTypeUser,
+					Content: "Help me with weather and time",
+				},
+			},
+			Tools: []agent.ToolInfo{
+				{
+					Name:        "get_weather",
+					Description: "Get weather information",
+					InputSchema: mcp.ToolInputSchema{
+						Type: "object",
+						Properties: map[string]interface{}{
+							"location": map[string]interface{}{"type": "string"},
+						},
+						Required: []string{"location"},
+					},
+				},
+				{
+					Name:        "get_time",
+					Description: "Get current time",
+					InputSchema: mcp.ToolInputSchema{
+						Type: "object",
+						Properties: map[string]interface{}{
+							"timezone": map[string]interface{}{"type": "string"},
+						},
+					},
+				},
+			},
+		}
+
+		params := convertAgentRequestToSDKParams(logger, req, "gpt-4")
+
+		require.Len(t, params.Tools, 2)
+		assert.Equal(t, "get_weather", params.Tools[0].OfFunction.Name)
+		assert.Equal(t, "Get weather information", params.Tools[0].OfFunction.Description.Value)
+		assert.Equal(t, "get_time", params.Tools[1].OfFunction.Name)
+		assert.Equal(t, "Get current time", params.Tools[1].OfFunction.Description.Value)
+	})
+
+	t.Run("empty request", func(t *testing.T) {
+		req := &agent.LLMRequest{
+			SystemMessage: "",
+			Messages:      []any{},
+			Tools:         []agent.ToolInfo{},
+		}
+
+		params := convertAgentRequestToSDKParams(logger, req, defaultModel)
+
+		assert.Equal(t, defaultModel, params.Model)
+		assert.Equal(t, "", params.Instructions.Value)
+		assert.Empty(t, params.Input.OfInputItemList)
+		assert.Empty(t, params.Tools)
+	})
+}
+
+func TestBuildMessageInput(t *testing.T) {
+	logger := zap.NewNop()
+
+	t.Run("user message", func(t *testing.T) {
+		msg := agent.MessageTypeContent{
+			Role:    agent.RoleTypeUser,
+			Content: "Hello",
+		}
+
+		result := buildMessageInput(logger, msg)
+		require.NotNil(t, result.OfMessage)
+		assert.Nil(t, result.OfOutputMessage)
+		assert.Equal(t, responses.EasyInputMessageRole("user"), result.OfMessage.Role)
+		assert.Equal(t, "message", string(result.OfMessage.Type))
+		require.Len(t, result.OfMessage.Content.OfInputItemContentList, 1)
+		assert.Equal(t, "input_text", string(result.OfMessage.Content.OfInputItemContentList[0].OfInputText.Type))
+		assert.Equal(t, "Hello", result.OfMessage.Content.OfInputItemContentList[0].OfInputText.Text)
+	})
+
+	t.Run("assistant message", func(t *testing.T) {
+		msg := agent.MessageTypeContent{
+			Role:    agent.RoleTypeAssistant,
+			Content: "Hello, I'm here to help.",
+		}
+
+		result := buildMessageInput(logger, msg)
+		require.NotNil(t, result.OfOutputMessage)
+		assert.Nil(t, result.OfMessage)
+		assert.Equal(t, "assistant", string(result.OfOutputMessage.Role))
+		assert.Equal(t, "message", string(result.OfOutputMessage.Type))
+		assert.Equal(t, "completed", string(result.OfOutputMessage.Status))
+		require.Len(t, result.OfOutputMessage.Content, 1)
+		assert.Equal(t, "output_text", string(result.OfOutputMessage.Content[0].OfOutputText.Type))
+		assert.Equal(t, "Hello, I'm here to help.", result.OfOutputMessage.Content[0].OfOutputText.Text)
+	})
+
+	t.Run("system message", func(t *testing.T) {
+		msg := agent.MessageTypeContent{
+			Role:    agent.RoleTypeSystem,
+			Content: "System message",
+		}
+
+		result := buildMessageInput(logger, msg)
+		require.NotNil(t, result.OfMessage)
+		assert.Nil(t, result.OfOutputMessage)
+		assert.Equal(t, responses.EasyInputMessageRole("system"), result.OfMessage.Role)
+		assert.Equal(t, "message", string(result.OfMessage.Type))
+		require.Len(t, result.OfMessage.Content.OfInputItemContentList, 1)
+		assert.Equal(t, "System message", result.OfMessage.Content.OfInputItemContentList[0].OfInputText.Text)
+	})
+
+	t.Run("developer message", func(t *testing.T) {
+		msg := agent.MessageTypeContent{
+			Role:    agent.RoleTypeDeveloper,
+			Content: "Developer message",
+		}
+
+		result := buildMessageInput(logger, msg)
+		require.NotNil(t, result.OfMessage)
+		assert.Nil(t, result.OfOutputMessage)
+		assert.Equal(t, responses.EasyInputMessageRole("developer"), result.OfMessage.Role)
+		assert.Equal(t, "message", string(result.OfMessage.Type))
+		require.Len(t, result.OfMessage.Content.OfInputItemContentList, 1)
+		assert.Equal(t, "Developer message", result.OfMessage.Content.OfInputItemContentList[0].OfInputText.Text)
+	})
+
+	t.Run("message with file content", func(t *testing.T) {
+		msg := agent.MessageTypeContent{
+			Role:        agent.RoleTypeUser,
+			Content:     "Analyze this file",
+			FileContent: requestctx.NewFileValue(io.NopCloser(strings.NewReader("test content")), "test.txt"),
+		}
+
+		result := buildMessageInput(logger, msg)
+		require.NotNil(t, result.OfMessage)
+		assert.Equal(t, responses.EasyInputMessageRole("user"), result.OfMessage.Role)
+		require.Len(t, result.OfMessage.Content.OfInputItemContentList, 2)
+		assert.Equal(t, "Analyze this file", result.OfMessage.Content.OfInputItemContentList[0].OfInputText.Text)
+		require.NotNil(t, result.OfMessage.Content.OfInputItemContentList[1].OfInputImage)
+		assert.Equal(t, "input_image", string(result.OfMessage.Content.OfInputItemContentList[1].OfInputImage.Type))
+	})
+}
+
+func TestBuildFunctionCallOutput(t *testing.T) {
+	t.Run("text response", func(t *testing.T) {
+		val := agent.MessageToolCallResponse{
+			ID:               "call_123",
+			ToolResponseType: agent.ToolResponseTypeText,
+			Text:             `{"temperature": 22, "condition": "sunny"}`,
+		}
+
+		result := buildFunctionCallOutput(val)
+		require.NotNil(t, result.OfFunctionCallOutput)
+		assert.Equal(t, "call_123", result.OfFunctionCallOutput.CallID)
+		assert.Equal(t, `{"temperature": 22, "condition": "sunny"}`, result.OfFunctionCallOutput.Output.OfString.Value)
+	})
+
+	t.Run("image response", func(t *testing.T) {
+		val := agent.MessageToolCallResponse{
+			ID:               "call_456",
+			ToolResponseType: agent.ToolResponseTypeImage,
+			ImageData:        []byte("dGVzdCBpbWFnZSBkYXRh"),
+			ImageMimeType:    "image/png",
+		}
+
+		result := buildFunctionCallOutput(val)
+		require.NotNil(t, result.OfFunctionCallOutput)
+		assert.Equal(t, "call_456", result.OfFunctionCallOutput.CallID)
+		assert.Contains(t, result.OfFunctionCallOutput.Output.OfString.Value, "data:image/png;base64,")
+	})
+}
+
+func TestBuildFunctionCallInput(t *testing.T) {
+	logger := zap.NewNop()
+
+	t.Run("simple arguments", func(t *testing.T) {
+		val := agent.MessageToolCall{
+			ID:   "call_123",
+			Name: "get_weather",
+			Arguments: map[string]interface{}{
+				"location": "New York",
+				"unit":     "celsius",
+			},
+		}
+
+		result := buildFunctionCallInput(logger, val)
+		require.NotNil(t, result.OfFunctionCall)
+		assert.Equal(t, "call_123", result.OfFunctionCall.CallID)
+		assert.Equal(t, "get_weather", result.OfFunctionCall.Name)
+		var args map[string]interface{}
+		err := json.Unmarshal([]byte(result.OfFunctionCall.Arguments), &args)
+		require.NoError(t, err)
+		assert.Equal(t, "New York", args["location"])
+		assert.Equal(t, "celsius", args["unit"])
+	})
+
+	t.Run("complex nested arguments", func(t *testing.T) {
+		val := agent.MessageToolCall{
+			ID:   "call_complex",
+			Name: "process_data",
+			Arguments: map[string]interface{}{
+				"data": map[string]interface{}{
+					"items": []interface{}{
+						map[string]interface{}{"id": 1, "active": true},
+						map[string]interface{}{"id": 2, "active": false},
+					},
+				},
+				"format": "json",
+			},
+		}
+
+		result := buildFunctionCallInput(logger, val)
+		require.NotNil(t, result.OfFunctionCall)
+		assert.Equal(t, "call_complex", result.OfFunctionCall.CallID)
+		assert.Equal(t, "process_data", result.OfFunctionCall.Name)
+		var args map[string]interface{}
+		err := json.Unmarshal([]byte(result.OfFunctionCall.Arguments), &args)
+		require.NoError(t, err)
+		assert.Equal(t, "json", args["format"])
+		data := args["data"].(map[string]interface{})
+		items := data["items"].([]interface{})
+		assert.Len(t, items, 2)
+	})
+
+	t.Run("empty arguments", func(t *testing.T) {
+		val := agent.MessageToolCall{
+			ID:        "call_empty",
+			Name:      "get_time",
+			Arguments: map[string]interface{}{},
+		}
+
+		result := buildFunctionCallInput(logger, val)
+		require.NotNil(t, result.OfFunctionCall)
+		assert.Equal(t, "call_empty", result.OfFunctionCall.CallID)
+		assert.Equal(t, "get_time", result.OfFunctionCall.Name)
+		assert.Equal(t, "{}", result.OfFunctionCall.Arguments)
+	})
+}
+
+func TestMapAgentRoleToSDKRole(t *testing.T) {
+	tests := []struct {
+		role     agent.RoleType
+		expected string
+	}{
+		{agent.RoleTypeSystem, "system"},
+		{agent.RoleTypeUser, "user"},
+		{agent.RoleTypeAssistant, "assistant"},
+		{agent.RoleTypeDeveloper, "developer"},
+		{agent.RoleTypeUnknown, "user"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expected, func(t *testing.T) {
+			result := mapAgentRoleToSDKRole(tt.role)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestMarshalArguments(t *testing.T) {
+	logger := zap.NewNop()
+
+	tests := []struct {
+		name     string
+		args     map[string]interface{}
+		expected string
+	}{
+		{
+			name:     "nil arguments",
+			args:     nil,
+			expected: "{}",
+		},
+		{
+			name:     "empty arguments",
+			args:     map[string]interface{}{},
+			expected: "{}",
+		},
+		{
+			name: "simple arguments",
+			args: map[string]interface{}{
+				"location": "New York",
+			},
+			expected: `{"location":"New York"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := marshalArguments(logger, tt.args)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestUnmarshalArguments(t *testing.T) {
+	logger := zap.NewNop()
+
+	tests := []struct {
+		name      string
+		arguments string
+		expected  map[string]interface{}
+	}{
+		{
+			name:      "empty string",
+			arguments: "",
+			expected:  map[string]interface{}{},
+		},
+		{
+			name:      "invalid json",
+			arguments: "{invalid}",
+			expected:  map[string]interface{}{},
+		},
+		{
+			name:      "valid json",
+			arguments: `{"location": "New York", "unit": "celsius"}`,
+			expected: map[string]interface{}{
+				"location": "New York",
+				"unit":     "celsius",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := unmarshalArguments(logger, tt.arguments)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
@@ -755,46 +660,23 @@ func TestConvertAgentRequestToRequest(t *testing.T) {
 func TestClient_ProvideResponse(t *testing.T) {
 	tests := []struct {
 		name             string
-		serverHandler    func(w http.ResponseWriter, r *http.Request)
+		serverResponse   string
+		statusCode       int
 		request          agent.LLMRequest
-		expectedError    bool
 		expectedResponse agent.LLMResponse
+		expectedError    bool
 	}{
 		{
 			name: "successful response with message only",
-			serverHandler: func(w http.ResponseWriter, r *http.Request) {
-				// Verify request
-				if r.Method != http.MethodPost {
-					t.Errorf("Expected method POST, got %s", r.Method)
-				}
-				if contentType := r.Header.Get("Content-Type"); contentType != "application/json" {
-					t.Errorf("Expected Content-Type: application/json, got %s", contentType)
-				}
-				if auth := r.Header.Get("Authorization"); auth != "Bearer test-api-key" {
-					t.Errorf("Expected Authorization: Bearer test-api-key, got %s", auth)
-				}
-
-				// Verify request body
-				var reqBody RequestBody
-				if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
-					t.Errorf("Failed to decode request body: %v", err)
-				}
-
-				mockResponse := Response{
-					Output: []OutputObject{
-						{
-							Type: OutputTypeMessage,
-							Content: []ContentObject{
-								{Type: "text", Text: "Hello! How can I help you today?"},
-							},
-						},
-					},
-				}
-
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusOK)
-				json.NewEncoder(w).Encode(mockResponse)
-			},
+			serverResponse: `{
+				"output": [
+					{
+						"type": "message",
+						"content": [{"type": "output_text", "text": "Hello! How can I help you today?"}]
+					}
+				]
+			}`,
+			statusCode: http.StatusOK,
 			request: agent.LLMRequest{
 				SystemMessage: "You are a helpful assistant.",
 				Messages: []any{
@@ -815,22 +697,17 @@ func TestClient_ProvideResponse(t *testing.T) {
 		},
 		{
 			name: "successful response with function call",
-			serverHandler: func(w http.ResponseWriter, r *http.Request) {
-				mockResponse := Response{
-					Output: []OutputObject{
-						{
-							Type:      OutputTypeFunctionCall,
-							Name:      "get_weather",
-							Arguments: `{"location": "New York", "unit": "celsius"}`,
-							CallID:    "call_123",
-						},
-					},
-				}
-
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusOK)
-				json.NewEncoder(w).Encode(mockResponse)
-			},
+			serverResponse: `{
+				"output": [
+					{
+						"type": "function_call",
+						"name": "get_weather",
+						"arguments": "{\"location\": \"New York\", \"unit\": \"celsius\"}",
+						"call_id": "call_123"
+					}
+				]
+			}`,
+			statusCode: http.StatusOK,
 			request: agent.LLMRequest{
 				SystemMessage: "You have access to weather tools.",
 				Messages: []any{
@@ -849,10 +726,6 @@ func TestClient_ProvideResponse(t *testing.T) {
 								"location": map[string]interface{}{
 									"type":        "string",
 									"description": "City name",
-								},
-								"unit": map[string]interface{}{
-									"type":        "string",
-									"description": "Temperature unit",
 								},
 							},
 							Required: []string{"location"},
@@ -874,28 +747,21 @@ func TestClient_ProvideResponse(t *testing.T) {
 		},
 		{
 			name: "successful response with mixed message and function call",
-			serverHandler: func(w http.ResponseWriter, r *http.Request) {
-				mockResponse := Response{
-					Output: []OutputObject{
-						{
-							Type: OutputTypeMessage,
-							Content: []ContentObject{
-								{Type: "text", Text: "I'll check the weather for you."},
-							},
-						},
-						{
-							Type:      OutputTypeFunctionCall,
-							Name:      "get_weather",
-							Arguments: `{"location": "London"}`,
-							CallID:    "call_456",
-						},
+			serverResponse: `{
+				"output": [
+					{
+						"type": "message",
+						"content": [{"type": "output_text", "text": "I'll check the weather for you."}]
 					},
-				}
-
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusOK)
-				json.NewEncoder(w).Encode(mockResponse)
-			},
+					{
+						"type": "function_call",
+						"name": "get_weather",
+						"arguments": "{\"location\": \"London\"}",
+						"call_id": "call_456"
+					}
+				]
+			}`,
+			statusCode: http.StatusOK,
 			request: agent.LLMRequest{
 				SystemMessage: "You are a helpful weather assistant.",
 				Messages: []any{
@@ -908,14 +774,7 @@ func TestClient_ProvideResponse(t *testing.T) {
 					{
 						Name:        "get_weather",
 						Description: "Get weather information",
-						InputSchema: mcp.ToolInputSchema{
-							Type: "object",
-							Properties: map[string]interface{}{
-								"location": map[string]interface{}{
-									"type": "string",
-								},
-							},
-						},
+						InputSchema: mcp.ToolInputSchema{Type: "object"},
 					},
 				},
 			},
@@ -934,70 +793,9 @@ func TestClient_ProvideResponse(t *testing.T) {
 			expectedError: false,
 		},
 		{
-			name: "response with tool response message",
-			serverHandler: func(w http.ResponseWriter, r *http.Request) {
-				// Verify that tool response is properly formatted in request
-				var reqBody RequestBody
-				if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
-					t.Errorf("Failed to decode request body: %v", err)
-				}
-
-				// Check that the tool response input is correctly formatted
-				found := false
-				for _, input := range reqBody.Input {
-					if funcOutput, ok := input.(map[string]interface{}); ok {
-						if funcOutput["type"] == FunctionCallOutputType {
-							found = true
-							break
-						}
-					}
-				}
-				if !found {
-					t.Error("Expected function call output in request")
-				}
-
-				mockResponse := Response{
-					Output: []OutputObject{
-						{
-							Type: OutputTypeMessage,
-							Content: []ContentObject{
-								{Type: "text", Text: "Based on the weather data, it's sunny today."},
-							},
-						},
-					},
-				}
-
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusOK)
-				json.NewEncoder(w).Encode(mockResponse)
-			},
-			request: agent.LLMRequest{
-				SystemMessage: "Process tool responses and provide helpful information.",
-				Messages: []any{
-					agent.MessageTypeContent{
-						Role:    agent.RoleTypeUser,
-						Content: "What's the weather like?",
-					},
-					agent.MessageToolCallResponse{
-						ID:   "call_weather_123",
-						Text: `{"temperature": 22, "condition": "sunny"}`,
-					},
-				},
-			},
-			expectedResponse: agent.LLMResponse{
-				Content: []agent.ContentResponse{
-					{Text: "Based on the weather data, it's sunny today."},
-				},
-				Tools: []agent.ToolResponseObject{},
-			},
-			expectedError: false,
-		},
-		{
-			name: "unauthorized error",
-			serverHandler: func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusUnauthorized)
-				w.Write([]byte(`{"error": "Invalid API key"}`))
-			},
+			name:           "unauthorized error",
+			serverResponse: `{"error": {"message": "Invalid API key", "type": "invalid_request_error"}}`,
+			statusCode:     http.StatusUnauthorized,
 			request: agent.LLMRequest{
 				SystemMessage: "You are a helpful assistant.",
 				Messages: []any{
@@ -1010,11 +808,9 @@ func TestClient_ProvideResponse(t *testing.T) {
 			expectedError: true,
 		},
 		{
-			name: "server error",
-			serverHandler: func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusInternalServerError)
-				w.Write([]byte(`{"error": "Internal server error"}`))
-			},
+			name:           "server error",
+			serverResponse: `{"error": {"message": "Internal server error", "type": "server_error"}}`,
+			statusCode:     http.StatusInternalServerError,
 			request: agent.LLMRequest{
 				SystemMessage: "You are a helpful assistant.",
 				Messages: []any{
@@ -1025,94 +821,152 @@ func TestClient_ProvideResponse(t *testing.T) {
 				},
 			},
 			expectedError: true,
-		},
-		{
-			name: "invalid JSON response",
-			serverHandler: func(w http.ResponseWriter, r *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`{invalid json}`))
-			},
-			request: agent.LLMRequest{
-				SystemMessage: "You are a helpful assistant.",
-				Messages: []any{
-					agent.MessageTypeContent{
-						Role:    agent.RoleTypeUser,
-						Content: "Hello",
-					},
-				},
-			},
-			expectedError: true,
-		},
-		{
-			name: "response with invalid function call arguments",
-			serverHandler: func(w http.ResponseWriter, r *http.Request) {
-				mockResponse := Response{
-					Output: []OutputObject{
-						{
-							Type:      OutputTypeFunctionCall,
-							Name:      "get_weather",
-							Arguments: `{invalid json}`,
-							CallID:    "call_invalid",
-						},
-					},
-				}
-
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusOK)
-				json.NewEncoder(w).Encode(mockResponse)
-			},
-			request: agent.LLMRequest{
-				SystemMessage: "You have access to weather tools.",
-				Messages: []any{
-					agent.MessageTypeContent{
-						Role:    agent.RoleTypeUser,
-						Content: "What's the weather?",
-					},
-				},
-				Tools: []agent.ToolInfo{
-					{
-						Name:        "get_weather",
-						Description: "Get weather",
-						InputSchema: mcp.ToolInputSchema{Type: "object"},
-					},
-				},
-			},
-			expectedResponse: agent.LLMResponse{
-				Content: []agent.ContentResponse{},
-				Tools:   []agent.ToolResponseObject{}, // Should be empty due to invalid JSON
-			},
-			expectedError: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(tt.serverHandler))
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, http.MethodPost, r.Method)
+				assert.Contains(t, r.Header.Get("Authorization"), "Bearer")
+
+				body, err := io.ReadAll(r.Body)
+				require.NoError(t, err)
+
+				var reqBody map[string]interface{}
+				err = json.Unmarshal(body, &reqBody)
+				require.NoError(t, err)
+
+				assert.NotEmpty(t, reqBody["model"])
+
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tt.statusCode)
+				w.Write([]byte(tt.serverResponse))
+			}))
 			defer server.Close()
 
-			client := &Client{
-				client: server.Client(),
-				apiKey: "test-api-key",
-			}
+			sdkClient := openai.NewClient(
+				option.WithAPIKey("test-api-key"),
+				option.WithBaseURL(server.URL),
+			)
 
-			// Override endpoint for testing
-			originalEndpoint := endpoint
-			endpoint = server.URL
-			defer func() { endpoint = originalEndpoint }()
+			client := &Client{
+				client: &sdkClient,
+				model:  "gpt-4",
+			}
 
 			response, err := client.ProvideResponse(context.Background(), tt.request)
 
 			if tt.expectedError {
-				if err == nil {
-					t.Error("Expected error but got none")
-				}
+				assert.Error(t, err)
 			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
+				assert.NoError(t, err)
 				assert.Equal(t, tt.expectedResponse, response)
 			}
 		})
 	}
+}
+
+func TestClientType(t *testing.T) {
+	client := &Client{}
+	assert.Equal(t, "openai", client.Type())
+}
+
+func TestCompleteConversationFlow(t *testing.T) {
+	logger := zap.NewNop()
+
+	req := &agent.LLMRequest{
+		SystemMessage: "Handle complete conversation flow.",
+		Messages: []any{
+			agent.MessageTypeContent{
+				Role:    agent.RoleTypeUser,
+				Content: "Get weather for NY and LA",
+			},
+			agent.MessageToolCall{
+				ID:   "call_ny",
+				Name: "get_weather",
+				Arguments: map[string]interface{}{
+					"location": "New York",
+					"unit":     "celsius",
+				},
+			},
+			agent.MessageToolCall{
+				ID:   "call_la",
+				Name: "get_weather",
+				Arguments: map[string]interface{}{
+					"location": "Los Angeles",
+				},
+			},
+			agent.MessageToolCallResponse{
+				ID:               "call_ny",
+				ToolResponseType: agent.ToolResponseTypeText,
+				Text:             `{"temperature": 18, "condition": "sunny"}`,
+			},
+			agent.MessageToolCallResponse{
+				ToolResponseType: agent.ToolResponseTypeText,
+				ID:               "call_la",
+				Text:             `{"temperature": 25, "condition": "clear"}`,
+			},
+			agent.MessageTypeContent{
+				Role:    agent.RoleTypeAssistant,
+				Content: "Weather retrieved for both cities.",
+			},
+		},
+		Tools: []agent.ToolInfo{},
+	}
+
+	params := convertAgentRequestToSDKParams(logger, req, "gpt-4")
+
+	assert.Equal(t, "gpt-4", params.Model)
+	assert.Equal(t, "Handle complete conversation flow.", params.Instructions.Value)
+
+	require.Len(t, params.Input.OfInputItemList, 6)
+
+	// Verify user message
+	userMsg := params.Input.OfInputItemList[0]
+	require.NotNil(t, userMsg.OfMessage)
+	assert.Equal(t, responses.EasyInputMessageRole("user"), userMsg.OfMessage.Role)
+	require.Len(t, userMsg.OfMessage.Content.OfInputItemContentList, 1)
+	assert.Equal(t, "Get weather for NY and LA", userMsg.OfMessage.Content.OfInputItemContentList[0].OfInputText.Text)
+
+	// Verify first function call (NY)
+	funcCallNY := params.Input.OfInputItemList[1]
+	require.NotNil(t, funcCallNY.OfFunctionCall)
+	assert.Equal(t, "call_ny", funcCallNY.OfFunctionCall.CallID)
+	assert.Equal(t, "get_weather", funcCallNY.OfFunctionCall.Name)
+	var argsNY map[string]interface{}
+	err := json.Unmarshal([]byte(funcCallNY.OfFunctionCall.Arguments), &argsNY)
+	require.NoError(t, err)
+	assert.Equal(t, "New York", argsNY["location"])
+	assert.Equal(t, "celsius", argsNY["unit"])
+
+	// Verify second function call (LA)
+	funcCallLA := params.Input.OfInputItemList[2]
+	require.NotNil(t, funcCallLA.OfFunctionCall)
+	assert.Equal(t, "call_la", funcCallLA.OfFunctionCall.CallID)
+	assert.Equal(t, "get_weather", funcCallLA.OfFunctionCall.Name)
+	var argsLA map[string]interface{}
+	err = json.Unmarshal([]byte(funcCallLA.OfFunctionCall.Arguments), &argsLA)
+	require.NoError(t, err)
+	assert.Equal(t, "Los Angeles", argsLA["location"])
+
+	// Verify first function call output (NY response)
+	funcOutputNY := params.Input.OfInputItemList[3]
+	require.NotNil(t, funcOutputNY.OfFunctionCallOutput)
+	assert.Equal(t, "call_ny", funcOutputNY.OfFunctionCallOutput.CallID)
+	assert.Equal(t, `{"temperature": 18, "condition": "sunny"}`, funcOutputNY.OfFunctionCallOutput.Output.OfString.Value)
+
+	// Verify second function call output (LA response)
+	funcOutputLA := params.Input.OfInputItemList[4]
+	require.NotNil(t, funcOutputLA.OfFunctionCallOutput)
+	assert.Equal(t, "call_la", funcOutputLA.OfFunctionCallOutput.CallID)
+	assert.Equal(t, `{"temperature": 25, "condition": "clear"}`, funcOutputLA.OfFunctionCallOutput.Output.OfString.Value)
+
+	// Verify assistant message
+	assistantMsg := params.Input.OfInputItemList[5]
+	require.NotNil(t, assistantMsg.OfOutputMessage)
+	assert.Equal(t, "assistant", string(assistantMsg.OfOutputMessage.Role))
+	assert.Equal(t, "completed", string(assistantMsg.OfOutputMessage.Status))
+	require.Len(t, assistantMsg.OfOutputMessage.Content, 1)
+	assert.Equal(t, "Weather retrieved for both cities.", assistantMsg.OfOutputMessage.Content[0].OfOutputText.Text)
 }

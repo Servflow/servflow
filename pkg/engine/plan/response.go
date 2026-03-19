@@ -38,8 +38,9 @@ type ResponseBuilder interface {
 }
 
 const (
-	builderTypeTemplate = "template"
-	builderTypeObject   = "json_object"
+	responseTypeTemplate = "template"
+	responseTypeObject   = "json_object"
+	responseTypeFile     = "file"
 )
 
 func newResponse(id, name string, resp apiconfig.ResponseConfig) (*Response, error) {
@@ -50,16 +51,16 @@ func newResponse(id, name string, resp apiconfig.ResponseConfig) (*Response, err
 	var responseBuilder ResponseBuilder
 	if resp.Type == "" {
 		if resp.Object.Value != "" || len(resp.Object.Fields) > 0 {
-			resp.Type = builderTypeObject
+			resp.Type = responseTypeObject
 		} else {
-			resp.Type = builderTypeTemplate
+			resp.Type = responseTypeTemplate
 		}
 	}
 
 	switch resp.Type {
-	case builderTypeTemplate:
+	case responseTypeTemplate:
 		responseBuilder = responsebuilder.NewTemplateBuilder(resp.Code, resp.Template)
-	case builderTypeObject:
+	case responseTypeObject:
 		responseBuilder = responsebuilder.NewObjectBuilder(&resp.Object, resp.Code)
 	default:
 		return nil, fmt.Errorf("unknown builder type: %s", resp.Type)

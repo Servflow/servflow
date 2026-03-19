@@ -109,6 +109,7 @@ type ResponseConfig struct {
 	Template string         `json:"template" yaml:"template"`
 	Type     string         `json:"type" yaml:"type"`
 	Object   ResponseObject `json:"responseObject" yaml:"responseObject"`
+	File     FileInput      `json:"file" yaml:"file"`
 }
 
 type ResponseObject struct {

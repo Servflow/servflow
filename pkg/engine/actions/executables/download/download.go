@@ -60,7 +60,7 @@ func (d *Download) Execute(ctx context.Context, modifiedConfig string) (interfac
 
 	fileValue, err := requestctx.GetFileFromContext(ctx, cfg.File)
 	if err != nil {
-		return nil, fmt.Errorf("file not found: %v", err)
+		return nil, fmt.Errorf("%w: file not found: %v", plan.ErrFailure, err)
 	}
 	defer fileValue.Close()
 

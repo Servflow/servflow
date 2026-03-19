@@ -57,7 +57,7 @@ func TestPlan_Execute(t *testing.T) {
 	testCases := []struct {
 		name            string
 		startAction     string
-		endValue        string
+		endValue        *EndValueSpec
 		contextSetup    func(context.Context)
 		mockAssertions  func(*MockActionExecutable, *MockActionExecutable, *MockActionExecutable)
 		expectedBody    string
@@ -68,7 +68,7 @@ func TestPlan_Execute(t *testing.T) {
 		{
 			name:         "success from response template",
 			startAction:  requestctx2.ActionConfigPrefix + "action1",
-			endValue:     "",
+			endValue:     nil,
 			contextSetup: func(ctx context.Context) {},
 			mockAssertions: func(exec1, exec2, exec3 *MockActionExecutable) {
 				exec1.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil)
@@ -79,7 +79,7 @@ func TestPlan_Execute(t *testing.T) {
 		{
 			name:        "success from end value",
 			startAction: requestctx2.ActionConfigPrefix + "action2",
-			endValue:    "{{ .testValue }}",
+			endValue:    &EndValueSpec{ValType: StringEndValue, StringVal: "{{ .testValue }}"},
 			contextSetup: func(ctx context.Context) {
 				requestctx2.AddRequestVariables(ctx, map[string]interface{}{"testValue": "hello"}, "")
 			},
@@ -91,7 +91,7 @@ func TestPlan_Execute(t *testing.T) {
 		{
 			name:         "invalid step",
 			startAction:  "invalidID",
-			endValue:     "",
+			endValue:     nil,
 			contextSetup: func(ctx context.Context) {},
 			mockAssertions: func(exec1, exec2, exec3 *MockActionExecutable) {
 				// No mock expectations for invalid action
@@ -102,7 +102,7 @@ func TestPlan_Execute(t *testing.T) {
 		{
 			name:        "execute in action",
 			startAction: requestctx2.ActionConfigPrefix + "action3",
-			endValue:    "",
+			endValue:    nil,
 			contextSetup: func(ctx context.Context) {
 				requestctx2.AddRequestVariables(ctx, map[string]interface{}{"testValue": "test value"}, "")
 			},
@@ -124,7 +124,7 @@ func TestPlan_Execute(t *testing.T) {
 		{
 			name:        "get from secret",
 			startAction: requestctx2.ActionConfigPrefix + "action2",
-			endValue:    `{{ secret "MONGO_PASS" }}`,
+			endValue:    &EndValueSpec{ValType: StringEndValue, StringVal: `{{ secret "MONGO_PASS" }}`},
 			contextSetup: func(ctx context.Context) {
 				os.Setenv("MONGO_PASS", "secret")
 				requestctx2.AddRequestVariables(ctx, map[string]interface{}{"testValue": "hello"}, "")

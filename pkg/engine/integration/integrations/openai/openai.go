@@ -211,8 +211,21 @@ func buildMessageInput(logger *zap.Logger, val agent.MessageTypeContent) respons
 }
 
 func buildFunctionCallOutput(val agent.MessageToolCallResponse) responses.ResponseInputItemUnionParam {
-	output := val.GenerateContent(true)
-	return responses.ResponseInputItemParamOfFunctionCallOutput(val.ID, output)
+	content, _, outputType := val.GenerateContent()
+
+	switch outputType {
+	case agent.ToolCallOutputTypeImage:
+		outputItems := responses.ResponseFunctionCallOutputItemListParam{
+			{
+				OfInputImage: &responses.ResponseInputImageContentParam{
+					ImageURL: openai.String(content),
+				},
+			},
+		}
+		return responses.ResponseInputItemParamOfFunctionCallOutput(val.ID, outputItems)
+	default:
+		return responses.ResponseInputItemParamOfFunctionCallOutput(val.ID, content)
+	}
 }
 
 func buildFunctionCallInput(logger *zap.Logger, val agent.MessageToolCall) responses.ResponseInputItemUnionParam {

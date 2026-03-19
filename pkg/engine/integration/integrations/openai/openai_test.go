@@ -495,7 +495,10 @@ func TestBuildFunctionCallOutput(t *testing.T) {
 		result := buildFunctionCallOutput(val)
 		require.NotNil(t, result.OfFunctionCallOutput)
 		assert.Equal(t, "call_456", result.OfFunctionCallOutput.CallID)
-		assert.Contains(t, result.OfFunctionCallOutput.Output.OfString.Value, "data:image/png;base64,")
+		require.Len(t, result.OfFunctionCallOutput.Output.OfResponseFunctionCallOutputItemArray, 1)
+		imageItem := result.OfFunctionCallOutput.Output.OfResponseFunctionCallOutputItemArray[0]
+		require.NotNil(t, imageItem.OfInputImage)
+		assert.Contains(t, imageItem.OfInputImage.ImageURL.Value, "data:image/png;base64,")
 	})
 }
 

@@ -281,6 +281,7 @@ func TestNewClient(t *testing.T) {
 			Params:      []string{"param1", "param2"},
 			ReturnValue: `{{ printf "%s%s" .variable_actions_workflow_action.result (tool_param "param1") }}`,
 			Start:       requestctx2.ActionConfigPrefix + "workflow_action",
+			Type:        "string",
 		}))
 		require.NoError(t, err)
 		require.NotNil(t, manager)

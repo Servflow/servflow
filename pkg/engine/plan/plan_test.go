@@ -109,7 +109,9 @@ func TestPlan_Execute(t *testing.T) {
 			mockAssertions: func(exec1, exec2, exec3 *MockActionExecutable) {
 				exec3.EXPECT().Execute(gomock.Any(), gomock.Any()).
 					DoAndReturn(func(ctx context.Context, _ string) (interface{}, error) {
-						resp, err := ExecuteFromContext(ctx, requestctx2.ActionConfigPrefix+"action2", "{{ .testValue }}")
+						resp, err := ExecuteFromContext(ctx, requestctx2.ActionConfigPrefix+"action2", &EndValueSpec{
+							StringVal: "{{ .testValue }}",
+						})
 						require.NoError(t, err)
 						assert.Equal(t, "test value", string(resp.Body))
 						return string(resp.Body), nil

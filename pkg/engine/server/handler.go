@@ -171,7 +171,7 @@ func (h *APIHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	resp, err := h.p.Execute(ctx, h.planStart, "")
+	resp, err := h.p.Execute(ctx, h.planStart, nil)
 	if err != nil || resp == nil {
 		if span != nil {
 			span.SetAttributes(attribute.Int("http.status_code", http.StatusInternalServerError))

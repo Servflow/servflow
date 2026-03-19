@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"text/template"
 
 	"github.com/Servflow/servflow/pkg/agent"
@@ -44,7 +45,13 @@ type WorkflowToolConfig struct {
 	ReturnValue string              `json:"returnValue"`
 	ReturnFile  apiconfig.FileInput `json:"returnFile"`
 	Start       string              `json:"start"`
+	Type        string              `json:"type"`
 }
+
+const (
+	workflowToolResponseString = "string"
+	workflowToolResponseFile   = "file"
+)
 
 type toolDescription struct {
 	Name        string              `json:"name"`
@@ -93,6 +100,9 @@ func WithServerConfig(config ServerConfig) ClientOption {
 
 func WithWorkflowToolConfig(config WorkflowToolConfig) ClientOption {
 	return func(manager *Manager) error {
+		if config.Type != workflowToolResponseString && config.Type != workflowToolResponseFile {
+			return fmt.Errorf("invalid workflow tool type: %s", config.Type)
+		}
 		properties := make(map[string]any)
 		for _, v := range config.Params {
 			properties[v] = map[string]string{
@@ -109,35 +119,63 @@ func WithWorkflowToolConfig(config WorkflowToolConfig) ClientOption {
 			},
 		}
 
-		manager.toolsExec[config.Name] = func(ctx context.Context, params map[string]any) ([]mcp.Content, error) {
-			logging.DebugContext(ctx,
-				"Executing workflow",
-				zap.Any("params", params),
-				zap.String("tool", config.Name),
-				zap.String("start", config.Start),
-				zap.String("returnValue", config.ReturnValue),
-			)
-			reqCtx, ok := requestctx.FromContext(ctx)
-			if !ok {
-				return nil, errors.New("invalid error")
-			}
-			reqCtx.AddRequestTemplateFunctions(template.FuncMap{
-				"tool_param": func(key string) string {
-					p, ok := params[key].(string)
-					if !ok {
-						return ""
-					}
-					return p
-				},
-			})
-			resp, err := plan.ExecuteFromContext(ctx, config.Start, config.ReturnValue)
+		manager.toolsExec[config.Name] = generateWorkflowToolExec(&config)
+
+		return nil
+	}
+}
+
+func generateWorkflowToolExec(config *WorkflowToolConfig) functionExec {
+	return func(ctx context.Context, params map[string]any) ([]mcp.Content, error) {
+		logging.DebugContext(ctx,
+			"Executing workflow",
+			zap.Any("params", params),
+			zap.String("tool", config.Name),
+			zap.String("start", config.Start),
+			zap.String("returnValue", config.ReturnValue),
+		)
+		reqCtx, ok := requestctx.FromContext(ctx)
+		if !ok {
+			return nil, errors.New("invalid error")
+		}
+		reqCtx.AddRequestTemplateFunctions(template.FuncMap{
+			"tool_param": func(key string) string {
+				p, ok := params[key].(string)
+				if !ok {
+					return ""
+				}
+				return p
+			},
+		})
+
+		endValueSpec := plan.EndValueSpec{}
+		switch config.Type {
+		case workflowToolResponseString:
+			endValueSpec.ValType = plan.StringEndValue
+			endValueSpec.StringVal = config.ReturnValue
+		case workflowToolResponseFile:
+			endValueSpec.ValType = plan.FileEndValue
+			endValueSpec.FileVal = config.ReturnFile
+		default:
+		}
+		resp, err := plan.ExecuteFromContext(ctx, config.Start, &endValueSpec)
+		if err != nil {
+			return nil, err
+		}
+
+		if resp.File != nil {
+			data, err := io.ReadAll(resp.File.GetReader())
 			if err != nil {
 				return nil, err
 			}
+			mimeType, err := resp.File.GetMimeType()
+			if err != nil {
+				return nil, err
+			}
+			return []mcp.Content{mcp.NewImageContent(string(data), mimeType)}, nil
+		} else {
 			return []mcp.Content{mcp.NewTextContent(string(resp.Body))}, nil
 		}
-
-		return nil
 	}
 }
 

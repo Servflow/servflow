@@ -7,6 +7,7 @@ import (
 
 	"github.com/Servflow/servflow/pkg/engine/integration"
 	dbfilters "github.com/Servflow/servflow/pkg/engine/integration/integrations/filters"
+	"github.com/Servflow/servflow/pkg/logging"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -18,8 +19,17 @@ type Config struct {
 }
 
 type Mongo struct {
+	integration.BaseIntegration
 	client *mongo.Client
 	dbName string
+}
+
+func (m *Mongo) Shutdown(ctx context.Context) error {
+	if m.client != nil {
+		logging.InfoContext(ctx, "shutting down mongo integration")
+		return m.client.Disconnect(ctx)
+	}
+	return nil
 }
 
 func (m *Mongo) ExecuteQuery(ctx context.Context, collection string, filterQuery string, projectionQuery string) ([]map[string]interface{}, error) {

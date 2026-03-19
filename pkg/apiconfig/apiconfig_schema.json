@@ -178,6 +178,9 @@
         "name": {
           "type": "string"
         },
+        "file": {
+          "type": "object"
+        },
         "code": {
           "type": "integer",
           "minimum": 100,

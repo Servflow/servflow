@@ -295,6 +295,12 @@ func (e *Engine) Stop() error {
 		}
 	}
 
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := integration.GetManager().Shutdown(shutdownCtx); err != nil {
+		logging.ErrorContext(e.ctx, "failed to shutdown integrations", err)
+	}
+
 	cl, err := storage.GetClient()
 	if err != nil {
 		return err

@@ -15,6 +15,16 @@ import (
 	"go.uber.org/zap"
 )
 
+type Shutdownable interface {
+	Shutdown(ctx context.Context) error
+}
+
+type BaseIntegration struct{}
+
+func (b *BaseIntegration) Shutdown(ctx context.Context) error {
+	return nil
+}
+
 type FieldType string
 
 const (
@@ -54,6 +64,32 @@ var integrationManager = &Manager{
 
 type Integration interface {
 	Type() string
+}
+
+func GetManager() *Manager {
+	return integrationManager
+}
+
+func (m *Manager) Shutdown(ctx context.Context) error {
+	logger := logging.FromContext(ctx)
+	var shutdownErr error
+
+	m.integrations.Range(func(key, value any) bool {
+		id := key.(string)
+		integration := value.(Integration)
+
+		if shutdownable, ok := integration.(Shutdownable); ok {
+			logger.Debug("shutting down integration", zap.String("id", id), zap.String("type", integration.Type()))
+			if err := shutdownable.Shutdown(ctx); err != nil {
+				logger.Error("failed to shutdown integration", zap.String("id", id), zap.Error(err))
+				shutdownErr = errors.Join(shutdownErr, fmt.Errorf("integration %s: %w", id, err))
+			}
+		}
+
+		return true
+	})
+
+	return shutdownErr
 }
 
 type factoryFunc func(map[string]any) (Integration, error)

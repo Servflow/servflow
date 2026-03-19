@@ -19,6 +19,8 @@ type Config struct {
 	ConnectionString string `json:"connectionString"`
 }
 
+var _ integration.Shutdownable = (*SQL)(nil)
+
 // TODO change to table
 var (
 	tableOption           = "table"
@@ -26,6 +28,7 @@ var (
 )
 
 type SQL struct {
+	integration.BaseIntegration
 	db *sqlx.DB
 }
 
@@ -54,6 +57,13 @@ func (s *SQL) Delete(ctx context.Context, options map[string]string, filters ...
 
 func (s *SQL) Type() string {
 	return "sql"
+}
+
+func (s *SQL) Shutdown(ctx context.Context) error {
+	if s.db != nil {
+		return s.db.Close()
+	}
+	return nil
 }
 
 func init() {

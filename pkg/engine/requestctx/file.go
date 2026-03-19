@@ -90,7 +90,7 @@ func GetFileFromContext(ctx context.Context, fileInput apiconfig.FileInput) (*Fi
 	case apiconfig.FileInputTypeRequest:
 		key = fileKeyRequestPrefix + fileInput.Identifier
 	case apiconfig.FileInputTypeAction:
-		key = fileKeyActionPrefix + fileInput.Identifier
+		key = fileKeyActionPrefix + strings.TrimPrefix(fileInput.Identifier, ActionConfigPrefix)
 	default:
 		return nil, nil
 	}

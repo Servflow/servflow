@@ -21,6 +21,7 @@ type Config struct {
 }
 
 type Client struct {
+	integration.BaseIntegration
 	client *openai.Client
 	model  string
 }

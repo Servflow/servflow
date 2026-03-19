@@ -23,11 +23,19 @@ type Config struct {
 }
 
 type Wrapper struct {
+	integration.BaseIntegration
 	client *qdrant.Client
 }
 
 func (w *Wrapper) Type() string {
 	return "qdrant"
+}
+
+func (w *Wrapper) Shutdown(ctx context.Context) error {
+	if w.client != nil {
+		return w.client.Close()
+	}
+	return nil
 }
 
 func parseHostPort(url string) (string, int) {

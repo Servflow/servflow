@@ -75,7 +75,9 @@ func (e *Engine) createMCPHandler(config *apiconfig.APIConfig) error {
 			},
 		})
 
-		resp, err := p.Execute(ctx, config.McpTool.Start, config.McpTool.Result)
+		resp, err := p.Execute(ctx, config.McpTool.Start, &plan.EndValueSpec{
+			StringVal: config.McpTool.Result,
+		})
 		if err != nil {
 			logger.Error("error executing planner", zap.Error(err))
 			return nil, errors.New("error executing request")

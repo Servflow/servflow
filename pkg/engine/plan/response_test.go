@@ -20,7 +20,7 @@ func TestNewResponse(t *testing.T) {
 			name: "json",
 			id:   "id",
 			config: apiconfig.ResponseConfig{
-				Type:     builderTypeTemplate,
+				Type:     responseTypeTemplate,
 				Template: "",
 				Code:     200,
 			},

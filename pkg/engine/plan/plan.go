@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/Servflow/servflow/internal/http"
+	"github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
 	"go.uber.org/zap"
@@ -29,7 +30,20 @@ type stepWrapper struct {
 	step Step
 }
 
-func (p *Plan) executeStep(ctx context.Context, step *stepWrapper, endValue string) (*http.SfResponse, error) {
+type EndValueType int
+
+const (
+	StringEndValue EndValueType = iota
+	FileEndValue
+)
+
+type EndValueSpec struct {
+	ValType   EndValueType
+	StringVal string
+	FileVal   apiconfig.FileInput
+}
+
+func (p *Plan) executeStep(ctx context.Context, step *stepWrapper, endValue *EndValueSpec) (*http.SfResponse, error) {
 	select {
 	case <-ctx.Done():
 		return nil, ErrContextCanceled
@@ -62,26 +76,35 @@ func (p *Plan) executeStep(ctx context.Context, step *stepWrapper, endValue stri
 	return p.generateEndValue(ctx, logger, endValue)
 }
 
-func (p *Plan) generateEndValue(ctx context.Context, logger *zap.Logger, endValue string) (*http.SfResponse, error) {
-	if endValue == "" {
+func (p *Plan) generateEndValue(ctx context.Context, logger *zap.Logger, endValue *EndValueSpec) (*http.SfResponse, error) {
+	if endValue == nil {
 		return nil, nil
 	}
-	tmpl, err := requestctx.CreateTextTemplate(ctx, endValue, nil)
-	if err != nil {
-		return nil, err
-	}
-	val, err := requestctx.ExecuteTemplateFromContext(ctx, tmpl)
-	if err != nil {
-		return nil, err
-	}
-	logger.Debug("template generated", zap.String("template", val))
 
-	return &http.SfResponse{
-		Body: []byte(val),
-	}, nil
+	resp := &http.SfResponse{}
+	switch endValue.ValType {
+	case StringEndValue:
+		tmpl, err := requestctx.CreateTextTemplate(ctx, endValue.StringVal, nil)
+		if err != nil {
+			return nil, err
+		}
+		val, err := requestctx.ExecuteTemplateFromContext(ctx, tmpl)
+		if err != nil {
+			return nil, err
+		}
+		logger.Debug("template generated", zap.String("template", val))
+		resp.Body = []byte(val)
+	case FileEndValue:
+		fileVal, err := requestctx.GetFileFromContext(ctx, endValue.FileVal)
+		if err != nil {
+			return nil, err
+		}
+		resp.File = fileVal
+	}
+	return resp, nil
 }
 
-func (p *Plan) Execute(ctx context.Context, id, endValue string) (*http.SfResponse, error) {
+func (p *Plan) Execute(ctx context.Context, id string, endValue *EndValueSpec) (*http.SfResponse, error) {
 	id = strings.TrimLeft(id, "$")
 	ctx = context.WithValue(ctx, ContextKey, p)
 	step, ok := p.steps[id]
@@ -92,7 +115,7 @@ func (p *Plan) Execute(ctx context.Context, id, endValue string) (*http.SfRespon
 	return p.executeStep(ctx, &step, endValue)
 }
 
-func ExecuteFromContext(ctx context.Context, id, endValue string) (*http.SfResponse, error) {
+func ExecuteFromContext(ctx context.Context, id string, endValue *EndValueSpec) (*http.SfResponse, error) {
 	plan, ok := ctx.Value(ContextKey).(*Plan)
 	if !ok {
 		return nil, errors.New("plan not found")

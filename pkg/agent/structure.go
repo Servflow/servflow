@@ -32,18 +32,18 @@ type LLMRequest struct {
 	Tools         []ToolInfo `json:"tools"`
 }
 
-type MessageContent struct {
+type MessageTypeContent struct {
 	Message
 	Role        RoleType
 	Content     string
 	FileContent *requestctx.FileValue `json:"-"`
 }
 
-func (c *MessageContent) Serialize() ([]byte, error) {
+func (c *MessageTypeContent) Serialize() ([]byte, error) {
 	return json.Marshal(c)
 }
 
-func (c *MessageContent) Deserialize(bytes []byte) error {
+func (c *MessageTypeContent) Deserialize(bytes []byte) error {
 	return json.Unmarshal(bytes, c)
 }
 
@@ -74,6 +74,13 @@ const (
 	ToolResponseTypeImage
 )
 
+type ToolCallOutputType int
+
+const (
+	ToolCallOutputTypeText ToolCallOutputType = iota
+	ToolCallOutputTypeImage
+)
+
 type MessageToolCallResponse struct {
 	Message
 	ToolResponseType ToolResponseType
@@ -83,17 +90,14 @@ type MessageToolCallResponse struct {
 	ImageMimeType    string
 }
 
-func (t *MessageToolCallResponse) GenerateContent(imageSupport bool) string {
+func (t *MessageToolCallResponse) GenerateContent() (content string, mimeType string, outputType ToolCallOutputType) {
 	switch t.ToolResponseType {
 	case ToolResponseTypeText:
-		return t.Text
+		return t.Text, "", ToolCallOutputTypeText
 	case ToolResponseTypeImage:
-		if imageSupport {
-			return fmt.Sprintf("data:%s;base64,%s", t.ImageMimeType, t.ImageData)
-		}
-		return ""
+		return fmt.Sprintf("data:%s;base64,%s", t.ImageMimeType, t.ImageData), t.ImageMimeType, ToolCallOutputTypeImage
 	default:
-		return t.Text
+		return t.Text, "", ToolCallOutputTypeText
 	}
 }
 

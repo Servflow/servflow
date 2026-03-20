@@ -88,7 +88,7 @@ func (e *Exec) Execute(ctx context.Context, _ string) (interface{}, error) {
 		go func(s string) {
 			defer wg.Done()
 			fmt.Printf("Executing step: %s\n", s)
-			_, err := plan.ExecuteFromContext(newCtx, s, "")
+			_, err := plan.ExecuteFromContext(newCtx, s, nil)
 			if err != nil {
 				select {
 				case errChan <- customError{err: err, step: s}:

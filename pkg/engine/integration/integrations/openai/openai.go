@@ -1,17 +1,16 @@
 package openai
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
-	"net/http"
 
 	"github.com/Servflow/servflow/pkg/agent"
 	"github.com/Servflow/servflow/pkg/engine/integration"
 	"github.com/Servflow/servflow/pkg/logging"
+	"github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/option"
+	"github.com/openai/openai-go/v3/responses"
 	"go.uber.org/zap"
 )
 
@@ -22,14 +21,16 @@ type Config struct {
 }
 
 type Client struct {
-	client *http.Client
-	apiKey string
+	integration.BaseIntegration
+	client *openai.Client
 	model  string
 }
 
 func (c *Client) Type() string {
 	return "openai"
 }
+
+var defaultModel = "gpt-4.1"
 
 func New(apiKey string, model string) (*Client, error) {
 	if apiKey == "" {
@@ -40,60 +41,26 @@ func New(apiKey string, model string) (*Client, error) {
 		model = defaultModel
 	}
 
+	client := openai.NewClient(option.WithAPIKey(apiKey))
+
 	return &Client{
-		client: &http.Client{},
-		apiKey: apiKey,
+		client: &client,
 		model:  model,
 	}, nil
 }
 
-var (
-	endpoint     = "https://api.openai.com/v1/responses"
-	defaultModel = "gpt-4.1"
-)
-
 func (c *Client) ProvideResponse(ctx context.Context, agentReq agent.LLMRequest) (resp agent.LLMResponse, err error) {
 	logger := logging.WithContextEnriched(ctx)
-	input := convertAgentRequestToOpenAIRequest(logger, &agentReq, c.model)
 
-	inputJson, err := json.Marshal(input)
+	params := convertAgentRequestToSDKParams(logger, &agentReq, c.model)
+
+	response, err := c.client.Responses.New(ctx, params)
 	if err != nil {
+		logger.Error("error from openai", zap.Error(err))
 		return
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(inputJson))
-	if err != nil {
-		return
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
-
-	r, err := c.client.Do(req)
-	if err != nil {
-		return
-	}
-	defer r.Body.Close()
-
-	if r.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(r.Body)
-		err = fmt.Errorf("expected status OK, got %d, message: %s", r.StatusCode, string(body))
-		logger.Error("error from openai", zap.String("response", string(body)))
-		return
-	}
-	defer r.Body.Close()
-
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		return
-	}
-
-	var response Response
-	if err = json.Unmarshal(body, &response); err != nil {
-		return
-	}
-
-	resp = convertResponseToAgentResponse(&response, logger)
+	resp = convertSDKResponseToAgentResponse(response, logger)
 	return resp, nil
 }
 
@@ -133,4 +100,181 @@ func init() {
 	}); err != nil {
 		panic(err)
 	}
+}
+
+func convertAgentRequestToSDKParams(logger *zap.Logger, req *agent.LLMRequest, model string) responses.ResponseNewParams {
+	params := responses.ResponseNewParams{
+		Model:        model,
+		Instructions: openai.String(req.SystemMessage),
+	}
+
+	inputItems := make([]responses.ResponseInputItemUnionParam, 0)
+
+	for _, m := range req.Messages {
+		switch val := m.(type) {
+		case agent.MessageTypeContent:
+			inputItems = append(inputItems, buildMessageInput(logger, val))
+		case agent.MessageToolCallResponse:
+			inputItems = append(inputItems, buildFunctionCallOutput(val))
+		case agent.MessageToolCall:
+			inputItems = append(inputItems, buildFunctionCallInput(logger, val))
+		}
+	}
+
+	params.Input = responses.ResponseNewParamsInputUnion{
+		OfInputItemList: inputItems,
+	}
+
+	if len(req.Tools) > 0 {
+		tools := make([]responses.ToolUnionParam, 0, len(req.Tools))
+		for _, t := range req.Tools {
+			schemaBytes, err := json.Marshal(t.InputSchema)
+			if err != nil {
+				logger.Warn("Failed to marshal input schema", zap.Error(err))
+				continue
+			}
+			var schemaMap map[string]interface{}
+			if err := json.Unmarshal(schemaBytes, &schemaMap); err != nil {
+				logger.Warn("Failed to unmarshal input schema", zap.Error(err))
+				continue
+			}
+
+			tools = append(tools, responses.ToolParamOfFunction(t.Name, schemaMap, false))
+			// Set description if available
+			if t.Description != "" {
+				tools[len(tools)-1].OfFunction.Description = openai.String(t.Description)
+			}
+		}
+		params.Tools = tools
+	}
+
+	return params
+}
+
+func buildMessageInput(logger *zap.Logger, val agent.MessageTypeContent) responses.ResponseInputItemUnionParam {
+	role := mapAgentRoleToSDKRole(val.Role)
+
+	// For assistant messages, we use OutputMessage format
+	if role == "assistant" {
+		content := make([]responses.ResponseOutputMessageContentUnionParam, 0)
+		if val.Content != "" {
+			content = append(content, responses.ResponseOutputMessageContentUnionParam{
+				OfOutputText: &responses.ResponseOutputTextParam{
+					Type: "output_text",
+					Text: val.Content,
+				},
+			})
+		}
+		return responses.ResponseInputItemUnionParam{
+			OfOutputMessage: &responses.ResponseOutputMessageParam{
+				Type:    "message",
+				Role:    "assistant",
+				Content: content,
+				Status:  "completed",
+			},
+		}
+	}
+
+	// For user/system/developer messages
+	contentParts := make([]responses.ResponseInputContentUnionParam, 0)
+
+	if val.Content != "" {
+		contentParts = append(contentParts, responses.ResponseInputContentUnionParam{
+			OfInputText: &responses.ResponseInputTextParam{
+				Type: "input_text",
+				Text: val.Content,
+			},
+		})
+	}
+
+	if val.FileContent != nil {
+		contentStr, err := val.FileContent.GenerateContentString()
+		if err != nil {
+			logger.Warn("Failed to generate content string", zap.Error(err))
+		} else {
+			contentParts = append(contentParts, responses.ResponseInputContentUnionParam{
+				OfInputImage: &responses.ResponseInputImageParam{
+					Type:     "input_image",
+					ImageURL: openai.String(contentStr),
+				},
+			})
+		}
+	}
+
+	return responses.ResponseInputItemUnionParam{
+		OfMessage: &responses.EasyInputMessageParam{
+			Role:    responses.EasyInputMessageRole(role),
+			Content: responses.EasyInputMessageContentUnionParam{OfInputItemContentList: contentParts},
+			Type:    "message",
+		},
+	}
+}
+
+func buildFunctionCallOutput(val agent.MessageToolCallResponse) responses.ResponseInputItemUnionParam {
+	content, _, outputType := val.GenerateContent()
+
+	switch outputType {
+	case agent.ToolCallOutputTypeImage:
+		outputItems := responses.ResponseFunctionCallOutputItemListParam{
+			{
+				OfInputImage: &responses.ResponseInputImageContentParam{
+					ImageURL: openai.String(content),
+				},
+			},
+		}
+		return responses.ResponseInputItemParamOfFunctionCallOutput(val.ID, outputItems)
+	default:
+		return responses.ResponseInputItemParamOfFunctionCallOutput(val.ID, content)
+	}
+}
+
+func buildFunctionCallInput(logger *zap.Logger, val agent.MessageToolCall) responses.ResponseInputItemUnionParam {
+	return responses.ResponseInputItemParamOfFunctionCall(marshalArguments(logger, val.Arguments), val.ID, val.Name)
+}
+
+func mapAgentRoleToSDKRole(role agent.RoleType) string {
+	switch role {
+	case agent.RoleTypeSystem:
+		return "system"
+	case agent.RoleTypeUser:
+		return "user"
+	case agent.RoleTypeAssistant:
+		return "assistant"
+	case agent.RoleTypeDeveloper:
+		return "developer"
+	default:
+		return "user"
+	}
+}
+
+func convertSDKResponseToAgentResponse(resp *responses.Response, logger *zap.Logger) agent.LLMResponse {
+	r := agent.LLMResponse{
+		Content: make([]agent.ContentResponse, 0),
+		Tools:   make([]agent.ToolResponseObject, 0),
+	}
+
+	for _, item := range resp.Output {
+		switch item.Type {
+		case "message":
+			msg := item.AsMessage()
+			for _, content := range msg.Content {
+				if content.Type == "output_text" {
+					textContent := content.AsOutputText()
+					r.Content = append(r.Content, agent.ContentResponse{
+						Text: textContent.Text,
+					})
+				}
+			}
+		case "function_call":
+			funcCall := item.AsFunctionCall()
+			args := unmarshalArguments(logger, funcCall.Arguments)
+			r.Tools = append(r.Tools, agent.ToolResponseObject{
+				Name:   funcCall.Name,
+				ToolID: funcCall.CallID,
+				Input:  args,
+			})
+		}
+	}
+
+	return r
 }

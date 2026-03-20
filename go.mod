@@ -23,7 +23,8 @@ require (
 	github.com/justinas/alice v1.2.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/lib/pq v1.10.9
-	github.com/mark3labs/mcp-go v0.43.2
+	github.com/mark3labs/mcp-go v0.45.0
+	github.com/openai/openai-go/v3 v3.28.0
 	github.com/qdrant/go-client v1.13.0
 	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.36.0
@@ -109,6 +110,7 @@ require (
 	github.com/spf13/cast v1.7.1 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
+	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect

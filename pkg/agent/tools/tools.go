@@ -2,10 +2,10 @@ package tools
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"text/template"
 
 	"github.com/Servflow/servflow/pkg/agent"
@@ -164,7 +164,8 @@ func generateWorkflowToolExec(config *WorkflowToolConfig) functionExec {
 		}
 
 		if resp.File != nil {
-			data, err := io.ReadAll(resp.File.GetReader())
+			data, err := resp.File.GetContent()
+			base64Content := base64.StdEncoding.EncodeToString(data)
 			if err != nil {
 				return nil, err
 			}
@@ -172,7 +173,7 @@ func generateWorkflowToolExec(config *WorkflowToolConfig) functionExec {
 			if err != nil {
 				return nil, err
 			}
-			return []mcp.Content{mcp.NewImageContent(string(data), mimeType)}, nil
+			return []mcp.Content{mcp.NewImageContent(base64Content, mimeType)}, nil
 		} else {
 			return []mcp.Content{mcp.NewTextContent(string(resp.Body))}, nil
 		}

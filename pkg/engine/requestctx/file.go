@@ -1,7 +1,6 @@
 package requestctx
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/base64"
@@ -19,6 +18,8 @@ const (
 	fileKeyActionPrefix  = "action."
 	fileKeyRequestPrefix = "request."
 )
+
+// TODO see if we want to limit file to reading once based on memory use and pressure
 
 var ErrFileNotFound = errors.New("file not found")
 
@@ -53,10 +54,24 @@ func (rc *RequestContext) LoadRequestFiles(r *http.Request) error {
 	return nil
 }
 
+// FileValue provides safe, consistent access to file content.
+//
+// Design:
+// FileValue intentionally does NOT implement io.Reader or expose the underlying reader.
+// This prevents inconsistent state that could occur if callers partially read from
+// the stream before calling methods like GetContent() or GenerateContentString().
+//
+// Usage:
+//   - Use GetContent() to retrieve the file's raw bytes (cached after first read)
+//   - Use GenerateContentString() to get a base64-encoded data URI
+//   - Use GetMimeType() to detect the file's MIME type
+//
+// All methods that read from the file will cache the content on first access,
+// ensuring subsequent calls return consistent data. The original file handle
+// is automatically closed after content is cached.
 type FileValue struct {
-	file     io.ReadCloser
-	content  []byte
-	reader   io.Reader
+	file     io.ReadCloser // original file handle, closed after content is cached
+	content  []byte        // cached content after first read
 	Name     string
 	mimeType string
 	closed   bool
@@ -64,9 +79,8 @@ type FileValue struct {
 
 func NewFileValue(file io.ReadCloser, name string) *FileValue {
 	return &FileValue{
-		file:   file,
-		reader: file,
-		Name:   name,
+		file: file,
+		Name: name,
 	}
 }
 
@@ -115,50 +129,68 @@ func (rc *RequestContext) AddActionFile(name string, file *FileValue) {
 	rc.availableFiles[fileKeyActionPrefix+name] = file
 }
 
+// GetContent returns the file's content as a byte slice.
+// The content is cached on first read, so subsequent calls return the same data.
+// The original file handle is closed after the content is cached.
+func (f *FileValue) GetContent() ([]byte, error) {
+	if f.content != nil {
+		return f.content, nil
+	}
+
+	content, err := io.ReadAll(f.file)
+	if err != nil {
+		return nil, err
+	}
+	f.content = content
+	f.closeOriginalFile()
+
+	return f.content, nil
+}
+
+// GenerateContentString returns a base64-encoded data URI containing the file content.
+// Format: data:<mime-type>;base64,<base64-encoded-content>
 func (f *FileValue) GenerateContentString() (string, error) {
 	mimeType, err := f.GetMimeType()
 	if err != nil {
 		return "", err
 	}
 
-	if f.content == nil {
-		content, err := io.ReadAll(f.reader)
-		if err != nil {
-			return "", err
-		}
-		f.content = content
-		f.reader = bytes.NewReader(f.content)
-		f.closeOriginalFile()
+	content, err := f.GetContent()
+	if err != nil {
+		return "", err
 	}
 
-	base64Content := base64.StdEncoding.EncodeToString(f.content)
+	base64Content := base64.StdEncoding.EncodeToString(content)
 	return fmt.Sprintf("data:%s;base64,%s", mimeType, base64Content), nil
 }
 
-func (f *FileValue) Read(p []byte) (n int, err error) {
-	return f.reader.Read(p)
-}
-
-func (f *FileValue) GetReader() io.Reader {
-	return f.reader
-}
-
+// GetMimeType detects and returns the file's MIME type.
+// The MIME type is cached after first detection.
 func (f *FileValue) GetMimeType() (string, error) {
 	if f.mimeType != "" {
 		return f.mimeType, nil
 	}
 
-	bufferedReader := bufio.NewReader(f.reader)
-	f.reader = bufferedReader
-
-	peek, err := bufferedReader.Peek(512)
-	if err != nil && err != io.EOF {
+	content, err := f.GetContent()
+	if err != nil {
 		return "", err
 	}
 
-	mtype := mimetype.Detect(peek)
+	mtype := mimetype.Detect(content)
 	f.mimeType = mtype.String()
 	return f.mimeType, nil
+}
+
+// NewReader returns a new io.Reader over the cached content.
+// This can be called multiple times to get fresh readers.
+// Note: GetContent() must have been called first (directly or via other methods),
+// or this will trigger content caching.
+func (f *FileValue) NewReader() (io.Reader, error) {
+	content, err := f.GetContent()
+	if err != nil {
+		return nil, err
+	}
+	return bytes.NewReader(content), nil
 }
 
 func (f *FileValue) closeOriginalFile() {

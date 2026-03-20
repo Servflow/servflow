@@ -12,6 +12,7 @@ import (
 
 	"github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRequestContext_FileManagement(t *testing.T) {
@@ -36,7 +37,7 @@ func TestRequestContext_FileManagement(t *testing.T) {
 			t.Errorf("Expected file with key '%s' not found in availableFiles", expectedKey)
 		}
 
-		reader, err := GetFileFromContext(ctx, apiconfig.FileInput{
+		fv, err := GetFileFromContext(ctx, apiconfig.FileInput{
 			Type:       apiconfig.FileInputTypeRequest,
 			Identifier: "testfile",
 		})
@@ -44,16 +45,16 @@ func TestRequestContext_FileManagement(t *testing.T) {
 			t.Fatalf("Failed to retrieve file: %v", err)
 		}
 
-		content, err := io.ReadAll(reader.GetReader())
+		content, err := fv.GetContent()
 		if err != nil {
-			t.Fatalf("Failed to read file content: %v", err)
+			t.Fatalf("Failed to get file content: %v", err)
 		}
 
 		if string(content) != fileContent {
 			t.Errorf("Expected file content '%s', got '%s'", fileContent, string(content))
 		}
 
-		reader.Close()
+		fv.Close()
 	})
 
 	t.Run("add and retrieve action file", func(t *testing.T) {
@@ -67,7 +68,7 @@ func TestRequestContext_FileManagement(t *testing.T) {
 			t.Errorf("Expected file with key '%s' not found in availableFiles", expectedKey)
 		}
 
-		reader, err := GetFileFromContext(ctx, apiconfig.FileInput{
+		fv, err := GetFileFromContext(ctx, apiconfig.FileInput{
 			Type:       apiconfig.FileInputTypeAction,
 			Identifier: "actionfile",
 		})
@@ -75,16 +76,16 @@ func TestRequestContext_FileManagement(t *testing.T) {
 			t.Fatalf("Failed to retrieve action file: %v", err)
 		}
 
-		content, err := io.ReadAll(reader.GetReader())
+		content, err := fv.GetContent()
 		if err != nil {
-			t.Fatalf("Failed to read file content: %v", err)
+			t.Fatalf("Failed to get file content: %v", err)
 		}
 
 		if string(content) != fileContent {
 			t.Errorf("Expected file content '%s', got '%s'", fileContent, string(content))
 		}
 
-		reader.Close()
+		fv.Close()
 	})
 
 	t.Run("multiple files in map", func(t *testing.T) {
@@ -107,7 +108,7 @@ func TestRequestContext_FileManagement(t *testing.T) {
 		}
 
 		for _, tc := range testCases {
-			reader, err := GetFileFromContext(ctx, apiconfig.FileInput{
+			fv, err := GetFileFromContext(ctx, apiconfig.FileInput{
 				Type:       tc.inputType,
 				Identifier: tc.identifier,
 			})
@@ -116,11 +117,11 @@ func TestRequestContext_FileManagement(t *testing.T) {
 				continue
 			}
 
-			content, _ := io.ReadAll(reader.GetReader())
+			content, _ := fv.GetContent()
 			if string(content) != tc.expected {
 				t.Errorf("File '%s': expected content '%s', got '%s'", tc.identifier, tc.expected, string(content))
 			}
-			reader.Close()
+			fv.Close()
 		}
 	})
 
@@ -128,17 +129,17 @@ func TestRequestContext_FileManagement(t *testing.T) {
 		reqCtx.AddRequestFile("overwritefile", NewFileValue(io.NopCloser(strings.NewReader("original content")), "original.txt"))
 		reqCtx.AddRequestFile("overwritefile", NewFileValue(io.NopCloser(strings.NewReader("new content")), "new.txt"))
 
-		reader, _ := GetFileFromContext(ctx, apiconfig.FileInput{
+		fv, _ := GetFileFromContext(ctx, apiconfig.FileInput{
 			Type:       apiconfig.FileInputTypeRequest,
 			Identifier: "overwritefile",
 		})
-		content, _ := io.ReadAll(reader.GetReader())
+		content, _ := fv.GetContent()
 
 		if string(content) != "new content" {
 			t.Errorf("Expected overwritten content 'new content', got '%s'", string(content))
 		}
 
-		reader.Close()
+		fv.Close()
 	})
 }
 
@@ -299,13 +300,13 @@ func TestFileValue_MimeTypeDetection(t *testing.T) {
 				t.Errorf("MIME type should be cached. First: %s, Second: %s", mimeType, mimeType2)
 			}
 
-			readContent, err := io.ReadAll(fv.GetReader())
+			content, err := fv.GetContent()
 			if err != nil {
-				t.Fatalf("Reading after MIME detection error = %v", err)
+				t.Fatalf("GetContent after MIME detection error = %v", err)
 			}
 
-			if !bytes.Equal(readContent, tt.content) {
-				t.Errorf("Content mismatch. Expected: %s, Got: %s", string(tt.content), string(readContent))
+			if !bytes.Equal(content, tt.content) {
+				t.Errorf("Content mismatch. Expected: %s, Got: %s", string(tt.content), string(content))
 			}
 
 			fv.Close()
@@ -349,35 +350,65 @@ func TestFileValue_GenerateContentString(t *testing.T) {
 	fv.Close()
 }
 
-func TestFileValue_ReadInterface(t *testing.T) {
-	content := []byte("test content for read interface")
-	file := io.NopCloser(bytes.NewReader(content))
-	fv := NewFileValue(file, "test.txt")
+func TestFileValue_GetContent(t *testing.T) {
+	t.Run("content is cached", func(t *testing.T) {
+		content := []byte("test content for caching")
+		file := io.NopCloser(bytes.NewReader(content))
+		fv := NewFileValue(file, "test.txt")
 
-	buf := make([]byte, 10)
-	n, err := fv.Read(buf)
-	if err != nil {
-		t.Fatalf("First Read() error = %v", err)
-	}
+		content1, err := fv.GetContent()
+		require.NoError(t, err)
 
-	if n != 10 {
-		t.Errorf("Expected to read 10 bytes, got %d", n)
-	}
+		content2, err := fv.GetContent()
+		require.NoError(t, err)
 
-	if !bytes.Equal(buf, content[:10]) {
-		t.Errorf("Read content mismatch. Expected: %s, Got: %s", string(content[:10]), string(buf))
-	}
+		assert.Equal(t, content1, content2)
+		assert.Equal(t, content, content1)
 
-	remaining, err := io.ReadAll(fv)
-	if err != nil {
-		t.Fatalf("ReadAll() error = %v", err)
-	}
+		fv.Close()
+	})
 
-	if !bytes.Equal(remaining, content[10:]) {
-		t.Errorf("Remaining content mismatch. Expected: %s, Got: %s", string(content[10:]), string(remaining))
-	}
+	t.Run("content consistent after multiple method calls", func(t *testing.T) {
+		content := []byte("consistent content test")
+		file := io.NopCloser(bytes.NewReader(content))
+		fv := NewFileValue(file, "test.txt")
 
-	fv.Close()
+		_, err := fv.GetMimeType()
+		require.NoError(t, err)
+
+		_, err = fv.GenerateContentString()
+		require.NoError(t, err)
+
+		gotContent, err := fv.GetContent()
+		require.NoError(t, err)
+		assert.Equal(t, content, gotContent)
+
+		fv.Close()
+	})
+}
+
+func TestFileValue_NewReader(t *testing.T) {
+	t.Run("returns fresh reader each time", func(t *testing.T) {
+		content := []byte("test content for reader")
+		file := io.NopCloser(bytes.NewReader(content))
+		fv := NewFileValue(file, "test.txt")
+
+		reader1, err := fv.NewReader()
+		require.NoError(t, err)
+
+		read1, err := io.ReadAll(reader1)
+		require.NoError(t, err)
+		assert.Equal(t, content, read1)
+
+		reader2, err := fv.NewReader()
+		require.NoError(t, err)
+
+		read2, err := io.ReadAll(reader2)
+		require.NoError(t, err)
+		assert.Equal(t, content, read2)
+
+		fv.Close()
+	})
 }
 
 func TestFileValue_CompleteWorkflow(t *testing.T) {
@@ -414,13 +445,18 @@ func TestFileValue_CompleteWorkflow(t *testing.T) {
 		t.Errorf("Decoded content mismatch")
 	}
 
-	readerContent, err := io.ReadAll(fv.GetReader())
+	reader, err := fv.NewReader()
 	if err != nil {
-		t.Fatalf("Failed to read from GetReader(): %v", err)
+		t.Fatalf("Failed to get NewReader(): %v", err)
+	}
+
+	readerContent, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("Failed to read from NewReader(): %v", err)
 	}
 
 	if !bytes.Equal(readerContent, imageContent) {
-		t.Errorf("GetReader() content mismatch")
+		t.Errorf("NewReader() content mismatch")
 	}
 
 	fv.Close()
@@ -458,9 +494,9 @@ func TestFileValue_CloseBehavior(t *testing.T) {
 			t.Errorf("Expected no error on close after auto-close, got: %v", err)
 		}
 
-		readContent, err := io.ReadAll(fv.GetReader())
+		readContent, err := fv.GetContent()
 		if err != nil {
-			t.Fatalf("Reading from cached content failed: %v", err)
+			t.Fatalf("Getting cached content failed: %v", err)
 		}
 
 		if !bytes.Equal(readContent, content) {

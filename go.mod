@@ -23,7 +23,7 @@ require (
 	github.com/justinas/alice v1.2.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/lib/pq v1.10.9
-	github.com/mark3labs/mcp-go v0.43.2
+	github.com/mark3labs/mcp-go v0.45.0
 	github.com/openai/openai-go/v3 v3.28.0
 	github.com/qdrant/go-client v1.13.0
 	github.com/stretchr/testify v1.10.0

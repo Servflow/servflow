@@ -160,10 +160,9 @@ func TestAction_Execute(t *testing.T) {
 			assert.Equal(t, "file_output", fileValue.Name)
 
 			// Read the file content to verify it was stored correctly
-			var buf bytes.Buffer
-			_, err = io.Copy(&buf, fileValue.GetReader())
+			content, err := fileValue.GetContent()
 			require.NoError(t, err)
-			assert.Equal(t, fileContent, buf.String())
+			assert.Equal(t, fileContent, string(content))
 		})
 	})
 

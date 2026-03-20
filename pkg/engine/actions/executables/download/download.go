@@ -91,7 +91,12 @@ func (d *Download) Execute(ctx context.Context, modifiedConfig string) (interfac
 	}
 	defer file.Close()
 
-	if _, err := io.Copy(file, fileValue.GetReader()); err != nil {
+	reader, err := fileValue.NewReader()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get file reader: %w", err)
+	}
+
+	if _, err := io.Copy(file, reader); err != nil {
 		return nil, fmt.Errorf("failed to write file: %w", err)
 	}
 

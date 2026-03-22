@@ -2,8 +2,11 @@ package tools
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
+	"strings"
 	"testing"
 
 	"net/http"
@@ -281,7 +284,6 @@ func TestNewClient(t *testing.T) {
 			Params:      []string{"param1", "param2"},
 			ReturnValue: `{{ printf "%s%s" .variable_actions_workflow_action.result (tool_param "param1") }}`,
 			Start:       requestctx2.ActionConfigPrefix + "workflow_action",
-			Type:        "string",
 		}))
 		require.NoError(t, err)
 		require.NotNil(t, manager)
@@ -328,5 +330,79 @@ func TestNewClient(t *testing.T) {
 				mcp.NewTextContent("workflow result:value1"),
 			}, resp)
 		})
+	})
+
+	t.Run("workflow action tool with file return", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		mockExec := plan2.NewMockActionExecutable(ctrl)
+
+		fileContent := "test file content for workflow"
+		fileReader := io.NopCloser(strings.NewReader(fileContent))
+
+		cfg := apiconfig.APIConfig{
+			Actions: map[string]apiconfig.Action{
+				"file_action": {
+					Type: "file_action",
+				},
+			},
+		}
+
+		customRegistry := actions.NewRegistry()
+		customRegistry.ReplaceActionType("file_action", func(config json.RawMessage) (actions.ActionExecutable, error) {
+			return mockExec, nil
+		})
+
+		mockExec.EXPECT().Config().Return("").AnyTimes()
+		mockExec.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(fileReader, nil)
+
+		planner := plan2.NewPlannerV2(plan2.PlannerConfig{
+			Actions:        cfg.Actions,
+			Responses:      cfg.Responses,
+			CustomRegistry: customRegistry,
+		}, logging.GetNewLogger())
+
+		testPlan, err := planner.Plan()
+		require.NoError(t, err)
+
+		manager, err := NewManager(WithWorkflowToolConfig(WorkflowToolConfig{
+			Name:        "workflow-file-test",
+			Description: "Test workflow execution with file return",
+			Params:      []string{"param1"},
+			Type:        "file",
+			ReturnFile: apiconfig.FileInput{
+				Type:       apiconfig.FileInputTypeAction,
+				Identifier: "file_action",
+			},
+			Start: requestctx2.ActionConfigPrefix + "file_action",
+		}))
+		require.NoError(t, err)
+		require.NotNil(t, manager)
+
+		t.Run("call workflow tool with file return", func(t *testing.T) {
+			ctx := requestctx2.NewTestContext()
+			ctx = context.WithValue(ctx, plan2.ContextKey, testPlan)
+
+			resp, err := manager.CallTool(ctx, "workflow-file-test", map[string]interface{}{
+				"param1": "value1",
+			})
+			require.NoError(t, err)
+			require.Len(t, resp, 1)
+
+			expectedBase64 := base64.StdEncoding.EncodeToString([]byte(fileContent))
+			assert.Equal(t, mcp.NewImageContent(expectedBase64, "text/plain; charset=utf-8"), resp[0])
+		})
+	})
+
+	t.Run("workflow tool with invalid type", func(t *testing.T) {
+		_, err := NewManager(WithWorkflowToolConfig(WorkflowToolConfig{
+			Name:        "invalid-type-test",
+			Description: "Test invalid type",
+			Params:      []string{"param1"},
+			Type:        "invalid",
+			Start:       requestctx2.ActionConfigPrefix + "some_action",
+		}))
+		assert.ErrorContains(t, err, "invalid workflow tool type: invalid")
 	})
 }

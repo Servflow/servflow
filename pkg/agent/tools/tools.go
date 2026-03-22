@@ -100,6 +100,9 @@ func WithServerConfig(config ServerConfig) ClientOption {
 
 func WithWorkflowToolConfig(config WorkflowToolConfig) ClientOption {
 	return func(manager *Manager) error {
+		if config.Type == "" {
+			config.Type = workflowToolResponseString
+		}
 		if config.Type != workflowToolResponseString && config.Type != workflowToolResponseFile {
 			return fmt.Errorf("invalid workflow tool type: %s", config.Type)
 		}

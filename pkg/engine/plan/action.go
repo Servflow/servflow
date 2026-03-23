@@ -18,6 +18,30 @@ import (
 	"go.uber.org/zap"
 )
 
+type actionSpanContextKey struct{}
+
+// withActionSpan stores the action span in the context
+func withActionSpan(ctx context.Context, span trace.Span) context.Context {
+	return context.WithValue(ctx, actionSpanContextKey{}, span)
+}
+
+// getActionSpan retrieves the action span from the context
+func getActionSpan(ctx context.Context) (trace.Span, bool) {
+	span, ok := ctx.Value(actionSpanContextKey{}).(trace.Span)
+	return span, ok
+}
+
+// AddSpanAttribute adds an attribute to the action span stored in the context.
+// Returns true if the attribute was added successfully, false if no span was found.
+func AddSpanAttribute(ctx context.Context, key string, value attribute.Value) bool {
+	span, ok := getActionSpan(ctx)
+	if !ok {
+		return false
+	}
+	span.SetAttributes(attribute.KeyValue{Key: attribute.Key(key), Value: value})
+	return true
+}
+
 // TODO deprecate out
 // TODO swap id for logger with id
 
@@ -88,7 +112,8 @@ func (a *Action) execute(ctx context.Context) (*stepWrapper, error) {
 
 	span.SetAttributes(attribute.String("config", cfg))
 
-	resp, err := a.exec.Execute(ctx, cfg)
+	execCtx := withActionSpan(ctx, span)
+	resp, err := a.exec.Execute(execCtx, cfg)
 	if err != nil {
 		span.RecordError(err)
 		if errors.Is(err, ErrFailure) {

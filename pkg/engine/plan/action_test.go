@@ -13,6 +13,9 @@ import (
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 	"go.uber.org/mock/gomock"
 )
 
@@ -244,6 +247,76 @@ func TestAction_Execute(t *testing.T) {
 
 	})
 }
+
+func TestAddSpanAttribute(t *testing.T) {
+	t.Run("adds attribute when span exists in context", func(t *testing.T) {
+		tracer := noop.NewTracerProvider().Tracer("test")
+		ctx, span := tracer.Start(context.Background(), "test-span")
+		defer span.End()
+
+		ctx = withActionSpan(ctx, span)
+
+		ok := AddSpanAttribute(ctx, "test-key", attribute.StringValue("test-value"))
+		assert.True(t, ok)
+	})
+
+	t.Run("returns false when no span in context", func(t *testing.T) {
+		ctx := context.Background()
+
+		ok := AddSpanAttribute(ctx, "test-key", attribute.StringValue("test-value"))
+		assert.False(t, ok)
+	})
+
+	t.Run("works with different attribute types", func(t *testing.T) {
+		tracer := noop.NewTracerProvider().Tracer("test")
+		ctx, span := tracer.Start(context.Background(), "test-span")
+		defer span.End()
+
+		ctx = withActionSpan(ctx, span)
+
+		testCases := []struct {
+			name  string
+			key   string
+			value attribute.Value
+		}{
+			{"string", "string-key", attribute.StringValue("string-value")},
+			{"int", "int-key", attribute.IntValue(42)},
+			{"bool", "bool-key", attribute.BoolValue(true)},
+			{"float", "float-key", attribute.Float64Value(3.14)},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				ok := AddSpanAttribute(ctx, tc.key, tc.value)
+				assert.True(t, ok)
+			})
+		}
+	})
+}
+
+func TestGetActionSpan(t *testing.T) {
+	t.Run("returns span when present", func(t *testing.T) {
+		tracer := noop.NewTracerProvider().Tracer("test")
+		ctx, span := tracer.Start(context.Background(), "test-span")
+		defer span.End()
+
+		ctx = withActionSpan(ctx, span)
+
+		retrieved, ok := getActionSpan(ctx)
+		assert.True(t, ok)
+		assert.Equal(t, span, retrieved)
+	})
+
+	t.Run("returns false when not present", func(t *testing.T) {
+		ctx := context.Background()
+
+		retrieved, ok := getActionSpan(ctx)
+		assert.False(t, ok)
+		assert.Nil(t, retrieved)
+	})
+}
+
+var _ trace.Span = (*noop.Span)(nil)
 
 func TestActionTemplateFunctions(t *testing.T) {
 	variables := map[string]interface{}{

@@ -11,6 +11,7 @@ import (
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/logging"
+	"go.opentelemetry.io/otel/attribute"
 	"go.uber.org/zap"
 
 	"github.com/tidwall/gjson"
@@ -83,18 +84,22 @@ func (h *Http) Execute(ctx context.Context, filledInConfig string) (interface{},
 
 	defer resp.Body.Close()
 
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	plan.AddSpanAttribute(ctx, "http.response_code", attribute.IntValue(resp.StatusCode))
+	plan.AddSpanAttribute(ctx, "http.response_body", attribute.StringValue(string(bodyBytes)))
+
+	logger.Debug("finished request", zap.String("url", req.URL.String()), zap.Int("status", resp.StatusCode), zap.ByteString("body", bodyBytes))
+
 	if cfg.ExpectedResponseCode != "" && cfg.ExpectedResponseCode != "0" {
 		expectedCode := cfg.ExpectedResponseCode
 		if fmt.Sprintf("%d", resp.StatusCode) != expectedCode {
 			return nil, fmt.Errorf("%w: unexpected response code %d, expected %s", plan.ErrFailure, resp.StatusCode, expectedCode)
 		}
 	}
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	logger.Debug("finished request", zap.String("url", req.URL.String()), zap.Int("status", resp.StatusCode), zap.ByteString("body", bodyBytes))
 
 	if len(bodyBytes) == 0 && cfg.FailIfResponseEmpty {
 		return nil, fmt.Errorf("%w: response body is empty", plan.ErrFailure)

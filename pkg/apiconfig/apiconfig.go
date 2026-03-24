@@ -80,11 +80,12 @@ type RequestConfig struct {
 }
 
 type Action struct {
-	Name   string                 `json:"name,omitempty" yaml:"name,omitempty"`
-	Type   string                 `json:"type" yaml:"type"`
-	Config map[string]interface{} `json:"config" yaml:"config"`
-	Next   string                 `json:"next" yaml:"next"`
-	Fail   string                 `json:"fail" yaml:"fail"`
+	Name       string                 `json:"name,omitempty" yaml:"name,omitempty"`
+	Type       string                 `json:"type" yaml:"type"`
+	Config     map[string]interface{} `json:"config" yaml:"config"`
+	Next       string                 `json:"next" yaml:"next"`
+	Fail       string                 `json:"fail" yaml:"fail"`
+	UseReplica bool                   `json:"useReplica,omitempty" yaml:"useReplica,omitempty"`
 }
 
 type Conditional struct {

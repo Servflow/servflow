@@ -41,6 +41,7 @@ func TestAction_Execute(t *testing.T) {
 			conf := fmt.Sprintf("test {{ .%sname }}", requestctx.BareVariablesPrefixStripped)
 
 			mockExec := NewMockActionExecutable(ctrl)
+			mockExec.EXPECT().Config().Return(conf)
 			mockExec.EXPECT().Execute(gomock.Any(), "test actual name").Return("response string", nil)
 
 			nextStep := testStep{id: "next"}
@@ -50,11 +51,10 @@ func TestAction_Execute(t *testing.T) {
 			require.NoError(t, err)
 
 			act := Action{
-				configStr: conf,
-				exec:      mockExec,
-				id:        "test",
-				next:      &stepWrapper{id: "next", step: &nextStep},
-				out:       "test",
+				exec: mockExec,
+				id:   "test",
+				next: &stepWrapper{id: "next", step: &nextStep},
+				out:  "test",
 			}
 
 			next, err := act.execute(ctx)
@@ -72,6 +72,7 @@ func TestAction_Execute(t *testing.T) {
 
 			mockExec := NewMockActionExecutable(ctrl)
 			config := fmt.Sprintf("test {{ .%sname.actualname }}", requestctx.BareVariablesPrefixStripped)
+			mockExec.EXPECT().Config().Return(config)
 			mockExec.EXPECT().Execute(gomock.Any(), "test actual name").Return("response string", nil)
 
 			nextStep := testStep{id: "next"}
@@ -85,11 +86,10 @@ func TestAction_Execute(t *testing.T) {
 			require.NoError(t, err)
 
 			act := Action{
-				configStr: config,
-				exec:      mockExec,
-				id:        "test",
-				next:      &stepWrapper{id: "next", step: &nextStep},
-				out:       "test",
+				exec: mockExec,
+				id:   "test",
+				next: &stepWrapper{id: "next", step: &nextStep},
+				out:  "test",
 			}
 
 			next, err := act.execute(ctx)
@@ -106,6 +106,7 @@ func TestAction_Execute(t *testing.T) {
 			defer ctrl.Finish()
 
 			mockExec := NewMockActionExecutable(ctrl)
+			mockExec.EXPECT().Config().Return("")
 			mockExec.EXPECT().Execute(gomock.Any(), "").Return("custom response", nil)
 
 			nextStep := testStep{id: "next"}
@@ -135,6 +136,7 @@ func TestAction_Execute(t *testing.T) {
 			mockExec := NewMockActionExecutable(ctrl)
 			fileContent := "test file content"
 			reader := io.NopCloser(strings.NewReader(fileContent))
+			mockExec.EXPECT().Config().Return("")
 			mockExec.EXPECT().Execute(gomock.Any(), "").Return(reader, nil)
 
 			nextStep := testStep{id: "next"}
@@ -175,6 +177,7 @@ func TestAction_Execute(t *testing.T) {
 			defer ctrl.Finish()
 
 			mockExec := NewMockActionExecutable(ctrl)
+			mockExec.EXPECT().Config().Return("")
 			mockExec.EXPECT().Type().Return("mock").AnyTimes()
 			mockExec.EXPECT().Execute(gomock.Any(), "").Return("response string", errors.New("dummy error"))
 
@@ -201,6 +204,7 @@ func TestAction_Execute(t *testing.T) {
 			defer ctrl.Finish()
 
 			mockExec := NewMockActionExecutable(ctrl)
+			mockExec.EXPECT().Config().Return("").AnyTimes()
 			mockExec.EXPECT().Execute(gomock.Any(), "").Return("response string", fmt.Errorf("%w: dummy error", ErrFailure)).AnyTimes()
 
 			nextStep := testStep{id: "next"}

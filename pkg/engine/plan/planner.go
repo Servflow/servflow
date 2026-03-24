@@ -177,13 +177,12 @@ func (p *PlannerV2) generateActionStep(id string) (*Action, error) {
 	}
 
 	return &Action{
-		configStr: exec.Config(),
-		id:        id,
-		name:      name,
-		next:      nextStep,
-		fail:      failStep,
-		out:       out,
-		exec:      exec,
+		id:   id,
+		name: name,
+		next: nextStep,
+		fail: failStep,
+		out:  out,
+		exec: exec,
 	}, nil
 }
 

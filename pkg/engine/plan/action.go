@@ -46,13 +46,13 @@ func AddSpanAttribute(ctx context.Context, key string, value attribute.Value) bo
 // TODO swap id for logger with id
 
 type Action struct {
-	configStr string
-	next      *stepWrapper
-	fail      *stepWrapper
-	exec      actions.ActionExecutable
-	out       string
-	id        string
-	name      string
+	next       *stepWrapper
+	fail       *stepWrapper
+	exec       actions.ActionExecutable
+	out        string
+	id         string
+	name       string
+	useReplica bool
 }
 
 var (
@@ -87,8 +87,9 @@ func (a *Action) execute(ctx context.Context) (*stepWrapper, error) {
 		err  error
 		cfg  string
 	)
-	if a.configStr != "" {
-		tmpl, err = requestctx.CreateTextTemplate(ctx, a.configStr, nil)
+	configStr := a.exec.Config()
+	if configStr != "" {
+		tmpl, err = requestctx.CreateTextTemplate(ctx, configStr, nil)
 		if err != nil {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, err.Error())

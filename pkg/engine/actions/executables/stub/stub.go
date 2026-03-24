@@ -18,6 +18,10 @@ func (s *Executable) Type() string {
 	return "stub"
 }
 
+func (s *Executable) SupportsReplica() bool {
+	return true
+}
+
 func NewExecutable(cfg map[string]interface{}) *Executable {
 	return &Executable{
 		Fields: cfg,

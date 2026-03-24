@@ -117,6 +117,10 @@ func (a *Action) Type() string {
 	return "authenticate"
 }
 
+func (a *Action) SupportsReplica() bool {
+	return true
+}
+
 func init() {
 	fields := map[string]actions.FieldInfo{
 		"integrationID": {

@@ -18,6 +18,10 @@ func (e *Email) Type() string {
 	return "email"
 }
 
+func (e *Email) SupportsReplica() bool {
+	return true
+}
+
 type Config struct {
 	SenderEmail    string       `json:"senderEmail"`
 	RecipientEmail string       `json:"recipientEmail"`

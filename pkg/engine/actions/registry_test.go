@@ -28,6 +28,10 @@ func (m *mockActionExecutable) Execute(ctx context.Context, modifiedConfig strin
 	return "mock response", nil
 }
 
+func (m *mockActionExecutable) SupportsReplica() bool {
+	return true
+}
+
 func TestRegisterAction(t *testing.T) {
 	// Note: This test uses the registry package directly since we can't easily
 	// reset the global state. In practice, we'd use dependency injection.

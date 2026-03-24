@@ -32,6 +32,10 @@ func (f FetchVector) Type() string {
 	return "fetchvector"
 }
 
+func (f FetchVector) SupportsReplica() bool {
+	return true
+}
+
 func (f FetchVector) Config() string {
 	dat, err := json.Marshal(f.cfg)
 	if err != nil {

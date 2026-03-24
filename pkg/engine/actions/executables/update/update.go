@@ -33,6 +33,10 @@ func (u *Update) Type() string {
 	return "update"
 }
 
+func (u *Update) SupportsReplica() bool {
+	return true
+}
+
 func New(config Config) (*Update, error) {
 	if config.IntegrationID == "" {
 		return nil, errors.New("datasource is required")

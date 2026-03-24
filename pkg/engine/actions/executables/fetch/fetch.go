@@ -23,6 +23,10 @@ func (f *Fetch) Type() string {
 	return "fetch"
 }
 
+func (f *Fetch) SupportsReplica() bool {
+	return true
+}
+
 type fetchImplementation interface {
 	integration.Integration
 	Fetch(ctx context.Context, options map[string]string, filters ...filters.Filter) ([]map[string]interface{}, error)

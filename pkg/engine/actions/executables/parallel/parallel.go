@@ -132,6 +132,10 @@ func (e *Exec) Type() string {
 	return "parallel"
 }
 
+func (e *Exec) SupportsReplica() bool {
+	return false
+}
+
 func isContextCancellationError(err error) bool {
 	return errors.Is(err, plan.ErrContextCanceled)
 }

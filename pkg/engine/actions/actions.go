@@ -13,4 +13,5 @@ type ActionExecutable interface {
 	Config() string
 	Execute(ctx context.Context, modifiedConfig string) (interface{}, error)
 	Type() string
+	SupportsReplica() bool
 }

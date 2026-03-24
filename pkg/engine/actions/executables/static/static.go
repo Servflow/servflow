@@ -18,6 +18,10 @@ func (s *Executable) Type() string {
 	return "static"
 }
 
+func (s *Executable) SupportsReplica() bool {
+	return true
+}
+
 type Config struct {
 	Return string `json:"return"`
 }

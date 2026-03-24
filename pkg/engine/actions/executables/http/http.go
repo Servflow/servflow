@@ -26,6 +26,10 @@ func (h *Http) Type() string {
 	return "http"
 }
 
+func (h *Http) SupportsReplica() bool {
+	return true
+}
+
 type Config struct {
 	URL                  string            `json:"url" yaml:"url"`
 	Method               string            `json:"method" yaml:"method"`

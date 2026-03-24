@@ -84,6 +84,10 @@ func (m *MGOQuery) Type() string {
 	return "mongoquery"
 }
 
+func (m *MGOQuery) SupportsReplica() bool {
+	return true
+}
+
 func init() {
 	fields := map[string]actions.FieldInfo{
 		"collection": {

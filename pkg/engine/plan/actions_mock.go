@@ -68,6 +68,20 @@ func (mr *MockActionExecutableMockRecorder) Execute(ctx, modifiedConfig any) *go
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockActionExecutable)(nil).Execute), ctx, modifiedConfig)
 }
 
+// SupportsReplica mocks base method.
+func (m *MockActionExecutable) SupportsReplica() bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SupportsReplica")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// SupportsReplica indicates an expected call of SupportsReplica.
+func (mr *MockActionExecutableMockRecorder) SupportsReplica() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SupportsReplica", reflect.TypeOf((*MockActionExecutable)(nil).SupportsReplica))
+}
+
 // Type mocks base method.
 func (m *MockActionExecutable) Type() string {
 	m.ctrl.T.Helper()

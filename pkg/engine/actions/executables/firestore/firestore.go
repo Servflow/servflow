@@ -31,6 +31,10 @@ func (f *Firestore) Type() string {
 	return "firestore"
 }
 
+func (f *Firestore) SupportsReplica() bool {
+	return true
+}
+
 func NewFirestoreExecutable(cfg Config) (*Firestore, error) {
 	if cfg.ServiceAccount == "" || cfg.ProjectID == "" || cfg.CollectionID == "" {
 		return nil, fmt.Errorf("please make sure service account, projectID and collection id are valid")

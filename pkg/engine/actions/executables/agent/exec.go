@@ -94,6 +94,10 @@ func (a *Agent) Type() string {
 	return "agent"
 }
 
+func (a *Agent) SupportsReplica() bool {
+	return false
+}
+
 func New(config Config) (*Agent, error) {
 	if config.IntegrationID == "" {
 		return nil, errors.New("IntegrationID is required")

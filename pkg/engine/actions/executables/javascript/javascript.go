@@ -50,6 +50,10 @@ func (e *Executable) Type() string {
 	return "javascript"
 }
 
+func (e *Executable) SupportsReplica() bool {
+	return true
+}
+
 func (e *Executable) Config() string {
 	return ""
 }

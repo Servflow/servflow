@@ -34,6 +34,10 @@ func (s *Store) Type() string {
 	return "store"
 }
 
+func (s *Store) SupportsReplica() bool {
+	return true
+}
+
 func New(config Config) (*Store, error) {
 	if config.IntegrationID == "" {
 		return nil, errors.New("datasource is required")

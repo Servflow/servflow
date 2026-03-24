@@ -19,6 +19,10 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
+func resetReplicaManager() {
+	replicaManager = &ReplicaManager{replicas: []Replica{}}
+}
+
 type testStep struct {
 	id string
 }
@@ -321,6 +325,142 @@ func TestGetActionSpan(t *testing.T) {
 }
 
 var _ trace.Span = (*noop.Span)(nil)
+
+func TestAction_ExecuteWithReplica(t *testing.T) {
+	t.Run("replica manager is called when useReplica=true and SupportsReplica=true", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		defer resetReplicaManager()
+
+		mockExec := NewMockActionExecutable(ctrl)
+		mockExec.EXPECT().Config().Return("")
+		mockExec.EXPECT().SupportsReplica().Return(true)
+		mockExec.EXPECT().Type().Return("mock")
+
+		mockReplica := NewMockReplica(ctrl)
+		mockReplica.EXPECT().ExecuteAction("mock", "", gomock.Any()).Return("replica response", nil)
+		GetReplicaManager().AddReplica(mockReplica)
+
+		ctx := requestctx.NewTestContext()
+		nextStep := testStep{id: "next"}
+
+		act := Action{
+			exec:       mockExec,
+			id:         "test",
+			next:       &stepWrapper{id: "next", step: &nextStep},
+			out:        "test",
+			useReplica: true,
+		}
+
+		next, err := act.execute(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, &stepWrapper{id: "next", step: &nextStep}, next)
+
+		field, err := requestctx.ReplaceVariableValuesInContext(ctx, "{{ .test }}")
+		require.NoError(t, err)
+		assert.Equal(t, "replica response", field)
+	})
+
+	t.Run("replica manager is NOT called when SupportsReplica=false", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		defer resetReplicaManager()
+
+		mockExec := NewMockActionExecutable(ctrl)
+		mockExec.EXPECT().Config().Return("")
+		mockExec.EXPECT().SupportsReplica().Return(false)
+		mockExec.EXPECT().Execute(gomock.Any(), "").Return("direct response", nil)
+
+		mockReplica := NewMockReplica(ctrl)
+		GetReplicaManager().AddReplica(mockReplica)
+
+		ctx := requestctx.NewTestContext()
+		nextStep := testStep{id: "next"}
+
+		act := Action{
+			exec:       mockExec,
+			id:         "test",
+			next:       &stepWrapper{id: "next", step: &nextStep},
+			out:        "test",
+			useReplica: true,
+		}
+
+		next, err := act.execute(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, &stepWrapper{id: "next", step: &nextStep}, next)
+
+		field, err := requestctx.ReplaceVariableValuesInContext(ctx, "{{ .test }}")
+		require.NoError(t, err)
+		assert.Equal(t, "direct response", field)
+	})
+
+	t.Run("falls back to direct execution when replica manager fails", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		defer resetReplicaManager()
+
+		mockExec := NewMockActionExecutable(ctrl)
+		mockExec.EXPECT().Config().Return("")
+		mockExec.EXPECT().SupportsReplica().Return(true)
+		mockExec.EXPECT().Type().Return("mock")
+		mockExec.EXPECT().Execute(gomock.Any(), "").Return("fallback response", nil)
+
+		mockReplica := NewMockReplica(ctrl)
+		mockReplica.EXPECT().ExecuteAction("mock", "", gomock.Any()).Return(nil, errors.New("replica error"))
+		GetReplicaManager().AddReplica(mockReplica)
+
+		ctx := requestctx.NewTestContext()
+		nextStep := testStep{id: "next"}
+
+		act := Action{
+			exec:       mockExec,
+			id:         "test",
+			next:       &stepWrapper{id: "next", step: &nextStep},
+			out:        "test",
+			useReplica: true,
+		}
+
+		next, err := act.execute(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, &stepWrapper{id: "next", step: &nextStep}, next)
+
+		field, err := requestctx.ReplaceVariableValuesInContext(ctx, "{{ .test }}")
+		require.NoError(t, err)
+		assert.Equal(t, "fallback response", field)
+	})
+
+	t.Run("returns error when both replica and fallback fail", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		defer resetReplicaManager()
+
+		mockExec := NewMockActionExecutable(ctrl)
+		mockExec.EXPECT().Config().Return("")
+		mockExec.EXPECT().SupportsReplica().Return(true)
+		mockExec.EXPECT().Type().Return("mock").AnyTimes()
+		mockExec.EXPECT().Execute(gomock.Any(), "").Return(nil, errors.New("direct execution error"))
+
+		mockReplica := NewMockReplica(ctrl)
+		mockReplica.EXPECT().ExecuteAction("mock", "", gomock.Any()).Return(nil, errors.New("replica error"))
+		GetReplicaManager().AddReplica(mockReplica)
+
+		ctx := requestctx.NewTestContext()
+		nextStep := testStep{id: "next"}
+
+		act := Action{
+			exec:       mockExec,
+			id:         "test",
+			next:       &stepWrapper{id: "next", step: &nextStep},
+			out:        "test",
+			useReplica: true,
+		}
+
+		next, err := act.execute(ctx)
+		assert.Error(t, err)
+		assert.Nil(t, next)
+		assert.Contains(t, err.Error(), "direct execution error")
+	})
+}
 
 func TestActionTemplateFunctions(t *testing.T) {
 	variables := map[string]interface{}{

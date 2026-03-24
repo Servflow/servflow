@@ -3,6 +3,7 @@ package plan
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"testing"
 
@@ -192,4 +193,46 @@ func TestPlan_Execute(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestExecuteSingleAction(t *testing.T) {
+	t.Run("successful execution", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		mockExec := NewMockActionExecutable(ctrl)
+		mockExec.EXPECT().Execute(gomock.Any(), `{"key":"value"}`).Return("test response", nil)
+
+		actions.ReplaceActionType("test-single-action", func(config json.RawMessage) (actions.ActionExecutable, error) {
+			return mockExec, nil
+		})
+
+		result, err := ExecuteSingleAction("test-single-action", json.RawMessage(`{"key":"value"}`))
+		require.NoError(t, err)
+		assert.Equal(t, "test response", result)
+	})
+
+	t.Run("unregistered action type", func(t *testing.T) {
+		result, err := ExecuteSingleAction("unregistered-action-type", json.RawMessage(`{}`))
+		require.Error(t, err)
+		assert.Nil(t, result)
+		assert.Contains(t, err.Error(), "not registered")
+	})
+
+	t.Run("execution error", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		mockExec := NewMockActionExecutable(ctrl)
+		mockExec.EXPECT().Execute(gomock.Any(), `{}`).Return(nil, errors.New("execution failed"))
+
+		actions.ReplaceActionType("test-single-action-error", func(config json.RawMessage) (actions.ActionExecutable, error) {
+			return mockExec, nil
+		})
+
+		result, err := ExecuteSingleAction("test-single-action-error", json.RawMessage(`{}`))
+		require.Error(t, err)
+		assert.Nil(t, result)
+		assert.Contains(t, err.Error(), "execution failed")
+	})
 }

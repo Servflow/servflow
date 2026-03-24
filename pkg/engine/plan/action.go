@@ -115,11 +115,7 @@ func (a *Action) execute(ctx context.Context) (*stepWrapper, error) {
 
 	var resp interface{}
 	if a.useReplica && a.exec.SupportsReplica() {
-		aggCtx, found := requestctx.FromContext(ctx)
-		if !found {
-			return nil, fmt.Errorf("request context not found")
-		}
-		resp, err = GetReplicaManager().ExecuteAction(a.exec.Type(), cfg, aggCtx.Variables())
+		resp, err = GetReplicaManager().ExecuteAction(a.exec.Type(), cfg)
 		if err != nil {
 			logger.Warn("replica manager failed, falling back to direct execution", zap.Error(err))
 			execCtx := withActionSpan(ctx, span)

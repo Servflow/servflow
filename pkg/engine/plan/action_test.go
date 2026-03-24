@@ -338,7 +338,7 @@ func TestAction_ExecuteWithReplica(t *testing.T) {
 		mockExec.EXPECT().Type().Return("mock")
 
 		mockReplica := NewMockReplica(ctrl)
-		mockReplica.EXPECT().ExecuteAction("mock", "", gomock.Any()).Return("replica response", nil)
+		mockReplica.EXPECT().ExecuteAction("mock", "").Return("replica response", nil)
 		GetReplicaManager().AddReplica(mockReplica)
 
 		ctx := requestctx.NewTestContext()
@@ -406,7 +406,7 @@ func TestAction_ExecuteWithReplica(t *testing.T) {
 		mockExec.EXPECT().Execute(gomock.Any(), "").Return("fallback response", nil)
 
 		mockReplica := NewMockReplica(ctrl)
-		mockReplica.EXPECT().ExecuteAction("mock", "", gomock.Any()).Return(nil, errors.New("replica error"))
+		mockReplica.EXPECT().ExecuteAction("mock", "").Return(nil, errors.New("replica error"))
 		GetReplicaManager().AddReplica(mockReplica)
 
 		ctx := requestctx.NewTestContext()
@@ -441,7 +441,7 @@ func TestAction_ExecuteWithReplica(t *testing.T) {
 		mockExec.EXPECT().Execute(gomock.Any(), "").Return(nil, errors.New("direct execution error"))
 
 		mockReplica := NewMockReplica(ctrl)
-		mockReplica.EXPECT().ExecuteAction("mock", "", gomock.Any()).Return(nil, errors.New("replica error"))
+		mockReplica.EXPECT().ExecuteAction("mock", "").Return(nil, errors.New("replica error"))
 		GetReplicaManager().AddReplica(mockReplica)
 
 		ctx := requestctx.NewTestContext()

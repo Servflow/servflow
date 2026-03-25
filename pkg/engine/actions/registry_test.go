@@ -24,8 +24,12 @@ func (m *mockActionExecutable) Config() string {
 	return m.config
 }
 
-func (m *mockActionExecutable) Execute(ctx context.Context, modifiedConfig string) (interface{}, error) {
-	return "mock response", nil
+func (m *mockActionExecutable) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
+	return "mock response", nil, nil
+}
+
+func (m *mockActionExecutable) SupportsReplica() bool {
+	return true
 }
 
 func TestRegisterAction(t *testing.T) {

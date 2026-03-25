@@ -70,7 +70,7 @@ func (e *groupError) firstError() error {
 	return err
 }
 
-func (e *Exec) Execute(ctx context.Context, _ string) (interface{}, error) {
+func (e *Exec) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
 	newCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -120,16 +120,20 @@ func (e *Exec) Execute(ctx context.Context, _ string) (interface{}, error) {
 
 	if allErrors.Count() > 0 {
 		if e.config.StopOnFailure {
-			return nil, allErrors.firstError()
+			return nil, nil, allErrors.firstError()
 		} else {
-			return nil, &allErrors
+			return nil, nil, &allErrors
 		}
 	}
-	return nil, nil
+	return nil, nil, nil
 }
 
 func (e *Exec) Type() string {
 	return "parallel"
+}
+
+func (e *Exec) SupportsReplica() bool {
+	return false
 }
 
 func isContextCancellationError(err error) bool {

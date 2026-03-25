@@ -18,41 +18,17 @@ import (
 	"go.uber.org/zap"
 )
 
-type actionSpanContextKey struct{}
-
-// withActionSpan stores the action span in the context
-func withActionSpan(ctx context.Context, span trace.Span) context.Context {
-	return context.WithValue(ctx, actionSpanContextKey{}, span)
-}
-
-// getActionSpan retrieves the action span from the context
-func getActionSpan(ctx context.Context) (trace.Span, bool) {
-	span, ok := ctx.Value(actionSpanContextKey{}).(trace.Span)
-	return span, ok
-}
-
-// AddSpanAttribute adds an attribute to the action span stored in the context.
-// Returns true if the attribute was added successfully, false if no span was found.
-func AddSpanAttribute(ctx context.Context, key string, value attribute.Value) bool {
-	span, ok := getActionSpan(ctx)
-	if !ok {
-		return false
-	}
-	span.SetAttributes(attribute.KeyValue{Key: attribute.Key(key), Value: value})
-	return true
-}
-
 // TODO deprecate out
 // TODO swap id for logger with id
 
 type Action struct {
-	configStr string
-	next      *stepWrapper
-	fail      *stepWrapper
-	exec      actions.ActionExecutable
-	out       string
-	id        string
-	name      string
+	next       *stepWrapper
+	fail       *stepWrapper
+	exec       actions.ActionExecutable
+	out        string
+	id         string
+	name       string
+	useReplica bool
 }
 
 var (
@@ -87,8 +63,9 @@ func (a *Action) execute(ctx context.Context) (*stepWrapper, error) {
 		err  error
 		cfg  string
 	)
-	if a.configStr != "" {
-		tmpl, err = requestctx.CreateTextTemplate(ctx, a.configStr, nil)
+	configStr := a.exec.Config()
+	if configStr != "" {
+		tmpl, err = requestctx.CreateTextTemplate(ctx, configStr, nil)
 		if err != nil {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, err.Error())
@@ -112,8 +89,24 @@ func (a *Action) execute(ctx context.Context) (*stepWrapper, error) {
 
 	span.SetAttributes(attribute.String("config", cfg))
 
-	execCtx := withActionSpan(ctx, span)
-	resp, err := a.exec.Execute(execCtx, cfg)
+	var (
+		resp   interface{}
+		fields map[string]string
+	)
+	if a.useReplica && a.exec.SupportsReplica() {
+		resp, fields, err = GetReplicaManager().ExecuteAction(a.exec.Type(), cfg)
+		if err != nil {
+			logger.Warn("replica manager failed, falling back to direct execution", zap.Error(err))
+			resp, _, err = a.exec.Execute(ctx, cfg)
+		}
+	} else {
+		resp, fields, err = a.exec.Execute(ctx, cfg)
+	}
+
+	for k, v := range fields {
+		span.SetAttributes(attribute.String(k, v))
+	}
+
 	if err != nil {
 		span.RecordError(err)
 		if errors.Is(err, ErrFailure) {

@@ -145,7 +145,7 @@ func TestAuthenticate_Execute(t *testing.T) {
 		configStr, err := json.Marshal(config)
 		require.NoError(t, err)
 
-		result, err := auth.Execute(context.Background(), string(configStr))
+		result, _, err := auth.Execute(context.Background(), string(configStr))
 		require.NoError(t, err)
 		assert.Equal(t, email, result)
 	})
@@ -180,7 +180,7 @@ func TestAuthenticate_Execute(t *testing.T) {
 		configStr, err := json.Marshal(config)
 		require.NoError(t, err)
 
-		_, err = auth.Execute(context.Background(), string(configStr))
+		_, _, err = auth.Execute(context.Background(), string(configStr))
 		require.Error(t, err)
 	})
 
@@ -216,7 +216,7 @@ func TestAuthenticate_Execute(t *testing.T) {
 		configStr, err := json.Marshal(config)
 		require.NoError(t, err)
 
-		_, err = auth.Execute(context.Background(), string(configStr))
+		_, _, err = auth.Execute(context.Background(), string(configStr))
 		require.Error(t, err)
 	})
 
@@ -258,7 +258,7 @@ func TestAuthenticate_Execute(t *testing.T) {
 		configStr, err := json.Marshal(config)
 		require.NoError(t, err)
 
-		_, err = auth.Execute(context.Background(), string(configStr))
+		_, _, err = auth.Execute(context.Background(), string(configStr))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "token subject is invalid")
 	})
@@ -304,7 +304,7 @@ func TestAuthenticate_Execute(t *testing.T) {
 		configStr, err := json.Marshal(config)
 		require.NoError(t, err)
 
-		resp, err := auth.Execute(context.Background(), string(configStr))
+		resp, _, err := auth.Execute(context.Background(), string(configStr))
 		require.Error(t, err)
 		assert.Nil(t, resp)
 		assert.Contains(t, err.Error(), "token subject is invalid")

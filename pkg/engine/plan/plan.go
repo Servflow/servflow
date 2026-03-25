@@ -2,12 +2,14 @@ package plan
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/Servflow/servflow/internal/http"
 	"github.com/Servflow/servflow/pkg/apiconfig"
+	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
 	"go.uber.org/zap"
@@ -41,6 +43,15 @@ type EndValueSpec struct {
 	ValType   EndValueType
 	StringVal string
 	FileVal   apiconfig.FileInput
+}
+
+func ExecuteSingleAction(actionType string, config json.RawMessage) (any, map[string]string, error) {
+	exec, err := actions.GetActionExecutable(actionType, config)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return exec.Execute(context.Background(), string(config))
 }
 
 func (p *Plan) executeStep(ctx context.Context, step *stepWrapper, endValue *EndValueSpec) (*http.SfResponse, error) {

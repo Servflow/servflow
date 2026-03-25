@@ -180,7 +180,7 @@ func TestExecutable_Execute(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			result, err := exec.Execute(ctx, "")
+			result, _, err := exec.Execute(ctx, "")
 			if tt.expectError {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorMsg)
@@ -196,7 +196,7 @@ func TestExecutable_Execute_NoContext(t *testing.T) {
 	exec, err := NewExecutable(Config{Script: "function servflowRun() { return 1; }"})
 	require.NoError(t, err)
 
-	_, err = exec.Execute(context.Background(), "")
+	_, _, err = exec.Execute(context.Background(), "")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get request variables")
 }

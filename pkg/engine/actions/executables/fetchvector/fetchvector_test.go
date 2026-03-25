@@ -44,7 +44,7 @@ func TestFetchVector_Execute(t *testing.T) {
 			fetchIntegration: mockIntegration,
 		}
 
-		result, err := fetchVectorObj.Execute(context.Background(), fetchVectorObj.Config())
+		result, _, err := fetchVectorObj.Execute(context.Background(), fetchVectorObj.Config())
 		require.NoError(t, err)
 		assert.Equal(t, []map[string]any{
 			{
@@ -81,7 +81,7 @@ func TestFetchVector_Execute(t *testing.T) {
 			fetchIntegration: mockIntegration,
 		}
 
-		_, err = fetchVectorObj.Execute(context.Background(), fetchVectorObj.Config())
+		_, _, err = fetchVectorObj.Execute(context.Background(), fetchVectorObj.Config())
 		assert.Error(t, err)
 	})
 }

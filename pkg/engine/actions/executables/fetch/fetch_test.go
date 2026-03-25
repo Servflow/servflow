@@ -43,7 +43,7 @@ func TestFetch_Execute(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		resp, err := fetch.Execute(context.Background(), fetch.Config())
+		resp, _, err := fetch.Execute(context.Background(), fetch.Config())
 		require.NoError(t, err)
 		assert.Equal(t, fetchReturn, resp)
 	})
@@ -72,7 +72,7 @@ func TestFetch_Execute(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		_, err = fetch.Execute(context.Background(), fetch.Config())
+		_, _, err = fetch.Execute(context.Background(), fetch.Config())
 		require.Error(t, err)
 	})
 
@@ -101,7 +101,7 @@ func TestFetch_Execute(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		_, err = fetch.Execute(context.Background(), fetch.Config())
+		_, _, err = fetch.Execute(context.Background(), fetch.Config())
 		require.Error(t, err)
 		assert.True(t, errors.Is(err, plan.ErrFailure), "Expected failure error to be wrapped with plan.ErrFailure")
 	})

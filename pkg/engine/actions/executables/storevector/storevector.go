@@ -31,6 +31,10 @@ func (s StoreVectors) Type() string {
 	return "storevector"
 }
 
+func (s StoreVectors) SupportsReplica() bool {
+	return true
+}
+
 func (s StoreVectors) Config() string {
 	cfg := *s.cfg
 	cfg.Options = nil
@@ -42,25 +46,25 @@ func (s StoreVectors) Config() string {
 	return string(dat)
 }
 
-func (s StoreVectors) Execute(ctx context.Context, modifiedConfig string) (interface{}, error) {
+func (s StoreVectors) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
 	var newCfg Config
 	err := json.Unmarshal([]byte(modifiedConfig), &newCfg)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var vectors []float32
 	err = json.Unmarshal([]byte(newCfg.Vectors), &vectors)
 	if err != nil {
-		return nil, fmt.Errorf("invalid value for vectors: %w", err)
+		return nil, nil, fmt.Errorf("invalid value for vectors: %w", err)
 	}
 
 	err = s.storeVectorIntegration.StoreVectors(vectors, newCfg.Fields, s.cfg.Options)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return nil, nil
+	return nil, nil, nil
 }
 
 func New(config Config) (*StoreVectors, error) {

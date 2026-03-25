@@ -25,6 +25,10 @@ func (h *Hash) Type() string {
 	return "hash"
 }
 
+func (h *Hash) SupportsReplica() bool {
+	return true
+}
+
 func New(value, algorithm string) (*Hash, error) {
 	hash := &Hash{value: value}
 	switch algorithm {
@@ -41,15 +45,15 @@ func (h *Hash) Config() string {
 	return h.value
 }
 
-func (h *Hash) Execute(ctx context.Context, modifiedConfig string) (interface{}, error) {
+func (h *Hash) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
 	logger := logging.FromContext(ctx).With(zap.String("execution_type", h.Type()))
 	_ = logging.WithLogger(ctx, logger)
 
 	res, err := bcrypt.GenerateFromPassword([]byte(modifiedConfig), 10)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
-	return string(res), nil
+	return string(res), nil, nil
 }
 
 func init() {

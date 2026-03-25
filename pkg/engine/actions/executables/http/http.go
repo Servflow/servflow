@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/logging"
-	"go.opentelemetry.io/otel/attribute"
 	"go.uber.org/zap"
 
 	"github.com/tidwall/gjson"
@@ -24,6 +24,10 @@ type Http struct {
 
 func (h *Http) Type() string {
 	return "http"
+}
+
+func (h *Http) SupportsReplica() bool {
+	return true
 }
 
 type Config struct {
@@ -51,14 +55,14 @@ func (h *Http) Config() string {
 	return string(configBytes)
 }
 
-func (h *Http) Execute(ctx context.Context, filledInConfig string) (interface{}, error) {
+func (h *Http) Execute(ctx context.Context, filledInConfig string) (interface{}, map[string]string, error) {
 	logger := logging.FromContext(ctx).With(zap.String("execution_type", h.Type()))
 	ctx = logging.WithLogger(ctx, logger)
 
 	var cfg Config
 
 	if err := json.Unmarshal([]byte(filledInConfig), &cfg); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var body io.Reader
@@ -68,7 +72,7 @@ func (h *Http) Execute(ctx context.Context, filledInConfig string) (interface{},
 
 	req, err := http.NewRequestWithContext(ctx, cfg.Method, cfg.URL, body)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if len(cfg.Headers) > 0 {
@@ -79,50 +83,51 @@ func (h *Http) Execute(ctx context.Context, filledInConfig string) (interface{},
 
 	resp, err := h.client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	defer resp.Body.Close()
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	plan.AddSpanAttribute(ctx, "http.response_code", attribute.IntValue(resp.StatusCode))
-	plan.AddSpanAttribute(ctx, "http.response_body", attribute.StringValue(string(bodyBytes)))
+	fields := map[string]string{}
+	fields["status_code"] = strconv.Itoa(resp.StatusCode)
+	fields["response_body"] = string(bodyBytes)
 
 	logger.Debug("finished request", zap.String("url", req.URL.String()), zap.Int("status", resp.StatusCode), zap.ByteString("body", bodyBytes))
 
 	if cfg.ExpectedResponseCode != "" && cfg.ExpectedResponseCode != "0" {
 		expectedCode := cfg.ExpectedResponseCode
 		if fmt.Sprintf("%d", resp.StatusCode) != expectedCode {
-			return nil, fmt.Errorf("%w: unexpected response code %d, expected %s", plan.ErrFailure, resp.StatusCode, expectedCode)
+			return nil, fields, fmt.Errorf("%w: unexpected response code %d, expected %s", plan.ErrFailure, resp.StatusCode, expectedCode)
 		}
 	}
 
 	if len(bodyBytes) == 0 && cfg.FailIfResponseEmpty {
-		return nil, fmt.Errorf("%w: response body is empty", plan.ErrFailure)
+		return nil, fields, fmt.Errorf("%w: response body is empty", plan.ErrFailure)
 	}
 
 	if cfg.ResponsePath == "" {
 		var result interface{}
 		if err := json.Unmarshal(bodyBytes, &result); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		return result, nil
+		return result, nil, nil
 	}
 
 	if !gjson.ValidBytes(bodyBytes) {
-		return nil, fmt.Errorf("%w: invalid JSON response", plan.ErrFailure)
+		return nil, nil, fmt.Errorf("%w: invalid JSON response", plan.ErrFailure)
 	}
 
 	value := gjson.GetBytes(bodyBytes, cfg.ResponsePath)
 	if !value.Exists() {
-		return nil, fmt.Errorf("%w: path '%s' not found in response", plan.ErrFailure, cfg.ResponsePath)
+		return nil, nil, fmt.Errorf("%w: path '%s' not found in response", plan.ErrFailure, cfg.ResponsePath)
 	}
 
-	return value.Value(), nil
+	return value.Value(), fields, nil
 }
 
 func init() {

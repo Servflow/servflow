@@ -18,6 +18,10 @@ func (s *Executable) Type() string {
 	return "static"
 }
 
+func (s *Executable) SupportsReplica() bool {
+	return true
+}
+
 type Config struct {
 	Return string `json:"return"`
 }
@@ -32,11 +36,11 @@ func (s *Executable) Config() string {
 	return s.Return
 }
 
-func (s *Executable) Execute(ctx context.Context, modifiedConfig string) (interface{}, error) {
+func (s *Executable) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
 	logger := logging.FromContext(ctx).With(zap.String("execution_type", s.Type()))
 	_ = logging.WithLogger(ctx, logger)
 
-	return modifiedConfig, nil
+	return modifiedConfig, nil, nil
 }
 
 func init() {

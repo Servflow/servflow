@@ -265,7 +265,7 @@ func TestNewClient(t *testing.T) {
 
 		// Setup mocks
 		mockExec.EXPECT().Config().Return("").AnyTimes()
-		mockExec.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(map[string]interface{}{"result": "workflow result:"}, nil)
+		mockExec.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(map[string]interface{}{"result": "workflow result:"}, nil, nil)
 
 		// Create planner and plan
 		planner := plan2.NewPlannerV2(plan2.PlannerConfig{
@@ -355,7 +355,7 @@ func TestNewClient(t *testing.T) {
 		})
 
 		mockExec.EXPECT().Config().Return("").AnyTimes()
-		mockExec.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(fileReader, nil)
+		mockExec.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(fileReader, nil, nil)
 
 		planner := plan2.NewPlannerV2(plan2.PlannerConfig{
 			Actions:        cfg.Actions,

@@ -72,7 +72,7 @@ func TestJWT_Execute_Encode(t *testing.T) {
 		}
 		jwtAction := New(config)
 
-		result, err := jwtAction.Execute(context.Background(), "testSubject")
+		result, _, err := jwtAction.Execute(context.Background(), "testSubject")
 		require.NoError(t, err)
 
 		// Verify token can be decoded
@@ -105,7 +105,7 @@ func TestJWT_Execute_Encode(t *testing.T) {
 		}
 		jwtAction := New(config)
 
-		result, err := jwtAction.Execute(context.Background(), "testSubject")
+		result, _, err := jwtAction.Execute(context.Background(), "testSubject")
 		require.NoError(t, err)
 
 		// Verify token can be decoded with custom claims
@@ -140,7 +140,7 @@ func TestJWT_Execute_Encode(t *testing.T) {
 		}
 		jwtAction := New(config)
 
-		result, err := jwtAction.Execute(context.Background(), "testSubject")
+		result, _, err := jwtAction.Execute(context.Background(), "testSubject")
 		require.NoError(t, err)
 
 		// Verify token can be decoded with the public key
@@ -193,7 +193,7 @@ func TestJWT_Execute_Decode(t *testing.T) {
 		}
 		jwtAction := New(config)
 
-		result, err := jwtAction.Execute(context.Background(), tokenString)
+		result, _, err := jwtAction.Execute(context.Background(), tokenString)
 		require.NoError(t, err)
 		assert.Equal(t, "decodedSubject", result)
 	})
@@ -206,7 +206,7 @@ func TestJWT_Execute_Decode(t *testing.T) {
 		}
 		jwtAction := New(config)
 
-		_, err := jwtAction.Execute(context.Background(), tokenString)
+		_, _, err := jwtAction.Execute(context.Background(), tokenString)
 		require.Error(t, err)
 	})
 
@@ -226,7 +226,7 @@ func TestJWT_Execute_Decode(t *testing.T) {
 		}
 		jwtAction := New(config)
 
-		_, err = jwtAction.Execute(context.Background(), expiredTokenString)
+		_, _, err = jwtAction.Execute(context.Background(), expiredTokenString)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "expired")
 	})
@@ -244,7 +244,7 @@ func TestJWT_Execute_Decode(t *testing.T) {
 		}
 		encodeAction := New(encodeConfig)
 
-		tokenResult, err := encodeAction.Execute(context.Background(), "testSubject")
+		tokenResult, _, err := encodeAction.Execute(context.Background(), "testSubject")
 		require.NoError(t, err)
 		tokenString := tokenResult.(string)
 
@@ -256,7 +256,7 @@ func TestJWT_Execute_Decode(t *testing.T) {
 		}
 		decodeAction := New(decodeConfig)
 
-		result, err := decodeAction.Execute(context.Background(), tokenString)
+		result, _, err := decodeAction.Execute(context.Background(), tokenString)
 		require.NoError(t, err)
 		assert.Equal(t, "testSubject", result)
 	})
@@ -274,7 +274,7 @@ func TestJWT_Execute_Decode(t *testing.T) {
 		encodeAction := New(encodeConfig)
 
 		// Encode a subject
-		tokenResult, err := encodeAction.Execute(context.Background(), "rsaSubject")
+		tokenResult, _, err := encodeAction.Execute(context.Background(), "rsaSubject")
 		require.NoError(t, err)
 		tokenString := tokenResult.(string)
 
@@ -287,7 +287,7 @@ func TestJWT_Execute_Decode(t *testing.T) {
 		decodeAction := New(decodeConfig)
 
 		// Decode the token
-		result, err := decodeAction.Execute(context.Background(), tokenString)
+		result, _, err := decodeAction.Execute(context.Background(), tokenString)
 		require.NoError(t, err)
 		assert.Equal(t, "rsaSubject", result)
 	})
@@ -309,7 +309,7 @@ func TestJWT_Execute_Decode(t *testing.T) {
 		}
 		encodeAction := New(encodeConfig)
 
-		tokenResult, err := encodeAction.Execute(context.Background(), "rsaSubject")
+		tokenResult, _, err := encodeAction.Execute(context.Background(), "rsaSubject")
 		require.NoError(t, err)
 		tokenString := tokenResult.(string)
 
@@ -322,7 +322,7 @@ func TestJWT_Execute_Decode(t *testing.T) {
 		decodeAction := New(decodeConfig)
 
 		// This should fail since keys don't match
-		_, err = decodeAction.Execute(context.Background(), tokenString)
+		_, _, err = decodeAction.Execute(context.Background(), tokenString)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "crypto/rsa: verification error")
 	})
@@ -348,7 +348,7 @@ func TestJWT_Execute_Decode(t *testing.T) {
 		encodeAction := New(encodeConfig)
 
 		// Encode a subject
-		tokenResult, err := encodeAction.Execute(context.Background(), "rsaSubject")
+		tokenResult, _, err := encodeAction.Execute(context.Background(), "rsaSubject")
 		require.NoError(t, err)
 		tokenString := tokenResult.(string)
 
@@ -361,7 +361,7 @@ func TestJWT_Execute_Decode(t *testing.T) {
 		decodeAction := New(decodeConfig)
 
 		// Decode the token
-		result, err := decodeAction.Execute(context.Background(), tokenString)
+		result, _, err := decodeAction.Execute(context.Background(), tokenString)
 		require.NoError(t, err)
 		assert.Equal(t, "rsaSubject", result)
 
@@ -442,7 +442,7 @@ func TestJWT_Execute_Decode_WithJwksURL(t *testing.T) {
 		}
 		jwtAction := New(config)
 
-		result, err := jwtAction.Execute(context.Background(), tokenString)
+		result, _, err := jwtAction.Execute(context.Background(), tokenString)
 		require.NoError(t, err)
 		assert.Equal(t, "jwksSubject", result)
 	})
@@ -455,7 +455,7 @@ func TestJWT_Execute_Decode_WithJwksURL(t *testing.T) {
 		}
 		jwtAction := New(config)
 
-		_, err := jwtAction.Execute(context.Background(), "invalid.token.string")
+		_, _, err := jwtAction.Execute(context.Background(), "invalid.token.string")
 		require.Error(t, err)
 	})
 
@@ -479,7 +479,7 @@ func TestJWT_Execute_Decode_WithJwksURL(t *testing.T) {
 		}
 		jwtAction := New(config)
 
-		_, err = jwtAction.Execute(context.Background(), otherTokenString)
+		_, _, err = jwtAction.Execute(context.Background(), otherTokenString)
 		require.Error(t, err)
 	})
 
@@ -492,7 +492,7 @@ func TestJWT_Execute_Decode_WithJwksURL(t *testing.T) {
 		}
 		jwtAction := New(config)
 
-		_, err := jwtAction.Execute(context.Background(), "invalid.token.string")
+		_, _, err := jwtAction.Execute(context.Background(), "invalid.token.string")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed")
 	})
@@ -506,7 +506,7 @@ func TestJWT_Execute_Decode_RequiresKeyOrJwksURL(t *testing.T) {
 		}
 		jwtAction := New(config)
 
-		_, err := jwtAction.Execute(context.Background(), "some.token.string")
+		_, _, err := jwtAction.Execute(context.Background(), "some.token.string")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "either key or jwksURL is required")
 	})
@@ -520,7 +520,7 @@ func TestJWT_Execute_Encode_RequiresKey(t *testing.T) {
 		}
 		jwtAction := New(config)
 
-		_, err := jwtAction.Execute(context.Background(), "testSubject")
+		_, _, err := jwtAction.Execute(context.Background(), "testSubject")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "key is required for encoding")
 	})

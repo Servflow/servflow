@@ -60,28 +60,32 @@ func New(config Config) (*MGOQuery, error) {
 	}, nil
 }
 
-func (m *MGOQuery) Execute(ctx context.Context, modifiedConfig string) (interface{}, error) {
+func (m *MGOQuery) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
 	var cfg Config
 	if err := json.Unmarshal([]byte(modifiedConfig), &cfg); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	m.config = cfg
 
 	result, err := m.i.ExecuteQuery(ctx, cfg.Collection, cfg.FilterQuery, cfg.Projection)
 	if err != nil {
-		return nil, fmt.Errorf("error executing integration: %v", err)
+		return nil, nil, fmt.Errorf("error executing integration: %v", err)
 	}
 
 	if len(result) == 0 && cfg.FailIfEmpty {
-		return nil, fmt.Errorf("%w: no documents found", plan.ErrFailure)
+		return nil, nil, fmt.Errorf("%w: no documents found", plan.ErrFailure)
 	}
 
-	return result, nil
+	return result, nil, nil
 
 }
 
 func (m *MGOQuery) Type() string {
 	return "mongoquery"
+}
+
+func (m *MGOQuery) SupportsReplica() bool {
+	return true
 }
 
 func init() {

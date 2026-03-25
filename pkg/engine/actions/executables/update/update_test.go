@@ -44,7 +44,7 @@ func TestUpdate_Execute(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		resp, err := update.Execute(context.Background(), update.Config())
+		resp, _, err := update.Execute(context.Background(), update.Config())
 		require.NoError(t, err)
 		assert.Nil(t, resp)
 	})
@@ -78,7 +78,7 @@ func TestUpdate_Execute(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		_, err = update.Execute(context.Background(), update.Config())
+		_, _, err = update.Execute(context.Background(), update.Config())
 		assert.Error(t, err)
 	})
 

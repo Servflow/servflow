@@ -330,20 +330,17 @@ func TestBaseParseTextTemplate(t *testing.T) {
 
 func TestExecuteTemplateWithActionFunctionMap(t *testing.T) {
 	tests := []struct {
-		name            string
-		input           string
-		values          map[string]interface{}
-		expected        string
-		secretSetupFunc func(*MockSecretStore)
-		wantErr         bool
+		name     string
+		input    string
+		values   map[string]interface{}
+		expected string
+		wantErr  bool
 	}{
 		{
 			name:     "Test missing key",
 			input:    "{{ .missingkey }}",
 			expected: "",
 			wantErr:  false,
-			secretSetupFunc: func(mockSecretStore *MockSecretStore) {
-			},
 		},
 		{
 			name:     "Basic template execution with strip",
@@ -351,8 +348,6 @@ func TestExecuteTemplateWithActionFunctionMap(t *testing.T) {
 			values:   map[string]interface{}{"name": "Mr. John"},
 			expected: "Hello, John!",
 			wantErr:  false,
-			secretSetupFunc: func(mockSecretStore *MockSecretStore) {
-			},
 		},
 		{
 			name:     "Test jsonout with array of digits",
@@ -360,8 +355,6 @@ func TestExecuteTemplateWithActionFunctionMap(t *testing.T) {
 			values:   map[string]interface{}{"numbers": []int{1, 2, 3, 4, 5}},
 			expected: "JSON Output: [1,2,3,4,5]",
 			wantErr:  false,
-			secretSetupFunc: func(mockSecretStore *MockSecretStore) {
-			},
 		},
 	}
 

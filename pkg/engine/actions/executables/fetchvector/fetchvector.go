@@ -32,6 +32,10 @@ func (f FetchVector) Type() string {
 	return "fetchvector"
 }
 
+func (f FetchVector) SupportsReplica() bool {
+	return true
+}
+
 func (f FetchVector) Config() string {
 	dat, err := json.Marshal(f.cfg)
 	if err != nil {
@@ -40,26 +44,26 @@ func (f FetchVector) Config() string {
 	return string(dat)
 }
 
-func (f FetchVector) Execute(ctx context.Context, modifiedConfig string) (interface{}, error) {
+func (f FetchVector) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
 	var newCfg Config
 	if err := json.Unmarshal([]byte(modifiedConfig), &newCfg); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var vectors []float32
 	if err := json.Unmarshal([]byte(newCfg.Vector), &vectors); err != nil {
-		return nil, fmt.Errorf("invalid value for vectors: %v", err)
+		return nil, nil, fmt.Errorf("invalid value for vectors: %v", err)
 	}
 
 	resultFields, err := f.fetchIntegration.FetchVector(vectors, newCfg.Options)
 	if err != nil {
-		return nil, fmt.Errorf("error fetching vectors: %v", err)
+		return nil, nil, fmt.Errorf("error fetching vectors: %v", err)
 	}
 	if len(resultFields) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
-	return resultFields, nil
+	return resultFields, nil, nil
 }
 
 func New(config Config) (*FetchVector, error) {

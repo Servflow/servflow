@@ -41,7 +41,7 @@ func TestStoreVectors_Execute(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		_, err = storeVectors.Execute(context.Background(), storeVectors.Config())
+		_, _, err = storeVectors.Execute(context.Background(), storeVectors.Config())
 		require.NoError(t, err)
 	})
 
@@ -70,7 +70,7 @@ func TestStoreVectors_Execute(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		_, err = storeVectors.Execute(context.Background(), storeVectors.Config())
+		_, _, err = storeVectors.Execute(context.Background(), storeVectors.Config())
 		assert.Error(t, err)
 	})
 }

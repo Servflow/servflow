@@ -35,7 +35,7 @@ func TestStore_Execute(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		resp, err := store.Execute(context.Background(), store.Config())
+		resp, _, err := store.Execute(context.Background(), store.Config())
 		require.NoError(t, err)
 		assert.Equal(t, map[string]interface{}{
 			"id":   "1",
@@ -66,7 +66,7 @@ func TestStore_Execute(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		resp, err := store.Execute(context.Background(), store.Config())
+		resp, _, err := store.Execute(context.Background(), store.Config())
 		require.NoError(t, err)
 		assert.Contains(t, resp, "id")
 	})
@@ -92,7 +92,7 @@ func TestStore_Execute(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		_, err = store.Execute(context.Background(), store.Config())
+		_, _, err = store.Execute(context.Background(), store.Config())
 		assert.Error(t, err)
 	})
 

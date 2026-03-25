@@ -65,11 +65,11 @@ func (a *Action) Config() string {
 	return string(jsonString)
 }
 
-func (a *Action) Execute(ctx context.Context, modifiedConfig string) (interface{}, error) {
+func (a *Action) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
 	var cfg Config
 
 	if err := json.Unmarshal([]byte(modifiedConfig), &cfg); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	token, err := jwt.Parse(cfg.Token, func(token *jwt.Token) (interface{}, error) {
@@ -79,7 +79,7 @@ func (a *Action) Execute(ctx context.Context, modifiedConfig string) (interface{
 		return []byte(cfg.JWTKey), nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	subject := ""
@@ -90,9 +90,9 @@ func (a *Action) Execute(ctx context.Context, modifiedConfig string) (interface{
 	}
 	if subject == "" {
 		if cfg.FailOnAuthError {
-			return nil, fmt.Errorf("%w: invalid token subject", plan.ErrFailure)
+			return nil, nil, fmt.Errorf("%w: invalid token subject", plan.ErrFailure)
 		}
-		return nil, errors.New("token subject is invalid")
+		return nil, nil, errors.New("token subject is invalid")
 	}
 
 	resp, err := a.fetchImplementation.Fetch(ctx, map[string]string{"collection": cfg.Collection}, filters.Filter{
@@ -101,16 +101,16 @@ func (a *Action) Execute(ctx context.Context, modifiedConfig string) (interface{
 		Comparator: subject,
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if len(resp) < 1 {
 		if cfg.FailOnAuthError {
-			return nil, fmt.Errorf("%w: authentication failed - user not found", plan.ErrFailure)
+			return nil, nil, fmt.Errorf("%w: authentication failed - user not found", plan.ErrFailure)
 		}
-		return nil, errors.New("token subject is invalid")
+		return nil, nil, errors.New("token subject is invalid")
 	}
 
-	return subject, nil
+	return subject, nil, nil
 }
 
 func (a *Action) Type() string {

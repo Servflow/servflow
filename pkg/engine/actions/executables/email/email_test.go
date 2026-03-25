@@ -48,7 +48,7 @@ func (e *emailSuite) TestEmailAction() {
 	go e.startMockSMTPServer(fmt.Sprintf("%s:%s", gjson.Get(cfg, "auth.serverHostname"), gjson.Get(cfg, "auth.serverPort")))
 	time.Sleep(time.Second)
 
-	_, err := e.email.Execute(context.Background(), cfg)
+	_, _, err := e.email.Execute(context.Background(), cfg)
 	e.Require().NoError(err)
 }
 

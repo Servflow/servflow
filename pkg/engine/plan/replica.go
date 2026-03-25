@@ -7,7 +7,7 @@ import (
 )
 
 type Replica interface {
-	ExecuteAction(actionType, actionConfig string) (interface{}, error)
+	ExecuteAction(actionType, actionConfig string) (interface{}, map[string]string, error)
 }
 
 type ReplicaManager struct {
@@ -32,14 +32,14 @@ func (m *ReplicaManager) RemoveReplica(replica Replica) {
 	}
 }
 
-func (m *ReplicaManager) ExecuteAction(actionType, actionConfig string) (interface{}, error) {
+func (m *ReplicaManager) ExecuteAction(actionType, actionConfig string) (interface{}, map[string]string, error) {
 	for _, replica := range m.replicas {
-		result, err := replica.ExecuteAction(actionType, actionConfig)
+		result, _, err := replica.ExecuteAction(actionType, actionConfig)
 		if err == nil {
-			return result, nil
+			return result, nil, nil
 		}
 	}
-	return nil, errors.New("error running replicas")
+	return nil, nil, errors.New("error running replicas")
 }
 
 var replicaManager = &ReplicaManager{

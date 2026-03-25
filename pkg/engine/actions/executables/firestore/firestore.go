@@ -61,17 +61,17 @@ func (f *Firestore) Config() string {
 	return f.config.DocumentTemplate
 }
 
-func (f *Firestore) Execute(ctx context.Context, modifiedConfig string) (interface{}, error) {
+func (f *Firestore) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
 	cfg := make(map[string]interface{})
 	if err := json.Unmarshal([]byte(modifiedConfig), &cfg); err != nil {
-		return "", err
+		return "", nil, err
 	}
 
 	_, _, err := f.client.Collection(f.collectionID).Add(ctx, cfg)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
-	return modifiedConfig, nil
+	return modifiedConfig, nil, nil
 }
 
 func init() {

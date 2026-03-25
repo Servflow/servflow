@@ -58,7 +58,7 @@ func (e *Executable) Config() string {
 	return ""
 }
 
-func (e *Executable) Execute(ctx context.Context, modifiedConfig string) (interface{}, error) {
+func (e *Executable) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
 	logger := logging.FromContext(ctx).With(zap.String("execution_type", e.Type()))
 	ctx = logging.WithLogger(ctx, logger)
 
@@ -67,38 +67,38 @@ func (e *Executable) Execute(ctx context.Context, modifiedConfig string) (interf
 	if e.compiledDeps != nil {
 		_, err := vm.RunProgram(e.compiledDeps)
 		if err != nil {
-			return nil, fmt.Errorf("failed to execute dependencies: %w", err)
+			return nil, nil, fmt.Errorf("failed to execute dependencies: %w", err)
 		}
 	}
 
 	_, err := vm.RunProgram(e.compiledScript)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute script: %w", err)
+		return nil, nil, fmt.Errorf("failed to execute script: %w", err)
 	}
 
 	servflowRun := vm.Get("servflowRun")
 	if servflowRun == nil || goja.IsUndefined(servflowRun) {
-		return nil, fmt.Errorf("servflowRun function not defined in script")
+		return nil, nil, fmt.Errorf("servflowRun function not defined in script")
 	}
 
 	fn, ok := goja.AssertFunction(servflowRun)
 	if !ok {
-		return nil, fmt.Errorf("servflowRun is not a function")
+		return nil, nil, fmt.Errorf("servflowRun is not a function")
 	}
 
 	variables, err := requestctx.GetAllRequestVariables(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get request variables: %w", err)
+		return nil, nil, fmt.Errorf("failed to get request variables: %w", err)
 	}
 
 	varsValue := vm.ToValue(variables)
 
 	result, err := fn(goja.Undefined(), varsValue)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute servflowRun: %w", err)
+		return nil, nil, fmt.Errorf("failed to execute servflowRun: %w", err)
 	}
 
-	return result.Export(), nil
+	return result.Export(), nil, nil
 }
 
 func init() {

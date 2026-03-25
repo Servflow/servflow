@@ -171,7 +171,7 @@ func TestHttp_Execute(t *testing.T) {
 			conf, err := json.Marshal(config)
 			require.NoError(t, err)
 
-			resp, err := h.Execute(context.Background(), string(conf))
+			resp, _, err := h.Execute(context.Background(), string(conf))
 			if c.ShouldError {
 				require.Error(t, err)
 				if c.Name == "Expected Response Code Failure" || c.Name == "Empty Response Failure" || c.Name == "invalid response path" {

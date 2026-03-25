@@ -45,10 +45,10 @@ type EndValueSpec struct {
 	FileVal   apiconfig.FileInput
 }
 
-func ExecuteSingleAction(actionType string, config json.RawMessage) (any, error) {
+func ExecuteSingleAction(actionType string, config json.RawMessage) (any, map[string]string, error) {
 	exec, err := actions.GetActionExecutable(actionType, config)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	return exec.Execute(context.Background(), string(config))

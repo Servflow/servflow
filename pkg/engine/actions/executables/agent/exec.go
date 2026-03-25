@@ -56,10 +56,10 @@ func (a *Agent) Config() string {
 	return string(c)
 }
 
-func (a *Agent) Execute(ctx context.Context, modifiedConfig string) (interface{}, error) {
+func (a *Agent) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
 	var newConfig Config
 	if err := json.Unmarshal([]byte(modifiedConfig), &newConfig); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	options := []agent.Option{agent.WithToolManager(a.toolManager)}
@@ -75,19 +75,19 @@ func (a *Agent) Execute(ctx context.Context, modifiedConfig string) (interface{}
 		options...,
 	)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	fileInput, err := requestctx.GetFileFromContext(ctx, newConfig.FileUpload)
 	if err != nil && !errors.Is(err, requestctx.ErrFileNotFound) {
-		return nil, fmt.Errorf("%w: %v", actions.ErrorFatal, err)
+		return nil, nil, fmt.Errorf("%w: %v", actions.ErrorFatal, err)
 	}
 	resp, err := session.Query(ctx, newConfig.UserPrompt, fileInput)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return resp, nil
+	return resp, nil, nil
 }
 
 func (a *Agent) Type() string {

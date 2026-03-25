@@ -18,30 +18,6 @@ import (
 	"go.uber.org/zap"
 )
 
-type actionSpanContextKey struct{}
-
-// withActionSpan stores the action span in the context
-func withActionSpan(ctx context.Context, span trace.Span) context.Context {
-	return context.WithValue(ctx, actionSpanContextKey{}, span)
-}
-
-// getActionSpan retrieves the action span from the context
-func getActionSpan(ctx context.Context) (trace.Span, bool) {
-	span, ok := ctx.Value(actionSpanContextKey{}).(trace.Span)
-	return span, ok
-}
-
-// AddSpanAttribute adds an attribute to the action span stored in the context.
-// Returns true if the attribute was added successfully, false if no span was found.
-func AddSpanAttribute(ctx context.Context, key string, value attribute.Value) bool {
-	span, ok := getActionSpan(ctx)
-	if !ok {
-		return false
-	}
-	span.SetAttributes(attribute.KeyValue{Key: attribute.Key(key), Value: value})
-	return true
-}
-
 // TODO deprecate out
 // TODO swap id for logger with id
 
@@ -113,17 +89,22 @@ func (a *Action) execute(ctx context.Context) (*stepWrapper, error) {
 
 	span.SetAttributes(attribute.String("config", cfg))
 
-	var resp interface{}
+	var (
+		resp   interface{}
+		fields map[string]string
+	)
 	if a.useReplica && a.exec.SupportsReplica() {
-		resp, err = GetReplicaManager().ExecuteAction(a.exec.Type(), cfg)
+		resp, fields, err = GetReplicaManager().ExecuteAction(a.exec.Type(), cfg)
 		if err != nil {
 			logger.Warn("replica manager failed, falling back to direct execution", zap.Error(err))
-			execCtx := withActionSpan(ctx, span)
-			resp, err = a.exec.Execute(execCtx, cfg)
+			resp, _, err = a.exec.Execute(ctx, cfg)
 		}
 	} else {
-		execCtx := withActionSpan(ctx, span)
-		resp, err = a.exec.Execute(execCtx, cfg)
+		resp, fields, err = a.exec.Execute(ctx, cfg)
+	}
+
+	for k, v := range fields {
+		span.SetAttributes(attribute.String(k, v))
 	}
 
 	if err != nil {

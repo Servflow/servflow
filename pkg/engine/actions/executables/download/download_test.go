@@ -180,7 +180,7 @@ func TestDownload_Execute(t *testing.T) {
 			download, err := New(cfg)
 			require.NoError(t, err)
 
-			result, err := download.Execute(ctx, download.Config())
+			result, _, err := download.Execute(ctx, download.Config())
 
 			if tc.expectError {
 				require.Error(t, err)

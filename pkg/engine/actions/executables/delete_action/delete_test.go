@@ -82,7 +82,7 @@ func TestDelete_Execute(t *testing.T) {
 		// Create JSON string for filters
 		modifiedConfig := `[{"field":"id","comparator":"1"}]`
 
-		resp, err := d.Execute(context.Background(), modifiedConfig)
+		resp, _, err := d.Execute(context.Background(), modifiedConfig)
 		require.NoError(t, err)
 		assert.Nil(t, resp) // Delete operation should return nil
 	})
@@ -119,7 +119,7 @@ func TestDelete_Execute(t *testing.T) {
 		// Create JSON string for filters
 		modifiedConfig := `[{"field":"id","comparator":"1"}]`
 
-		_, err = d.Execute(context.Background(), modifiedConfig)
+		_, _, err = d.Execute(context.Background(), modifiedConfig)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "delete with filters")
 	})
@@ -150,7 +150,7 @@ func TestDelete_Execute(t *testing.T) {
 		// Invalid JSON string for filters
 		modifiedConfig := `{"invalid":"json"`
 
-		_, err = d.Execute(context.Background(), modifiedConfig)
+		_, _, err = d.Execute(context.Background(), modifiedConfig)
 		require.Error(t, err)
 	})
 

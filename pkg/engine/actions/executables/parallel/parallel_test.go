@@ -66,9 +66,9 @@ func TestParallelExec_Execute(t *testing.T) {
 		}
 
 		// Set up expectations - all should succeed
-		mockAction1.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("result1", nil)
-		mockAction2.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("result2", nil)
-		mockAction3.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("result3", nil)
+		mockAction1.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("result1", nil, nil)
+		mockAction2.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("result2", nil, nil)
+		mockAction3.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("result3", nil, nil)
 
 		testPlan := createTestPlanWithMocks(ctrl, mockActions)
 		ctx := requestctx.NewTestContext()
@@ -87,7 +87,7 @@ func TestParallelExec_Execute(t *testing.T) {
 		}
 
 		// Execute
-		result, err := parallelExec.Execute(ctx, "")
+		result, _, err := parallelExec.Execute(ctx, "")
 
 		// Assertions
 		require.NoError(t, err)
@@ -109,11 +109,11 @@ func TestParallelExec_Execute(t *testing.T) {
 		}
 
 		expectedError := errors.New("action1 failed")
-		mockAction1.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, expectedError)
+		mockAction1.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil, expectedError)
 
 		// Other actions might or might not be called due to cancellation
-		mockAction2.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("result2", nil).AnyTimes()
-		mockAction3.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("result3", nil).AnyTimes()
+		mockAction2.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("result2", nil, nil).AnyTimes()
+		mockAction3.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("result3", nil, nil).AnyTimes()
 
 		testPlan := createTestPlanWithMocks(ctrl, mockActions)
 		ctx := requestctx.NewTestContext()
@@ -131,7 +131,7 @@ func TestParallelExec_Execute(t *testing.T) {
 		}
 
 		// Execute
-		result, err := parallelExec.Execute(ctx, "")
+		result, _, err := parallelExec.Execute(ctx, "")
 
 		// Assertions
 		require.Error(t, err)
@@ -157,9 +157,9 @@ func TestParallelExec_Execute(t *testing.T) {
 		error1 := errors.New("action1 failed")
 		error3 := errors.New("action3 failed")
 
-		mockAction1.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, error1)
-		mockAction2.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("result2", nil)
-		mockAction3.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, error3)
+		mockAction1.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil, error1)
+		mockAction2.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("result2", nil, nil)
+		mockAction3.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil, error3)
 
 		testPlan := createTestPlanWithMocks(ctrl, mockActions)
 		ctx := requestctx.NewTestContext()
@@ -177,7 +177,7 @@ func TestParallelExec_Execute(t *testing.T) {
 		}
 
 		// Execute
-		result, err := parallelExec.Execute(ctx, "")
+		result, _, err := parallelExec.Execute(ctx, "")
 
 		// Assertions
 		require.Error(t, err)
@@ -216,9 +216,9 @@ func TestParallelExec_Execute(t *testing.T) {
 		error2 := errors.New("action2 failed")
 		error3 := errors.New("action3 failed")
 
-		mockAction1.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, error1)
-		mockAction2.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, error2).AnyTimes()
-		mockAction3.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, error3).AnyTimes()
+		mockAction1.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil, error1)
+		mockAction2.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil, error2).AnyTimes()
+		mockAction3.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil, error3).AnyTimes()
 
 		testPlan := createTestPlanWithMocks(ctrl, mockActions)
 		ctx := requestctx.NewTestContext()
@@ -236,7 +236,7 @@ func TestParallelExec_Execute(t *testing.T) {
 		}
 
 		// Execute
-		result, err := parallelExec.Execute(ctx, "")
+		result, _, err := parallelExec.Execute(ctx, "")
 
 		// Assertions
 		require.Error(t, err)
@@ -268,9 +268,9 @@ func TestParallelExec_Execute(t *testing.T) {
 		error2 := errors.New("action2 failed")
 		error3 := errors.New("action3 failed")
 
-		mockAction1.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, error1)
-		mockAction2.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, error2)
-		mockAction3.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, error3)
+		mockAction1.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil, error1)
+		mockAction2.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil, error2)
+		mockAction3.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil, error3)
 
 		testPlan := createTestPlanWithMocks(ctrl, mockActions)
 		ctx := requestctx.NewTestContext()
@@ -288,7 +288,7 @@ func TestParallelExec_Execute(t *testing.T) {
 		}
 
 		// Execute
-		result, err := parallelExec.Execute(ctx, "")
+		result, _, err := parallelExec.Execute(ctx, "")
 
 		// Assertions
 		require.Error(t, err)
@@ -317,7 +317,7 @@ func TestParallelExec_Execute(t *testing.T) {
 		}
 
 		// Mock action returns context canceled error
-		mockAction1.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, plan.ErrContextCanceled)
+		mockAction1.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil, plan.ErrContextCanceled)
 
 		testPlan := createTestPlanWithMocks(ctrl, mockActions)
 		ctx := requestctx.NewTestContext()
@@ -333,7 +333,7 @@ func TestParallelExec_Execute(t *testing.T) {
 		}
 
 		// Execute
-		result, err := parallelExec.Execute(ctx, "")
+		result, _, err := parallelExec.Execute(ctx, "")
 
 		// Assertions - context canceled errors should be ignored
 		require.NoError(t, err)
@@ -351,7 +351,7 @@ func TestParallelExec_Execute(t *testing.T) {
 		}
 
 		// Execute
-		result, err := parallelExec.Execute(ctx, "")
+		result, _, err := parallelExec.Execute(ctx, "")
 
 		// Assertions - should succeed with no work to do
 		require.NoError(t, err)
@@ -367,7 +367,7 @@ func TestParallelExec_Execute(t *testing.T) {
 			"action1": mockAction1,
 		}
 
-		mockAction1.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("result1", nil)
+		mockAction1.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("result1", nil, nil)
 
 		testPlan := createTestPlanWithMocks(ctrl, mockActions)
 		ctx := requestctx.NewTestContext()
@@ -383,7 +383,7 @@ func TestParallelExec_Execute(t *testing.T) {
 		}
 
 		// Execute
-		result, err := parallelExec.Execute(ctx, "")
+		result, _, err := parallelExec.Execute(ctx, "")
 
 		// Assertions
 		require.NoError(t, err)

@@ -69,13 +69,13 @@ func (s *Store) Config() string {
 	return string(filtersStr)
 }
 
-func (s *Store) Execute(ctx context.Context, modifiedConfig string) (interface{}, error) {
+func (s *Store) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
 	logger := logging.FromContext(ctx).With(zap.String("execution_type", s.Type()))
 	ctx = logging.WithLogger(ctx, logger)
 
 	var item map[string]interface{}
 	if err := json.Unmarshal([]byte(modifiedConfig), &item); err != nil {
-		return "", nil
+		return "", nil, nil
 	}
 	if item == nil {
 		item = make(map[string]interface{})
@@ -87,9 +87,9 @@ func (s *Store) Execute(ctx context.Context, modifiedConfig string) (interface{}
 	}
 	err := s.i.Store(ctx, item, map[string]string{"collection": s.cfg.Table})
 	if err != nil {
-		return "", fmt.Errorf("error storing: %w", err)
+		return "", nil, fmt.Errorf("error storing: %w", err)
 	}
-	return item, nil
+	return item, nil, nil
 }
 
 func init() {

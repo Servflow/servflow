@@ -39,12 +39,13 @@ func (m *MockReplica) EXPECT() *MockReplicaMockRecorder {
 }
 
 // ExecuteAction mocks base method.
-func (m *MockReplica) ExecuteAction(arg0, arg1 string) (any, error) {
+func (m *MockReplica) ExecuteAction(arg0, arg1 string) (any, map[string]string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ExecuteAction", arg0, arg1)
 	ret0, _ := ret[0].(any)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret1, _ := ret[1].(map[string]string)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // ExecuteAction indicates an expected call of ExecuteAction.

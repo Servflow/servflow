@@ -68,17 +68,17 @@ func (u *Update) Config() string {
 	return string(cfgStr)
 }
 
-func (u *Update) Execute(ctx context.Context, modifiedConfig string) (interface{}, error) {
+func (u *Update) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
 	var cfg Config
 	if err := json.Unmarshal([]byte(modifiedConfig), &cfg); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	err := u.i.Update(ctx, cfg.Fields, map[string]string{"collection": u.cfg.Table}, cfg.Filters...)
 	if err != nil {
-		return nil, fmt.Errorf("update operation failed: %w", err)
+		return nil, nil, fmt.Errorf("update operation failed: %w", err)
 	}
-	return nil, nil
+	return nil, nil, nil
 }
 
 func init() {

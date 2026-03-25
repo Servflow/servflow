@@ -36,7 +36,7 @@ func TestFirestore_Execute(t *testing.T) {
 	})
 	require.NoError(t, err, "error creating client")
 
-	_, err = client.Execute(context.Background(), `{"email":"test_execute@gmail.com","first_name":"test","last_name":"user"}`)
+	_, _, err = client.Execute(context.Background(), `{"email":"test_execute@gmail.com","first_name":"test","last_name":"user"}`)
 	require.NoError(t, err, "error executing firestore client")
 
 	// fetch created user

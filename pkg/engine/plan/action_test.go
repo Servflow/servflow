@@ -13,9 +13,6 @@ import (
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
-	"go.opentelemetry.io/otel/trace/noop"
 	"go.uber.org/mock/gomock"
 )
 
@@ -46,7 +43,7 @@ func TestAction_Execute(t *testing.T) {
 
 			mockExec := NewMockActionExecutable(ctrl)
 			mockExec.EXPECT().Config().Return(conf)
-			mockExec.EXPECT().Execute(gomock.Any(), "test actual name").Return("response string", nil)
+			mockExec.EXPECT().Execute(gomock.Any(), "test actual name").Return("response string", nil, nil)
 
 			nextStep := testStep{id: "next"}
 
@@ -77,7 +74,7 @@ func TestAction_Execute(t *testing.T) {
 			mockExec := NewMockActionExecutable(ctrl)
 			config := fmt.Sprintf("test {{ .%sname.actualname }}", requestctx.BareVariablesPrefixStripped)
 			mockExec.EXPECT().Config().Return(config)
-			mockExec.EXPECT().Execute(gomock.Any(), "test actual name").Return("response string", nil)
+			mockExec.EXPECT().Execute(gomock.Any(), "test actual name").Return("response string", nil, nil)
 
 			nextStep := testStep{id: "next"}
 
@@ -111,7 +108,7 @@ func TestAction_Execute(t *testing.T) {
 
 			mockExec := NewMockActionExecutable(ctrl)
 			mockExec.EXPECT().Config().Return("")
-			mockExec.EXPECT().Execute(gomock.Any(), "").Return("custom response", nil)
+			mockExec.EXPECT().Execute(gomock.Any(), "").Return("custom response", nil, nil)
 
 			nextStep := testStep{id: "next"}
 
@@ -141,7 +138,7 @@ func TestAction_Execute(t *testing.T) {
 			fileContent := "test file content"
 			reader := io.NopCloser(strings.NewReader(fileContent))
 			mockExec.EXPECT().Config().Return("")
-			mockExec.EXPECT().Execute(gomock.Any(), "").Return(reader, nil)
+			mockExec.EXPECT().Execute(gomock.Any(), "").Return(reader, nil, nil)
 
 			nextStep := testStep{id: "next"}
 
@@ -183,7 +180,7 @@ func TestAction_Execute(t *testing.T) {
 			mockExec := NewMockActionExecutable(ctrl)
 			mockExec.EXPECT().Config().Return("")
 			mockExec.EXPECT().Type().Return("mock").AnyTimes()
-			mockExec.EXPECT().Execute(gomock.Any(), "").Return("response string", errors.New("dummy error"))
+			mockExec.EXPECT().Execute(gomock.Any(), "").Return("response string", nil, errors.New("dummy error"))
 
 			mockStep := testStep{id: "next"}
 
@@ -209,7 +206,7 @@ func TestAction_Execute(t *testing.T) {
 
 			mockExec := NewMockActionExecutable(ctrl)
 			mockExec.EXPECT().Config().Return("").AnyTimes()
-			mockExec.EXPECT().Execute(gomock.Any(), "").Return("response string", fmt.Errorf("%w: dummy error", ErrFailure)).AnyTimes()
+			mockExec.EXPECT().Execute(gomock.Any(), "").Return("response string", nil, fmt.Errorf("%w: dummy error", ErrFailure)).AnyTimes()
 
 			nextStep := testStep{id: "next"}
 			failStep := testStep{id: "fail"}
@@ -256,76 +253,6 @@ func TestAction_Execute(t *testing.T) {
 	})
 }
 
-func TestAddSpanAttribute(t *testing.T) {
-	t.Run("adds attribute when span exists in context", func(t *testing.T) {
-		tracer := noop.NewTracerProvider().Tracer("test")
-		ctx, span := tracer.Start(context.Background(), "test-span")
-		defer span.End()
-
-		ctx = withActionSpan(ctx, span)
-
-		ok := AddSpanAttribute(ctx, "test-key", attribute.StringValue("test-value"))
-		assert.True(t, ok)
-	})
-
-	t.Run("returns false when no span in context", func(t *testing.T) {
-		ctx := context.Background()
-
-		ok := AddSpanAttribute(ctx, "test-key", attribute.StringValue("test-value"))
-		assert.False(t, ok)
-	})
-
-	t.Run("works with different attribute types", func(t *testing.T) {
-		tracer := noop.NewTracerProvider().Tracer("test")
-		ctx, span := tracer.Start(context.Background(), "test-span")
-		defer span.End()
-
-		ctx = withActionSpan(ctx, span)
-
-		testCases := []struct {
-			name  string
-			key   string
-			value attribute.Value
-		}{
-			{"string", "string-key", attribute.StringValue("string-value")},
-			{"int", "int-key", attribute.IntValue(42)},
-			{"bool", "bool-key", attribute.BoolValue(true)},
-			{"float", "float-key", attribute.Float64Value(3.14)},
-		}
-
-		for _, tc := range testCases {
-			t.Run(tc.name, func(t *testing.T) {
-				ok := AddSpanAttribute(ctx, tc.key, tc.value)
-				assert.True(t, ok)
-			})
-		}
-	})
-}
-
-func TestGetActionSpan(t *testing.T) {
-	t.Run("returns span when present", func(t *testing.T) {
-		tracer := noop.NewTracerProvider().Tracer("test")
-		ctx, span := tracer.Start(context.Background(), "test-span")
-		defer span.End()
-
-		ctx = withActionSpan(ctx, span)
-
-		retrieved, ok := getActionSpan(ctx)
-		assert.True(t, ok)
-		assert.Equal(t, span, retrieved)
-	})
-
-	t.Run("returns false when not present", func(t *testing.T) {
-		ctx := context.Background()
-
-		retrieved, ok := getActionSpan(ctx)
-		assert.False(t, ok)
-		assert.Nil(t, retrieved)
-	})
-}
-
-var _ trace.Span = (*noop.Span)(nil)
-
 func TestAction_ExecuteWithReplica(t *testing.T) {
 	t.Run("replica manager is called when useReplica=true and SupportsReplica=true", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
@@ -338,7 +265,7 @@ func TestAction_ExecuteWithReplica(t *testing.T) {
 		mockExec.EXPECT().Type().Return("mock")
 
 		mockReplica := NewMockReplica(ctrl)
-		mockReplica.EXPECT().ExecuteAction("mock", "").Return("replica response", nil)
+		mockReplica.EXPECT().ExecuteAction("mock", "").Return("replica response", nil, nil)
 		GetReplicaManager().AddReplica(mockReplica)
 
 		ctx := requestctx.NewTestContext()
@@ -369,7 +296,7 @@ func TestAction_ExecuteWithReplica(t *testing.T) {
 		mockExec := NewMockActionExecutable(ctrl)
 		mockExec.EXPECT().Config().Return("")
 		mockExec.EXPECT().SupportsReplica().Return(false)
-		mockExec.EXPECT().Execute(gomock.Any(), "").Return("direct response", nil)
+		mockExec.EXPECT().Execute(gomock.Any(), "").Return("direct response", nil, nil)
 
 		mockReplica := NewMockReplica(ctrl)
 		GetReplicaManager().AddReplica(mockReplica)
@@ -403,10 +330,10 @@ func TestAction_ExecuteWithReplica(t *testing.T) {
 		mockExec.EXPECT().Config().Return("")
 		mockExec.EXPECT().SupportsReplica().Return(true)
 		mockExec.EXPECT().Type().Return("mock")
-		mockExec.EXPECT().Execute(gomock.Any(), "").Return("fallback response", nil)
+		mockExec.EXPECT().Execute(gomock.Any(), "").Return("fallback response", nil, nil)
 
 		mockReplica := NewMockReplica(ctrl)
-		mockReplica.EXPECT().ExecuteAction("mock", "").Return(nil, errors.New("replica error"))
+		mockReplica.EXPECT().ExecuteAction("mock", "").Return(nil, nil, errors.New("replica error"))
 		GetReplicaManager().AddReplica(mockReplica)
 
 		ctx := requestctx.NewTestContext()
@@ -438,10 +365,10 @@ func TestAction_ExecuteWithReplica(t *testing.T) {
 		mockExec.EXPECT().Config().Return("")
 		mockExec.EXPECT().SupportsReplica().Return(true)
 		mockExec.EXPECT().Type().Return("mock").AnyTimes()
-		mockExec.EXPECT().Execute(gomock.Any(), "").Return(nil, errors.New("direct execution error"))
+		mockExec.EXPECT().Execute(gomock.Any(), "").Return(nil, nil, errors.New("direct execution error"))
 
 		mockReplica := NewMockReplica(ctrl)
-		mockReplica.EXPECT().ExecuteAction("mock", "").Return(nil, errors.New("replica error"))
+		mockReplica.EXPECT().ExecuteAction("mock", "").Return(nil, nil, errors.New("replica error"))
 		GetReplicaManager().AddReplica(mockReplica)
 
 		ctx := requestctx.NewTestContext()

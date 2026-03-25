@@ -53,18 +53,18 @@ func New(config Config) (*Download, error) {
 	}, nil
 }
 
-func (d *Download) Execute(ctx context.Context, modifiedConfig string) (interface{}, error) {
+func (d *Download) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
 	logger := logging.FromContext(ctx).With(zap.String("execution_type", d.Type()))
 	ctx = logging.WithLogger(ctx, logger)
 
 	var cfg Config
 	if err := json.Unmarshal([]byte(modifiedConfig), &cfg); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	fileValue, err := requestctx.GetFileFromContext(ctx, cfg.File)
 	if err != nil {
-		return nil, fmt.Errorf("%w: file not found: %v", plan.ErrFailure, err)
+		return nil, nil, fmt.Errorf("%w: file not found: %v", plan.ErrFailure, err)
 	}
 	defer fileValue.Close()
 
@@ -74,39 +74,39 @@ func (d *Download) Execute(ctx context.Context, modifiedConfig string) (interfac
 	}
 
 	if fileName == "" {
-		return nil, fmt.Errorf("%w: no filename specified and original filename is empty", plan.ErrFailure)
+		return nil, nil, fmt.Errorf("%w: no filename specified and original filename is empty", plan.ErrFailure)
 	}
 
 	if err := os.MkdirAll(cfg.DestinationPath, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create destination directory: %w", err)
+		return nil, nil, fmt.Errorf("failed to create destination directory: %w", err)
 	}
 
 	fullPath := filepath.Join(cfg.DestinationPath, fileName)
 
 	if !cfg.Overwrite {
 		if _, err := os.Stat(fullPath); err == nil {
-			return nil, fmt.Errorf("%w: file already exists: %s", plan.ErrFailure, fullPath)
+			return nil, nil, fmt.Errorf("%w: file already exists: %s", plan.ErrFailure, fullPath)
 		}
 	}
 
 	file, err := os.Create(fullPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create file: %w", err)
+		return nil, nil, fmt.Errorf("failed to create file: %w", err)
 	}
 	defer file.Close()
 
 	reader, err := fileValue.NewReader()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get file reader: %w", err)
+		return nil, nil, fmt.Errorf("failed to get file reader: %w", err)
 	}
 
 	if _, err := io.Copy(file, reader); err != nil {
-		return nil, fmt.Errorf("failed to write file: %w", err)
+		return nil, nil, fmt.Errorf("failed to write file: %w", err)
 	}
 
 	logger.Debug("file downloaded successfully", zap.String("path", fullPath))
 
-	return fullPath, nil
+	return fullPath, nil, nil
 }
 
 func init() {

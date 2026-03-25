@@ -53,11 +53,11 @@ func (e *Email) Config() string {
 	return string(configBytes)
 }
 
-func (e *Email) Execute(ctx context.Context, filledInConfig string) (interface{}, error) {
+func (e *Email) Execute(ctx context.Context, filledInConfig string) (interface{}, map[string]string, error) {
 	var cfg Config
 
 	if err := json.Unmarshal([]byte(filledInConfig), &cfg); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	message := strings.Builder{}
@@ -83,10 +83,10 @@ func (e *Email) Execute(ctx context.Context, filledInConfig string) (interface{}
 	)
 
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return nil, nil
+	return nil, nil, nil
 }
 
 func init() {

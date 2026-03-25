@@ -72,7 +72,7 @@ func TestPlan_Execute(t *testing.T) {
 			endValue:     nil,
 			contextSetup: func(ctx context.Context) {},
 			mockAssertions: func(exec1, exec2, exec3 *MockActionExecutable) {
-				exec1.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil)
+				exec1.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil, nil)
 			},
 			expectedBody: `{"status": "success"}`,
 			expectedJSON: true,
@@ -85,7 +85,7 @@ func TestPlan_Execute(t *testing.T) {
 				requestctx2.AddRequestVariables(ctx, map[string]interface{}{"testValue": "hello"}, "")
 			},
 			mockAssertions: func(exec1, exec2, exec3 *MockActionExecutable) {
-				exec2.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil)
+				exec2.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil, nil)
 			},
 			expectedBody: "hello",
 		},
@@ -109,15 +109,15 @@ func TestPlan_Execute(t *testing.T) {
 			},
 			mockAssertions: func(exec1, exec2, exec3 *MockActionExecutable) {
 				exec3.EXPECT().Execute(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(ctx context.Context, _ string) (interface{}, error) {
+					DoAndReturn(func(ctx context.Context, _ string) (interface{}, map[string]string, error) {
 						resp, err := ExecuteFromContext(ctx, requestctx2.ActionConfigPrefix+"action2", &EndValueSpec{
 							StringVal: "{{ .testValue }}",
 						})
 						require.NoError(t, err)
 						assert.Equal(t, "test value", string(resp.Body))
-						return string(resp.Body), nil
+						return string(resp.Body), nil, nil
 					})
-				exec2.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil)
+				exec2.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil, nil)
 			},
 			expectedBody: `{"data": "test value"}`,
 			expectedJSON: true,
@@ -131,7 +131,7 @@ func TestPlan_Execute(t *testing.T) {
 				requestctx2.AddRequestVariables(ctx, map[string]interface{}{"testValue": "hello"}, "")
 			},
 			mockAssertions: func(exec1, exec2, exec3 *MockActionExecutable) {
-				exec2.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil)
+				exec2.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil, nil)
 			},
 			expectedBody: "secret",
 		},
@@ -201,19 +201,19 @@ func TestExecuteSingleAction(t *testing.T) {
 		defer ctrl.Finish()
 
 		mockExec := NewMockActionExecutable(ctrl)
-		mockExec.EXPECT().Execute(gomock.Any(), `{"key":"value"}`).Return("test response", nil)
+		mockExec.EXPECT().Execute(gomock.Any(), `{"key":"value"}`).Return("test response", nil, nil)
 
 		actions.ReplaceActionType("test-single-action", func(config json.RawMessage) (actions.ActionExecutable, error) {
 			return mockExec, nil
 		})
 
-		result, err := ExecuteSingleAction("test-single-action", json.RawMessage(`{"key":"value"}`))
+		result, _, err := ExecuteSingleAction("test-single-action", json.RawMessage(`{"key":"value"}`))
 		require.NoError(t, err)
 		assert.Equal(t, "test response", result)
 	})
 
 	t.Run("unregistered action type", func(t *testing.T) {
-		result, err := ExecuteSingleAction("unregistered-action-type", json.RawMessage(`{}`))
+		result, _, err := ExecuteSingleAction("unregistered-action-type", json.RawMessage(`{}`))
 		require.Error(t, err)
 		assert.Nil(t, result)
 		assert.Contains(t, err.Error(), "not registered")
@@ -224,13 +224,13 @@ func TestExecuteSingleAction(t *testing.T) {
 		defer ctrl.Finish()
 
 		mockExec := NewMockActionExecutable(ctrl)
-		mockExec.EXPECT().Execute(gomock.Any(), `{}`).Return(nil, errors.New("execution failed"))
+		mockExec.EXPECT().Execute(gomock.Any(), `{}`).Return(nil, nil, errors.New("execution failed"))
 
 		actions.ReplaceActionType("test-single-action-error", func(config json.RawMessage) (actions.ActionExecutable, error) {
 			return mockExec, nil
 		})
 
-		result, err := ExecuteSingleAction("test-single-action-error", json.RawMessage(`{}`))
+		result, _, err := ExecuteSingleAction("test-single-action-error", json.RawMessage(`{}`))
 		require.Error(t, err)
 		assert.Nil(t, result)
 		assert.Contains(t, err.Error(), "execution failed")

@@ -58,7 +58,7 @@ func (r *TestRunner) WithDefaultMocks() *TestRunner {
 	mockProvider := plan2.NewMockActionProvider(r.ctrl)
 	mockExecutable := plan2.NewMockActionExecutable(r.ctrl)
 	mockExecutable.EXPECT().Config().Return("").AnyTimes()
-	mockExecutable.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("default response", nil).AnyTimes()
+	mockExecutable.EXPECT().Execute(gomock.Any(), gomock.Any()).Return("default response", nil, nil).AnyTimes()
 	mockProvider.EXPECT().GetActionExecutable(gomock.Any(), gomock.Any()).Return(mockExecutable, nil).AnyTimes()
 	return r
 }

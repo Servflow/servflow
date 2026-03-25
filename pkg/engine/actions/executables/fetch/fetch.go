@@ -70,31 +70,31 @@ func (f *Fetch) Config() string {
 	return string(filtersStr)
 }
 
-func (f *Fetch) Execute(ctx context.Context, modifiedConfig string) (interface{}, error) {
+func (f *Fetch) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
 	logger := logging.FromContext(ctx).With(zap.String("execution_type", f.Type()))
 	ctx = logging.WithLogger(ctx, logger)
 
 	var filters []filters.Filter
 	if err := json.Unmarshal([]byte(modifiedConfig), &filters); err != nil {
-		return "", err
+		return "", nil, err
 	}
 
 	var ret interface{}
 	resp, err := f.fetchIntegrations.Fetch(ctx, map[string]string{"collection": f.cfg.Table}, filters...)
 	if err != nil {
-		return "", fmt.Errorf("fetch with filters: %v", err)
+		return "", nil, fmt.Errorf("fetch with filters: %v", err)
 	}
 	ret = resp
 	if len(resp) < 1 {
 		if f.cfg.FailIfEmpty {
-			return nil, fmt.Errorf("%w: no data found", plan.ErrFailure)
+			return nil, nil, fmt.Errorf("%w: no data found", plan.ErrFailure)
 		}
-		return map[string]interface{}{}, nil
+		return map[string]interface{}{}, nil, nil
 	}
 	if f.cfg.Single && len(resp) > 0 {
 		ret = resp[0]
 	}
-	return ret, nil
+	return ret, nil, nil
 }
 
 func init() {

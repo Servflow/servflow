@@ -36,15 +36,15 @@ func (s *Executable) Config() string {
 	return string(d)
 }
 
-func (s *Executable) Execute(ctx context.Context, modifiedConfig string) (interface{}, error) {
+func (s *Executable) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
 	logger := logging.FromContext(ctx).With(zap.String("execution_type", s.Type()))
 	_ = logging.WithLogger(ctx, logger)
 
 	var newFields map[string]interface{}
 	if err := json.Unmarshal([]byte(modifiedConfig), &newFields); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return newFields, nil
+	return newFields, nil, nil
 }
 
 func init() {

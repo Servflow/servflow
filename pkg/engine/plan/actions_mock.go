@@ -54,12 +54,13 @@ func (mr *MockActionExecutableMockRecorder) Config() *gomock.Call {
 }
 
 // Execute mocks base method.
-func (m *MockActionExecutable) Execute(ctx context.Context, modifiedConfig string) (any, error) {
+func (m *MockActionExecutable) Execute(ctx context.Context, modifiedConfig string) (any, map[string]string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Execute", ctx, modifiedConfig)
 	ret0, _ := ret[0].(any)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret1, _ := ret[1].(map[string]string)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // Execute indicates an expected call of Execute.

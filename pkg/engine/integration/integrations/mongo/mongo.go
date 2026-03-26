@@ -3,6 +3,7 @@ package mongo
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/Servflow/servflow/pkg/engine/integration"
@@ -22,9 +23,13 @@ type Mongo struct {
 	integration.BaseIntegration
 	client *mongo.Client
 	dbName string
+	config Config
+	mu     sync.Mutex
 }
 
 func (m *Mongo) Shutdown(ctx context.Context) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	if m.client != nil {
 		logging.InfoContext(ctx, "shutting down mongo integration")
 		return m.client.Disconnect(ctx)
@@ -32,7 +37,49 @@ func (m *Mongo) Shutdown(ctx context.Context) error {
 	return nil
 }
 
+func (m *Mongo) connect(ctx context.Context) error {
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(m.config.ConnectionString).
+		SetMaxConnIdleTime(5*time.Minute).
+		SetSocketTimeout(30*time.Second).
+		SetServerSelectionTimeout(5*time.Second))
+	if err != nil {
+		return fmt.Errorf("error with mongo config: %v", err)
+	}
+
+	if err := client.Ping(ctx, nil); err != nil {
+		return fmt.Errorf("error creating connection: %v", err)
+	}
+
+	m.client = client
+	return nil
+}
+
+func (m *Mongo) ensureConnected(ctx context.Context) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.client == nil {
+		return m.connect(ctx)
+	}
+
+	pingCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
+	if err := m.client.Ping(pingCtx, nil); err != nil {
+		logging.InfoContext(ctx, "mongo connection lost, reconnecting...")
+		_ = m.client.Disconnect(ctx)
+		m.client = nil
+		return m.connect(ctx)
+	}
+
+	return nil
+}
+
 func (m *Mongo) ExecuteQuery(ctx context.Context, collection string, filterQuery string, projectionQuery string) ([]map[string]interface{}, error) {
+	if err := m.ensureConnected(ctx); err != nil {
+		return nil, fmt.Errorf("connection error: %w", err)
+	}
+
 	var filter bson.M
 	if filterQuery != "" {
 		if err := bson.UnmarshalExtJSON([]byte(filterQuery), false, &filter); err != nil {
@@ -69,6 +116,10 @@ func (m *Mongo) ExecuteQuery(ctx context.Context, collection string, filterQuery
 }
 
 func (m *Mongo) Delete(ctx context.Context, options map[string]string, filters ...dbfilters.Filter) error {
+	if err := m.ensureConnected(ctx); err != nil {
+		return fmt.Errorf("connection error: %w", err)
+	}
+
 	c, ok := options[collectionOption]
 	if !ok {
 		return fmt.Errorf("invalid collection")
@@ -127,32 +178,27 @@ func init() {
 	}
 }
 
-// TODO pass context for cancellation
-// TODO databases need a release function
-
 func newWrapper(cfg Config) (*Mongo, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(cfg.ConnectionString).
-		SetMaxConnIdleTime(5*time.Minute).
-		SetSocketTimeout(30*time.Second).
-		SetServerSelectionTimeout(5*time.Second))
-	if err != nil {
-		return nil, fmt.Errorf("error with mongo config: %v", err)
-	}
-
-	if err := client.Ping(ctx, nil); err != nil {
-		return nil, fmt.Errorf("error creating connection: %v", err)
-	}
-
 	m := &Mongo{
 		dbName: cfg.DBName,
-		client: client,
+		config: cfg,
 	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := m.connect(ctx); err != nil {
+		return nil, err
+	}
+
 	return m, nil
 }
 
 func (m *Mongo) Update(ctx context.Context, fields map[string]interface{}, options map[string]string, filters ...dbfilters.Filter) error {
+	if err := m.ensureConnected(ctx); err != nil {
+		return fmt.Errorf("connection error: %w", err)
+	}
+
 	c, ok := options[collectionOption]
 	if !ok {
 		return fmt.Errorf("invalid collection")
@@ -170,6 +216,10 @@ func (m *Mongo) Update(ctx context.Context, fields map[string]interface{}, optio
 }
 
 func (m *Mongo) Fetch(ctx context.Context, options map[string]string, filters ...dbfilters.Filter) (items []map[string]interface{}, err error) {
+	if err := m.ensureConnected(ctx); err != nil {
+		return nil, fmt.Errorf("connection error: %w", err)
+	}
+
 	c, ok := options[collectionOption]
 	if !ok {
 		return nil, fmt.Errorf("invalid collection")
@@ -198,6 +248,10 @@ func (m *Mongo) Fetch(ctx context.Context, options map[string]string, filters ..
 }
 
 func (m *Mongo) Store(ctx context.Context, item map[string]interface{}, options map[string]string) error {
+	if err := m.ensureConnected(ctx); err != nil {
+		return fmt.Errorf("connection error: %w", err)
+	}
+
 	_, err := m.client.Database(m.dbName).Collection(options[collectionOption]).InsertOne(ctx, item)
 	if err != nil {
 		return fmt.Errorf("error inserting item: %w", err)

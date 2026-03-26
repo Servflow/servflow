@@ -235,7 +235,6 @@ func (e *Engine) startServer() {
 		err := e.server.ListenAndServe()
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logging.ErrorContext(e.ctx, "error starting server", err)
-			e.cancel()
 		}
 	}()
 }
@@ -295,7 +294,7 @@ func (e *Engine) Stop() error {
 		}
 	}
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(e.ctx, 10*time.Second)
 	defer cancel()
 	if err := integration.GetManager().Shutdown(shutdownCtx); err != nil {
 		logging.ErrorContext(e.ctx, "failed to shutdown integrations", err)
@@ -314,6 +313,7 @@ func (e *Engine) Stop() error {
 			return err
 		}
 	}
+	e.cancel()
 	return nil
 }
 

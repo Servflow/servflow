@@ -317,6 +317,21 @@ func (e *Engine) Stop() error {
 	return nil
 }
 
+func (e *Engine) ShutdownServer() error {
+	e.timerMutex.Lock()
+	if e.idleTimer != nil {
+		e.idleTimer.Stop()
+		e.idleTimer = nil
+	}
+	e.timerMutex.Unlock()
+
+	if e.server != nil {
+		return e.server.Shutdown(context.Background())
+	}
+
+	return nil
+}
+
 func (e *Engine) initIdleTimer() {
 	if e.idleTimeout <= 0 {
 		return

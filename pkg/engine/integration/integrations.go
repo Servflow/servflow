@@ -139,6 +139,16 @@ func GetInfoForIntegration(integrationType string) (RegistrationInfo, error) {
 	return info, nil
 }
 
+func GetLazyLoadedIntegrations() map[string]LazyIntegration {
+	integrations := make(map[string]LazyIntegration)
+	integrationManager.lazyIntegrations.Range(func(key, value interface{}) bool {
+		integration := value.(LazyIntegration)
+		integrations[key.(string)] = integration
+		return true
+	})
+	return integrations
+}
+
 func InitializeIntegration(integrationType, id string, config map[string]any, shouldLazyLoad bool) error {
 	info, ok := integrationManager.availableConstructors[integrationType]
 	if !ok {

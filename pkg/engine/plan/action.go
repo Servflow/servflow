@@ -93,11 +93,13 @@ func (a *Action) execute(ctx context.Context) (*stepWrapper, error) {
 		resp   interface{}
 		fields map[string]string
 	)
+	logger.Debug("executing action", zap.String("action_id", a.id), zap.Bool("use_replica", a.useReplica), zap.Bool("supports_replica", a.exec.SupportsReplica()))
 	if a.useReplica && a.exec.SupportsReplica() {
+		logger.Debug("executing replica action")
 		resp, fields, err = GetReplicaManager().ExecuteAction(a.exec.Type(), cfg)
 		if err != nil {
 			logger.Warn("replica manager failed, falling back to direct execution", zap.Error(err))
-			resp, _, err = a.exec.Execute(ctx, cfg)
+			resp, fields, err = a.exec.Execute(ctx, cfg)
 		}
 	} else {
 		resp, fields, err = a.exec.Execute(ctx, cfg)

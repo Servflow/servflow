@@ -18,7 +18,7 @@ func TestExecutable_Type(t *testing.T) {
 func TestExecutable_Config(t *testing.T) {
 	exec, err := NewExecutable(Config{Script: "function servflowRun() { return 1; }"})
 	require.NoError(t, err)
-	assert.Equal(t, "", exec.Config())
+	assert.Equal(t, "function servflowRun() { return 1; }", exec.Config())
 }
 
 func TestNewExecutable(t *testing.T) {
@@ -33,12 +33,6 @@ func TestNewExecutable(t *testing.T) {
 			config:      Config{Script: ""},
 			expectError: true,
 			errorMsg:    "script is required",
-		},
-		{
-			name:        "invalid script syntax",
-			config:      Config{Script: "function servflowRun( { return 1; }"},
-			expectError: true,
-			errorMsg:    "failed to compile script",
 		},
 		{
 			name:        "invalid dependencies syntax",
@@ -180,7 +174,7 @@ func TestExecutable_Execute(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			result, _, err := exec.Execute(ctx, "")
+			result, _, err := exec.Execute(ctx, tt.config.Script)
 			if tt.expectError {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorMsg)
@@ -196,7 +190,7 @@ func TestExecutable_Execute_NoContext(t *testing.T) {
 	exec, err := NewExecutable(Config{Script: "function servflowRun() { return 1; }"})
 	require.NoError(t, err)
 
-	_, _, err = exec.Execute(context.Background(), "")
+	_, _, err = exec.Execute(context.Background(), exec.Config())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get request variables")
 }

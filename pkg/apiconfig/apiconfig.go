@@ -33,12 +33,13 @@ const (
 )
 
 type APIConfig struct {
-	ID           string                    `json:"id" yaml:"id"`
-	Actions      map[string]Action         `json:"actions" yaml:"actions"`
-	Conditionals map[string]Conditional    `json:"conditionals" yaml:"conditionals"`
-	Responses    map[string]ResponseConfig `json:"responses" yaml:"responses"`
-	HttpConfig   HttpConfig                `json:"http" yaml:"http"`
-	McpTool      MCPToolConfig             `json:"mcpTool" yaml:"mcpTool"`
+	ID           string                       `json:"id" yaml:"id"`
+	Actions      map[string]Action            `json:"actions" yaml:"actions"`
+	Conditionals map[string]Conditional       `json:"conditionals" yaml:"conditionals"`
+	Responses    map[string]ResponseConfig    `json:"responses" yaml:"responses"`
+	HttpConfig   HttpConfig                   `json:"http" yaml:"http"`
+	McpTool      MCPToolConfig                `json:"mcpTool" yaml:"mcpTool"`
+	Integrations map[string]IntegrationConfig `json:"integrations" yaml:"integrations"`
 }
 
 func (a *APIConfig) IsMCPConfig() bool {
@@ -132,10 +133,13 @@ func (o *ResponseObject) ToProto() *proto.ResponseObject {
 }
 
 type IntegrationConfig struct {
-	ID        string                 `json:"id" yaml:"id"`
-	Config    json.RawMessage        `json:"config" yaml:"-"`
+	ID     string          `json:"id" yaml:"id"`
+	Config json.RawMessage `json:"config" yaml:"-"`
+	// NewConfig the purpose of new config is to simply capture the fields from the yaml and convert it to
+	// the config field (a byte array).
 	NewConfig map[string]interface{} `yaml:"config"`
 	Type      string                 `json:"type" yaml:"type"`
+	LazyLoad  bool                   `json:"lazyLoad" yaml:"lazyLoad"`
 }
 
 func (d *IntegrationConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {

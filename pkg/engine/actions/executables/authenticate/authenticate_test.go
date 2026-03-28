@@ -51,7 +51,7 @@ func TestAuthenticate_New(t *testing.T) {
 			return mockInvalidIntegration, nil
 		})
 
-		err := integration.InitializeIntegration("invalid", "invalidds", nil)
+		err := integration.InitializeIntegration("invalid", "invalidds", nil, false)
 		require.NoError(t, err)
 
 		_, err = New(Config{
@@ -72,7 +72,7 @@ func TestAuthenticate_New(t *testing.T) {
 			return mockIntegration, nil
 		})
 
-		err := integration.InitializeIntegration("mock", "mockds", nil)
+		err := integration.InitializeIntegration("mock", "mockds", nil, false)
 		require.NoError(t, err)
 
 		auth, err := New(Config{
@@ -123,7 +123,7 @@ func TestAuthenticate_Execute(t *testing.T) {
 			return mockIntegration, nil
 		})
 
-		err := integration.InitializeIntegration("mock", "mockds", nil)
+		err := integration.InitializeIntegration("mock", "mockds", nil, false)
 		require.NoError(t, err)
 
 		auth, err := New(Config{
@@ -159,7 +159,7 @@ func TestAuthenticate_Execute(t *testing.T) {
 			return mockIntegration, nil
 		})
 
-		err := integration.InitializeIntegration("mock", "mockds", nil)
+		err := integration.InitializeIntegration("mock", "mockds", nil, false)
 		require.NoError(t, err)
 
 		auth, err := New(Config{
@@ -193,7 +193,7 @@ func TestAuthenticate_Execute(t *testing.T) {
 			return mockIntegration, nil
 		})
 
-		err := integration.InitializeIntegration("mock", "mockds", nil)
+		err := integration.InitializeIntegration("mock", "mockds", nil, false)
 		require.NoError(t, err)
 
 		auth, err := New(Config{
@@ -238,7 +238,7 @@ func TestAuthenticate_Execute(t *testing.T) {
 			return mockIntegration, nil
 		})
 
-		err = integration.InitializeIntegration("mock", "mockds", nil)
+		err = integration.InitializeIntegration("mock", "mockds", nil, false)
 		require.NoError(t, err)
 
 		auth, err := New(Config{
@@ -282,7 +282,7 @@ func TestAuthenticate_Execute(t *testing.T) {
 			return mockIntegration, nil
 		})
 
-		err := integration.InitializeIntegration("mock", "mockds", nil)
+		err := integration.InitializeIntegration("mock", "mockds", nil, false)
 		require.NoError(t, err)
 
 		auth, err := New(Config{

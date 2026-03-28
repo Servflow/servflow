@@ -30,7 +30,7 @@ func TestStoreVectors_Execute(t *testing.T) {
 			return mockIntegration, nil
 		})
 
-		err = integration.InitializeIntegration("mock", "mockid", nil)
+		err = integration.InitializeIntegration("mock", "mockid", nil, false)
 		require.NoError(t, err)
 
 		storeVectors, err := New(Config{
@@ -60,7 +60,7 @@ func TestStoreVectors_Execute(t *testing.T) {
 		integration.ReplaceIntegrationType("mock", func(m map[string]interface{}) (integration.Integration, error) {
 			return mockIntegration, nil
 		})
-		integration.InitializeIntegration("mock", "mockid", nil)
+		integration.InitializeIntegration("mock", "mockid", nil, false)
 
 		storeVectors, err := New(Config{
 			IntegrationID: "mockid",

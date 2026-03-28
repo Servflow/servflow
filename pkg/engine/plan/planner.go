@@ -9,6 +9,7 @@ import (
 
 	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/actions"
+	"github.com/Servflow/servflow/pkg/engine/integration"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"go.uber.org/zap"
 )
@@ -37,6 +38,7 @@ type PlannerConfig struct {
 	Actions        map[string]apiconfig.Action
 	Conditions     map[string]apiconfig.Conditional
 	Responses      map[string]apiconfig.ResponseConfig
+	Integrations   map[string]apiconfig.IntegrationConfig
 }
 
 type PlannerV2 struct {
@@ -69,6 +71,12 @@ func (p *PlannerV2) Plan() (*Plan, error) {
 		id = requestctx.ResponsesConfigPrefix + id
 		err := p.generate(id)
 		if err != nil {
+			return nil, err
+		}
+	}
+	for id := range p.config.Integrations {
+		integ := p.config.Integrations[id]
+		if err := integration.InitializeIntegration(integ.Type, integ.ID, integ.Config, integ.LazyLoad); err != nil {
 			return nil, err
 		}
 	}

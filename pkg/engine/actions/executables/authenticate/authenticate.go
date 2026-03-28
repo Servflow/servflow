@@ -43,7 +43,7 @@ func New(config Config) (*Action, error) {
 		return nil, errors.New("database field required")
 	}
 
-	i, err := integration.GetIntegration(config.IntegrationID)
+	i, err := integration.GetIntegration(context.Background(), config.IntegrationID)
 	if err != nil {
 		return nil, err
 	}

@@ -28,7 +28,7 @@ func TestFetch_Execute(t *testing.T) {
 			return mockIntegration, nil
 		})
 
-		err := integration.InitializeIntegration("mock", "mockds", nil)
+		err := integration.InitializeIntegration("mock", "mockds", nil, false)
 		require.NoError(t, err)
 
 		fetch, err := New(Config{
@@ -58,7 +58,7 @@ func TestFetch_Execute(t *testing.T) {
 		integration.ReplaceIntegrationType("mock", func(m map[string]any) (integration.Integration, error) {
 			return mockIntegration, nil
 		})
-		integration.InitializeIntegration("mock", "mockds", nil)
+		integration.InitializeIntegration("mock", "mockds", nil, false)
 
 		fetch, err := New(Config{
 			Table:         "mock",
@@ -86,7 +86,7 @@ func TestFetch_Execute(t *testing.T) {
 		integration.ReplaceIntegrationType("mock", func(m map[string]any) (integration.Integration, error) {
 			return mockIntegration, nil
 		})
-		integration.InitializeIntegration("mock", "mockds", nil)
+		integration.InitializeIntegration("mock", "mockds", nil, false)
 
 		fetch, err := New(Config{
 			Table:         "mock",

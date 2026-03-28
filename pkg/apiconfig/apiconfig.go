@@ -33,12 +33,13 @@ const (
 )
 
 type APIConfig struct {
-	ID           string                    `json:"id" yaml:"id"`
-	Actions      map[string]Action         `json:"actions" yaml:"actions"`
-	Conditionals map[string]Conditional    `json:"conditionals" yaml:"conditionals"`
-	Responses    map[string]ResponseConfig `json:"responses" yaml:"responses"`
-	HttpConfig   HttpConfig                `json:"http" yaml:"http"`
-	McpTool      MCPToolConfig             `json:"mcpTool" yaml:"mcpTool"`
+	ID           string                       `json:"id" yaml:"id"`
+	Actions      map[string]Action            `json:"actions" yaml:"actions"`
+	Conditionals map[string]Conditional       `json:"conditionals" yaml:"conditionals"`
+	Responses    map[string]ResponseConfig    `json:"responses" yaml:"responses"`
+	HttpConfig   HttpConfig                   `json:"http" yaml:"http"`
+	McpTool      MCPToolConfig                `json:"mcpTool" yaml:"mcpTool"`
+	Integrations map[string]IntegrationConfig `json:"integrations" yaml:"integrations"`
 }
 
 func (a *APIConfig) IsMCPConfig() bool {
@@ -132,34 +133,33 @@ func (o *ResponseObject) ToProto() *proto.ResponseObject {
 }
 
 type IntegrationConfig struct {
-	ID        string                 `json:"id" yaml:"id"`
-	Config    json.RawMessage        `json:"config" yaml:"-"`
-	NewConfig map[string]interface{} `yaml:"config"`
-	Type      string                 `json:"type" yaml:"type"`
+	ID       string                 `json:"id" yaml:"id"`
+	Config   map[string]interface{} `json:"config" yaml:"config"`
+	Type     string                 `json:"type" yaml:"type"`
+	LazyLoad bool                   `json:"lazyLoad" yaml:"lazyLoad"`
 }
 
-func (d *IntegrationConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	var tmp struct {
-		Type      string                 `yaml:"type"`
-		NewConfig map[string]interface{} `yaml:"config"`
-		ID        string                 `yaml:"id"`
-	}
-	if err := unmarshal(&tmp); err != nil {
-		return err
-	}
-
-	data, err := json.Marshal(tmp.NewConfig)
-	if err != nil {
-		return err
-	}
-
-	d.Type = tmp.Type
-	d.Config = data
-	d.ID = tmp.ID
-	d.NewConfig = tmp.NewConfig
-	return nil
-}
-
+//	func (d *IntegrationConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
+//		var tmp struct {
+//			Type      string                 `yaml:"type"`
+//			NewConfig map[string]interface{} `yaml:"config"`
+//			ID        string                 `yaml:"id"`
+//		}
+//		if err := unmarshal(&tmp); err != nil {
+//			return err
+//		}
+//
+//		data, err := json.Marshal(tmp.NewConfig)
+//		if err != nil {
+//			return err
+//		}
+//
+//		d.Type = tmp.Type
+//		d.Config = data
+//		d.ID = tmp.ID
+//		d.NewConfig = tmp.NewConfig
+//		return nil
+//	}
 func (a *APIConfig) Validate() error {
 	var validationErrors ValidationErrors
 

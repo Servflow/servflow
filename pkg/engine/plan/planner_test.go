@@ -1,12 +1,14 @@
 package plan
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"testing"
 
 	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/actions"
+	"github.com/Servflow/servflow/pkg/engine/integration"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/stretchr/testify/assert"
@@ -15,6 +17,14 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
+
+type mockPlannerIntegration struct {
+	typeName string
+}
+
+func (m *mockPlannerIntegration) Type() string {
+	return m.typeName
+}
 
 var sampleConfig = &apiconfig.APIConfig{
 	Actions: map[string]apiconfig.Action{
@@ -413,4 +423,111 @@ func TestPlannerV2_generateResponseStep(t *testing.T) {
 
 	_, err = planner.generateResponseStep("nonexistent")
 	assert.Error(t, err)
+}
+
+func TestPlannerV2_IntegrationsLazyLoaded(t *testing.T) {
+	integration.ReplaceIntegrationType("mock-planner-test", func(config map[string]any) (integration.Integration, error) {
+		return &mockPlannerIntegration{typeName: "mock-planner-test"}, nil
+	})
+
+	t.Run("single integration added to lazy loaded", func(t *testing.T) {
+		integrationID := "test-integration-1"
+		integrationConfig := map[string]apiconfig.IntegrationConfig{
+			integrationID: {
+				ID:     integrationID,
+				Type:   "mock-planner-test",
+				Config: json.RawMessage(`{"key": "value"}`),
+			},
+		}
+
+		planner := NewPlannerV2(PlannerConfig{
+			Actions:      map[string]apiconfig.Action{},
+			Conditions:   map[string]apiconfig.Conditional{},
+			Responses:    map[string]apiconfig.ResponseConfig{},
+			Integrations: integrationConfig,
+		}, silentLogger())
+
+		plan, err := planner.Plan()
+		require.NoError(t, err)
+		assert.NotNil(t, plan)
+
+		integ, err := integration.GetIntegration(context.Background(), integrationID)
+		require.NoError(t, err)
+		assert.NotNil(t, integ)
+		assert.Equal(t, "mock-planner-test", integ.Type())
+	})
+
+	t.Run("multiple integrations added to lazy loaded", func(t *testing.T) {
+		integrationConfigs := map[string]apiconfig.IntegrationConfig{
+			"multi-integration-1": {
+				ID:     "multi-integration-1",
+				Type:   "mock-planner-test",
+				Config: json.RawMessage(`{"setting": "one"}`),
+			},
+			"multi-integration-2": {
+				ID:     "multi-integration-2",
+				Type:   "mock-planner-test",
+				Config: json.RawMessage(`{"setting": "two"}`),
+			},
+		}
+
+		planner := NewPlannerV2(PlannerConfig{
+			Actions:      map[string]apiconfig.Action{},
+			Conditions:   map[string]apiconfig.Conditional{},
+			Responses:    map[string]apiconfig.ResponseConfig{},
+			Integrations: integrationConfigs,
+		}, silentLogger())
+
+		plan, err := planner.Plan()
+		require.NoError(t, err)
+		assert.NotNil(t, plan)
+
+		for id := range integrationConfigs {
+			integ, err := integration.GetIntegration(context.Background(), id)
+			require.NoError(t, err, "integration %s should be accessible", id)
+			assert.NotNil(t, integ)
+			assert.Equal(t, "mock-planner-test", integ.Type())
+		}
+	})
+
+	t.Run("plan fails when integration type not registered", func(t *testing.T) {
+		integrationConfig := map[string]apiconfig.IntegrationConfig{
+			"unknown-integration": {
+				ID:     "unknown-integration",
+				Type:   "unknown-type-xyz",
+				Config: json.RawMessage(`{"key": "value"}`),
+			},
+		}
+
+		planner := NewPlannerV2(PlannerConfig{
+			Actions:      map[string]apiconfig.Action{},
+			Conditions:   map[string]apiconfig.Conditional{},
+			Responses:    map[string]apiconfig.ResponseConfig{},
+			Integrations: integrationConfig,
+		}, silentLogger())
+
+		_, err := planner.Plan()
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "not registered")
+	})
+
+	t.Run("plan fails when integration config is invalid json", func(t *testing.T) {
+		integrationConfig := map[string]apiconfig.IntegrationConfig{
+			"invalid-config-integration": {
+				ID:     "invalid-config-integration",
+				Type:   "mock-planner-test",
+				Config: json.RawMessage(`{invalid json`),
+			},
+		}
+
+		planner := NewPlannerV2(PlannerConfig{
+			Actions:      map[string]apiconfig.Action{},
+			Conditions:   map[string]apiconfig.Conditional{},
+			Responses:    map[string]apiconfig.ResponseConfig{},
+			Integrations: integrationConfig,
+		}, silentLogger())
+
+		_, err := planner.Plan()
+		require.Error(t, err)
+	})
 }

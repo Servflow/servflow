@@ -45,7 +45,7 @@ func New(config Config) (*Store, error) {
 	if config.Table == "" {
 		return nil, errors.New("table is required")
 	}
-	i, err := integration.GetIntegration(config.IntegrationID)
+	i, err := integration.GetIntegration(context.Background(), config.IntegrationID)
 	if err != nil {
 		return nil, err
 	}

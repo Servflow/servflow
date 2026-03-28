@@ -251,11 +251,18 @@ func RegisterIntegrationsFromConfig(integrationsConfig []apiconfig.IntegrationCo
 				buf  bytes.Buffer
 			)
 
+			confStr, err := json.Marshal(config.Config)
+			if err != nil {
+				errChan <- &errorReport{
+					integrationID: config.ID,
+					error:         fmt.Errorf("could not marshal integration config: %w", err),
+				}
+			}
 			tmpl, err := template.New("config").Funcs(template.FuncMap{
 				"secret": func(key string) string {
 					return secrets.FetchSecret(key)
 				},
-			}).Parse(string(config.Config))
+			}).Parse(string(confStr))
 
 			if err != nil {
 				errChan <- &errorReport{

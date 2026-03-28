@@ -133,37 +133,33 @@ func (o *ResponseObject) ToProto() *proto.ResponseObject {
 }
 
 type IntegrationConfig struct {
-	ID     string          `json:"id" yaml:"id"`
-	Config json.RawMessage `json:"config" yaml:"-"`
-	// NewConfig the purpose of new config is to simply capture the fields from the yaml and convert it to
-	// the config field (a byte array).
-	NewConfig map[string]interface{} `yaml:"config"`
-	Type      string                 `json:"type" yaml:"type"`
-	LazyLoad  bool                   `json:"lazyLoad" yaml:"lazyLoad"`
+	ID       string                 `json:"id" yaml:"id"`
+	Config   map[string]interface{} `json:"config" yaml:"config"`
+	Type     string                 `json:"type" yaml:"type"`
+	LazyLoad bool                   `json:"lazyLoad" yaml:"lazyLoad"`
 }
 
-func (d *IntegrationConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	var tmp struct {
-		Type      string                 `yaml:"type"`
-		NewConfig map[string]interface{} `yaml:"config"`
-		ID        string                 `yaml:"id"`
-	}
-	if err := unmarshal(&tmp); err != nil {
-		return err
-	}
-
-	data, err := json.Marshal(tmp.NewConfig)
-	if err != nil {
-		return err
-	}
-
-	d.Type = tmp.Type
-	d.Config = data
-	d.ID = tmp.ID
-	d.NewConfig = tmp.NewConfig
-	return nil
-}
-
+//	func (d *IntegrationConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
+//		var tmp struct {
+//			Type      string                 `yaml:"type"`
+//			NewConfig map[string]interface{} `yaml:"config"`
+//			ID        string                 `yaml:"id"`
+//		}
+//		if err := unmarshal(&tmp); err != nil {
+//			return err
+//		}
+//
+//		data, err := json.Marshal(tmp.NewConfig)
+//		if err != nil {
+//			return err
+//		}
+//
+//		d.Type = tmp.Type
+//		d.Config = data
+//		d.ID = tmp.ID
+//		d.NewConfig = tmp.NewConfig
+//		return nil
+//	}
 func (a *APIConfig) Validate() error {
 	var validationErrors ValidationErrors
 

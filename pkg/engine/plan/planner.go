@@ -76,11 +76,7 @@ func (p *PlannerV2) Plan() (*Plan, error) {
 	}
 	for id := range p.config.Integrations {
 		integ := p.config.Integrations[id]
-		var configMap map[string]interface{}
-		if err := json.Unmarshal(integ.Config, &configMap); err != nil {
-			return nil, err
-		}
-		if err := integration.InitializeIntegration(integ.Type, integ.ID, configMap, true); err != nil {
+		if err := integration.InitializeIntegration(integ.Type, integ.ID, integ.Config, integ.LazyLoad); err != nil {
 			return nil, err
 		}
 	}

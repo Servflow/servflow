@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -78,7 +79,7 @@ func TestIntegrationManager_LazyLoad(t *testing.T) {
 	err = InitializeIntegration("mock", "mock-1", map[string]any{"key": "value"}, true)
 	require.NoError(t, err)
 
-	integration, err := GetIntegration("mock-1")
+	integration, err := GetIntegration(context.Background(), "mock-1")
 	assert.NoError(t, err)
 
 	mockIntegration, ok := integration.(*mockIntegration)

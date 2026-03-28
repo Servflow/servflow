@@ -11,6 +11,7 @@ import (
 	"text/template"
 
 	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/engine/secrets"
 	"github.com/Servflow/servflow/pkg/logging"
 	"go.uber.org/zap"
@@ -160,6 +161,7 @@ func InitializeIntegration(integrationType, id string, config map[string]any, sh
 		if err != nil {
 			return err
 		}
+
 		integrationManager.lazyIntegrations.Store(id, LazyIntegration{
 			Type:   integrationType,
 			Config: jsonConfig,
@@ -180,7 +182,7 @@ func InitializeIntegration(integrationType, id string, config map[string]any, sh
 
 // GetIntegration gets an initialized registration from the list of integration
 // as an interface
-func GetIntegration(id string) (Integration, error) {
+func GetIntegration(ctx context.Context, id string) (Integration, error) {
 	//var (
 	//	integration any
 	//	ok          bool
@@ -198,8 +200,21 @@ func GetIntegration(id string) (Integration, error) {
 			return nil, fmt.Errorf("could not find info to lazy load integration for %s: %w", id, err)
 		}
 
+		tmpl, err := requestctx.CreateTextTemplate(ctx, string(lazyIntegration.Config), nil)
+		if err != nil {
+			if errors.Is(err, requestctx.ErrNoContext) {
+				return nil, fmt.Errorf("lazy loaded integration being called early or without a context: %w", err)
+			}
+			return nil, err
+		}
+
+		cfg, err := requestctx.ExecuteTemplateFromContext(ctx, tmpl)
+		if err != nil {
+			return nil, err
+		}
+
 		config := map[string]any{}
-		if err := json.Unmarshal(lazyIntegration.Config, &config); err != nil {
+		if err := json.Unmarshal([]byte(cfg), &config); err != nil {
 			return nil, err
 		}
 		integration, err := info.Constructor(config)

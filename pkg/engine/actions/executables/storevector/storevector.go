@@ -71,7 +71,7 @@ func New(config Config) (*StoreVectors, error) {
 	if config.IntegrationID == "" {
 		return nil, fmt.Errorf("no integration ID provided")
 	}
-	i, err := integration.GetIntegration(config.IntegrationID)
+	i, err := integration.GetIntegration(context.Background(), config.IntegrationID)
 	if err != nil {
 		return nil, err
 	}

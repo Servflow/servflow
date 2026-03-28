@@ -154,7 +154,6 @@ func WrapWithFunction(template, funcWrap string) string {
 // it also loads up the template variables stored in the request context
 func CreateTextTemplate(reqCtx context.Context, config string, funcMap template.FuncMap) (*template.Template, error) {
 	rCtx, ok := FromContext(reqCtx)
-
 	if funcMap == nil {
 		funcMap = template.FuncMap{}
 	}
@@ -163,6 +162,8 @@ func CreateTextTemplate(reqCtx context.Context, config string, funcMap template.
 		for k, v := range rcFunc {
 			funcMap[k] = v
 		}
+	} else {
+		return nil, ErrNoContext
 	}
 	return createTemplate(config, funcMap, false)
 }

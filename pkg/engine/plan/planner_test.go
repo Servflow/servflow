@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"testing"
@@ -450,7 +451,7 @@ func TestPlannerV2_IntegrationsLazyLoaded(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, plan)
 
-		integ, err := integration.GetIntegration(integrationID)
+		integ, err := integration.GetIntegration(context.Background(), integrationID)
 		require.NoError(t, err)
 		assert.NotNil(t, integ)
 		assert.Equal(t, "mock-planner-test", integ.Type())
@@ -482,7 +483,7 @@ func TestPlannerV2_IntegrationsLazyLoaded(t *testing.T) {
 		assert.NotNil(t, plan)
 
 		for id := range integrationConfigs {
-			integ, err := integration.GetIntegration(id)
+			integ, err := integration.GetIntegration(context.Background(), id)
 			require.NoError(t, err, "integration %s should be accessible", id)
 			assert.NotNil(t, integ)
 			assert.Equal(t, "mock-planner-test", integ.Type())

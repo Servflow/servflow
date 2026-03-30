@@ -1,7 +1,6 @@
 package plan
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"testing"
@@ -436,7 +435,7 @@ func TestPlannerV2_IntegrationsLazyLoaded(t *testing.T) {
 			integrationID: {
 				ID:     integrationID,
 				Type:   "mock-planner-test",
-				Config: json.RawMessage(`{"key": "value"}`),
+				Config: map[string]interface{}{"key": "value"},
 			},
 		}
 
@@ -451,7 +450,7 @@ func TestPlannerV2_IntegrationsLazyLoaded(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, plan)
 
-		integ, err := integration.GetIntegration(context.Background(), integrationID)
+		integ, err := integration.GetIntegration(requestctx.NewTestContext(), integrationID)
 		require.NoError(t, err)
 		assert.NotNil(t, integ)
 		assert.Equal(t, "mock-planner-test", integ.Type())
@@ -462,12 +461,12 @@ func TestPlannerV2_IntegrationsLazyLoaded(t *testing.T) {
 			"multi-integration-1": {
 				ID:     "multi-integration-1",
 				Type:   "mock-planner-test",
-				Config: json.RawMessage(`{"setting": "one"}`),
+				Config: map[string]interface{}{"setting": "one"},
 			},
 			"multi-integration-2": {
 				ID:     "multi-integration-2",
 				Type:   "mock-planner-test",
-				Config: json.RawMessage(`{"setting": "two"}`),
+				Config: map[string]interface{}{"setting": "two"},
 			},
 		}
 
@@ -483,7 +482,7 @@ func TestPlannerV2_IntegrationsLazyLoaded(t *testing.T) {
 		assert.NotNil(t, plan)
 
 		for id := range integrationConfigs {
-			integ, err := integration.GetIntegration(context.Background(), id)
+			integ, err := integration.GetIntegration(requestctx.NewTestContext(), id)
 			require.NoError(t, err, "integration %s should be accessible", id)
 			assert.NotNil(t, integ)
 			assert.Equal(t, "mock-planner-test", integ.Type())
@@ -495,7 +494,7 @@ func TestPlannerV2_IntegrationsLazyLoaded(t *testing.T) {
 			"unknown-integration": {
 				ID:     "unknown-integration",
 				Type:   "unknown-type-xyz",
-				Config: json.RawMessage(`{"key": "value"}`),
+				Config: map[string]interface{}{"key": "value"},
 			},
 		}
 
@@ -509,25 +508,5 @@ func TestPlannerV2_IntegrationsLazyLoaded(t *testing.T) {
 		_, err := planner.Plan()
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not registered")
-	})
-
-	t.Run("plan fails when integration config is invalid json", func(t *testing.T) {
-		integrationConfig := map[string]apiconfig.IntegrationConfig{
-			"invalid-config-integration": {
-				ID:     "invalid-config-integration",
-				Type:   "mock-planner-test",
-				Config: json.RawMessage(`{invalid json`),
-			},
-		}
-
-		planner := NewPlannerV2(PlannerConfig{
-			Actions:      map[string]apiconfig.Action{},
-			Conditions:   map[string]apiconfig.Conditional{},
-			Responses:    map[string]apiconfig.ResponseConfig{},
-			Integrations: integrationConfig,
-		}, silentLogger())
-
-		_, err := planner.Plan()
-		require.Error(t, err)
 	})
 }

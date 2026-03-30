@@ -1,10 +1,10 @@
 package integration
 
 import (
-	"context"
 	"encoding/json"
 	"testing"
 
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -79,7 +79,7 @@ func TestIntegrationManager_LazyLoad(t *testing.T) {
 	err = InitializeIntegration("mock", "mock-1", map[string]any{"key": "value"}, true)
 	require.NoError(t, err)
 
-	integration, err := GetIntegration(context.Background(), "mock-1")
+	integration, err := GetIntegration(requestctx.NewTestContext(), "mock-1")
 	assert.NoError(t, err)
 
 	mockIntegration, ok := integration.(*mockIntegration)

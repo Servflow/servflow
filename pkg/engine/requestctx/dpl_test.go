@@ -1,7 +1,6 @@
 package requestctx
 
 import (
-	"context"
 	"testing"
 
 	"github.com/Servflow/servflow/pkg/engine/secrets"
@@ -263,7 +262,7 @@ func TestCreateTextTemplate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpl, err := CreateTextTemplate(context.Background(), tt.config, tt.funcMap)
+			tmpl, err := CreateTextTemplate(NewTestContext(), tt.config, tt.funcMap)
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Nil(t, tmpl)
@@ -367,7 +366,7 @@ func TestExecuteTemplateWithActionFunctionMap(t *testing.T) {
 			err := AddRequestVariables(ctx, tt.values, "")
 			require.NoError(t, err)
 
-			tmpl, err := CreateTextTemplate(context.Background(), tt.input, nil)
+			tmpl, err := CreateTextTemplate(NewTestContext(), tt.input, nil)
 			require.NoError(t, err)
 
 			result, err := ExecuteTemplateFromContext(ctx, tmpl)
@@ -439,7 +438,7 @@ func BenchmarkExecuteTemplateFromContext(b *testing.B) {
 	err := AddRequestVariables(ctx, map[string]interface{}{"variable1": "test", "variable2": "test2"}, "")
 	require.NoError(b, err)
 	input := "Start {{.variable1}} middle {{.variable2}} end."
-	template, err := CreateTextTemplate(context.Background(), input, nil)
+	template, err := CreateTextTemplate(NewTestContext(), input, nil)
 	require.NoError(b, err)
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {

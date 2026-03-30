@@ -90,10 +90,13 @@ func init() {
 			Required:    true,
 		},
 		"filters": {
-			Type:        "array",
+			Type:        actions.FieldTypeMap,
 			Label:       "Filters",
 			Placeholder: "Query filters to identify records to update",
 			Required:    true,
+			Metadata: map[string]string{
+				"type": "filter",
+			},
 		},
 		"table": {
 			Type:        actions.FieldTypeString,

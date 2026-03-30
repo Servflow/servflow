@@ -33,9 +33,10 @@ func (e *Engine) createBasicHandler(config *apiconfig.APIConfig) (http.Handler, 
 	logger.Debug("Loading API configuration", zap.String("api", config.ID), zap.String("path", config.HttpConfig.ListenPath), zap.String("method", config.HttpConfig.Method))
 
 	planner := plan.NewPlannerV2(plan.PlannerConfig{
-		Actions:    config.Actions,
-		Conditions: config.Conditionals,
-		Responses:  config.Responses,
+		Actions:      config.Actions,
+		Conditions:   config.Conditionals,
+		Responses:    config.Responses,
+		Integrations: config.Integrations,
 	}, logger)
 	p, err := planner.Plan()
 	if err != nil {

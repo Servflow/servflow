@@ -75,6 +75,7 @@ func TestIntegrationManager_LazyLoad(t *testing.T) {
 		Description: "Mock integration for testing",
 		Constructor: mockConstructor,
 	})
+	require.NoError(t, err, "registering mock integration")
 
 	err = InitializeIntegration("mock", "mock-1", map[string]any{"key": "value"}, true)
 	require.NoError(t, err)

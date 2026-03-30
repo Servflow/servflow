@@ -110,6 +110,9 @@ func init() {
 			Label:       "Filters",
 			Placeholder: "Query filters",
 			Required:    false,
+			Metadata: map[string]string{
+				"type": "filter",
+			},
 		},
 		"table": {
 			Type:        actions.FieldTypeString,

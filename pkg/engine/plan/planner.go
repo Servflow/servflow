@@ -53,6 +53,12 @@ func NewPlannerV2(config PlannerConfig, logger *zap.Logger) *PlannerV2 {
 }
 
 func (p *PlannerV2) Plan() (*Plan, error) {
+	for id := range p.config.Integrations {
+		integ := p.config.Integrations[id]
+		if err := integration.InitializeIntegration(integ.Type, id, integ.Config, integ.LazyLoad); err != nil {
+			return nil, err
+		}
+	}
 	for id := range p.config.Actions {
 		id = requestctx.ActionConfigPrefix + id
 		err := p.generate(id)
@@ -74,12 +80,7 @@ func (p *PlannerV2) Plan() (*Plan, error) {
 			return nil, err
 		}
 	}
-	for id := range p.config.Integrations {
-		integ := p.config.Integrations[id]
-		if err := integration.InitializeIntegration(integ.Type, integ.ID, integ.Config, integ.LazyLoad); err != nil {
-			return nil, err
-		}
-	}
+
 	return &Plan{
 		steps: p.finalSteps,
 	}, nil

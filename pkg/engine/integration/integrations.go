@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"text/template"
 
@@ -258,11 +259,13 @@ func RegisterIntegrationsFromConfig(integrationsConfig []apiconfig.IntegrationCo
 					error:         fmt.Errorf("could not marshal integration config: %w", err),
 				}
 			}
+
+			confParsed := parseString(string(confStr))
 			tmpl, err := template.New("config").Funcs(template.FuncMap{
 				"secret": func(key string) string {
 					return secrets.FetchSecret(key)
 				},
-			}).Parse(string(confStr))
+			}).Parse(confParsed)
 
 			if err != nil {
 				errChan <- &errorReport{
@@ -285,7 +288,7 @@ func RegisterIntegrationsFromConfig(integrationsConfig []apiconfig.IntegrationCo
 				}
 			}
 
-			if err := InitializeIntegration(dsConfig.Type, dsConfig.ID, conf, false); err != nil {
+			if err := InitializeIntegration(dsConfig.Type, dsConfig.ID, conf, dsConfig.LazyLoad); err != nil {
 				errChan <- &errorReport{
 					integrationID: config.ID,
 					error:         fmt.Errorf("error initializing integration with ID %s and type %s: %w", dsConfig.ID, dsConfig.Type, err),
@@ -312,4 +315,8 @@ func RegisterIntegrationsFromConfig(integrationsConfig []apiconfig.IntegrationCo
 			return nil
 		}
 	}
+}
+
+func parseString(s string) string {
+	return strings.ReplaceAll(s, `\"`, `"`)
 }

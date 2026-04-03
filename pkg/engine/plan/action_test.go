@@ -44,6 +44,7 @@ func TestAction_Execute(t *testing.T) {
 			mockExec := NewMockActionExecutable(ctrl)
 			mockExec.EXPECT().Config().Return(conf)
 			mockExec.EXPECT().Execute(gomock.Any(), "test actual name").Return("response string", nil, nil)
+			mockExec.EXPECT().SupportsReplica().Return(false)
 
 			nextStep := testStep{id: "next"}
 
@@ -75,6 +76,7 @@ func TestAction_Execute(t *testing.T) {
 			config := fmt.Sprintf("test {{ .%sname.actualname }}", requestctx.BareVariablesPrefixStripped)
 			mockExec.EXPECT().Config().Return(config)
 			mockExec.EXPECT().Execute(gomock.Any(), "test actual name").Return("response string", nil, nil)
+			mockExec.EXPECT().SupportsReplica().Return(false)
 
 			nextStep := testStep{id: "next"}
 
@@ -109,6 +111,7 @@ func TestAction_Execute(t *testing.T) {
 			mockExec := NewMockActionExecutable(ctrl)
 			mockExec.EXPECT().Config().Return("")
 			mockExec.EXPECT().Execute(gomock.Any(), "").Return("custom response", nil, nil)
+			mockExec.EXPECT().SupportsReplica().Return(false)
 
 			nextStep := testStep{id: "next"}
 
@@ -139,6 +142,7 @@ func TestAction_Execute(t *testing.T) {
 			reader := io.NopCloser(strings.NewReader(fileContent))
 			mockExec.EXPECT().Config().Return("")
 			mockExec.EXPECT().Execute(gomock.Any(), "").Return(reader, nil, nil)
+			mockExec.EXPECT().SupportsReplica().Return(false)
 
 			nextStep := testStep{id: "next"}
 
@@ -181,6 +185,7 @@ func TestAction_Execute(t *testing.T) {
 			mockExec.EXPECT().Config().Return("")
 			mockExec.EXPECT().Type().Return("mock").AnyTimes()
 			mockExec.EXPECT().Execute(gomock.Any(), "").Return("response string", nil, errors.New("dummy error"))
+			mockExec.EXPECT().SupportsReplica().Return(false)
 
 			mockStep := testStep{id: "next"}
 
@@ -207,6 +212,7 @@ func TestAction_Execute(t *testing.T) {
 			mockExec := NewMockActionExecutable(ctrl)
 			mockExec.EXPECT().Config().Return("").AnyTimes()
 			mockExec.EXPECT().Execute(gomock.Any(), "").Return("response string", nil, fmt.Errorf("%w: dummy error", ErrFailure)).AnyTimes()
+			mockExec.EXPECT().SupportsReplica().Return(false).AnyTimes()
 
 			nextStep := testStep{id: "next"}
 			failStep := testStep{id: "fail"}
@@ -261,7 +267,7 @@ func TestAction_ExecuteWithReplica(t *testing.T) {
 
 		mockExec := NewMockActionExecutable(ctrl)
 		mockExec.EXPECT().Config().Return("")
-		mockExec.EXPECT().SupportsReplica().Return(true)
+		mockExec.EXPECT().SupportsReplica().Return(true).AnyTimes()
 		mockExec.EXPECT().Type().Return("mock")
 
 		mockReplica := NewMockReplica(ctrl)
@@ -295,7 +301,7 @@ func TestAction_ExecuteWithReplica(t *testing.T) {
 
 		mockExec := NewMockActionExecutable(ctrl)
 		mockExec.EXPECT().Config().Return("")
-		mockExec.EXPECT().SupportsReplica().Return(false)
+		mockExec.EXPECT().SupportsReplica().Return(false).AnyTimes()
 		mockExec.EXPECT().Execute(gomock.Any(), "").Return("direct response", nil, nil)
 
 		mockReplica := NewMockReplica(ctrl)
@@ -328,7 +334,7 @@ func TestAction_ExecuteWithReplica(t *testing.T) {
 
 		mockExec := NewMockActionExecutable(ctrl)
 		mockExec.EXPECT().Config().Return("")
-		mockExec.EXPECT().SupportsReplica().Return(true)
+		mockExec.EXPECT().SupportsReplica().Return(true).AnyTimes()
 		mockExec.EXPECT().Type().Return("mock")
 		mockExec.EXPECT().Execute(gomock.Any(), "").Return("fallback response", nil, nil)
 
@@ -363,7 +369,7 @@ func TestAction_ExecuteWithReplica(t *testing.T) {
 
 		mockExec := NewMockActionExecutable(ctrl)
 		mockExec.EXPECT().Config().Return("")
-		mockExec.EXPECT().SupportsReplica().Return(true)
+		mockExec.EXPECT().SupportsReplica().Return(true).AnyTimes()
 		mockExec.EXPECT().Type().Return("mock").AnyTimes()
 		mockExec.EXPECT().Execute(gomock.Any(), "").Return(nil, nil, errors.New("direct execution error"))
 
@@ -408,7 +414,8 @@ func TestActionTemplateFunctions(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			tmpl, err := requestctx.CreateTextTemplate(context.Background(), testCase.template, nil)
+			ctx := requestctx.NewTestContext()
+			tmpl, err := requestctx.CreateTextTemplate(ctx, testCase.template, nil)
 			require.NoError(t, err)
 			var buff bytes.Buffer
 			err = tmpl.Execute(&buff, variables)

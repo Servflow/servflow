@@ -52,7 +52,7 @@ func New(config Config) (*Delete, error) {
 	if config.Table == "" {
 		return nil, errors.New("table is required")
 	}
-	i, err := integration.GetIntegration(config.IntegrationID)
+	i, err := integration.GetIntegration(context.Background(), config.IntegrationID)
 	if err != nil {
 		return nil, err
 	}
@@ -90,10 +90,13 @@ func init() {
 			Required:    true,
 		},
 		"filters": {
-			Type:        "array",
+			Type:        actions.FieldTypeMap,
 			Label:       "Filters",
 			Placeholder: "Query filters to identify records to delete",
 			Required:    true,
+			Metadata: map[string]string{
+				"type": "filter",
+			},
 		},
 		"table": {
 			Type:        actions.FieldTypeString,

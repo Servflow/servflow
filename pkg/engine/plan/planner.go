@@ -9,6 +9,7 @@ import (
 
 	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/actions"
+	"github.com/Servflow/servflow/pkg/engine/integration"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"go.uber.org/zap"
 )
@@ -37,6 +38,7 @@ type PlannerConfig struct {
 	Actions        map[string]apiconfig.Action
 	Conditions     map[string]apiconfig.Conditional
 	Responses      map[string]apiconfig.ResponseConfig
+	Integrations   map[string]apiconfig.IntegrationConfig
 }
 
 type PlannerV2 struct {
@@ -51,6 +53,12 @@ func NewPlannerV2(config PlannerConfig, logger *zap.Logger) *PlannerV2 {
 }
 
 func (p *PlannerV2) Plan() (*Plan, error) {
+	for id := range p.config.Integrations {
+		integ := p.config.Integrations[id]
+		if err := integration.InitializeIntegration(integ.Type, id, integ.Config, integ.LazyLoad); err != nil {
+			return nil, err
+		}
+	}
 	for id := range p.config.Actions {
 		id = requestctx.ActionConfigPrefix + id
 		err := p.generate(id)
@@ -72,6 +80,7 @@ func (p *PlannerV2) Plan() (*Plan, error) {
 			return nil, err
 		}
 	}
+
 	return &Plan{
 		steps: p.finalSteps,
 	}, nil

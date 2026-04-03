@@ -47,7 +47,7 @@ func New(config Config) (*Fetch, error) {
 	if config.Table == "" {
 		return nil, errors.New("table is required")
 	}
-	i, err := integration.GetIntegration(config.IntegrationID)
+	i, err := integration.GetIntegration(context.Background(), config.IntegrationID)
 	if err != nil {
 		return nil, err
 	}
@@ -110,6 +110,9 @@ func init() {
 			Label:       "Filters",
 			Placeholder: "Query filters",
 			Required:    false,
+			Metadata: map[string]string{
+				"type": "filter",
+			},
 		},
 		"table": {
 			Type:        actions.FieldTypeString,

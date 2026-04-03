@@ -76,7 +76,7 @@ func (a *Action) execute(ctx context.Context) (*stepWrapper, error) {
 	if tmpl != nil {
 		cfg, err = requestctx.ExecuteTemplateFromContext(ctx, tmpl)
 		if err != nil {
-			logger.Error("error executing template for action", zap.Error(err))
+			logger.Error("error executing template for action "+a.name, zap.Error(err))
 			span.RecordError(err)
 			span.SetStatus(codes.Error, err.Error())
 			if a.fail != nil {

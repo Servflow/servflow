@@ -1,7 +1,6 @@
 package requestctx
 
 import (
-	"context"
 	"testing"
 	"text/template"
 
@@ -158,7 +157,7 @@ func TestTemplateFunctions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpl, err := CreateTextTemplate(context.Background(), tt.templateInput, tt.funcMap)
+			tmpl, err := CreateTextTemplate(NewTestContext(), tt.templateInput, tt.funcMap)
 			require.NoError(t, err)
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
@@ -233,7 +232,7 @@ func TestTemplateFunctions(t *testing.T) {
 
 		for _, tt := range hashTests {
 			t.Run(tt.name, func(t *testing.T) {
-				tmpl, err := CreateTextTemplate(context.Background(), tt.templateInput, nil)
+				tmpl, err := CreateTextTemplate(NewTestContext(), tt.templateInput, nil)
 				require.NoError(t, err)
 
 				ctx := NewTestContext()
@@ -304,7 +303,7 @@ func TestTemplateFunctions(t *testing.T) {
 
 		for _, tt := range joinTests {
 			t.Run(tt.name, func(t *testing.T) {
-				tmpl, err := CreateTextTemplate(context.Background(), tt.templateInput, nil)
+				tmpl, err := CreateTextTemplate(NewTestContext(), tt.templateInput, nil)
 				require.NoError(t, err)
 
 				ctx := NewTestContext()

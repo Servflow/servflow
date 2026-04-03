@@ -95,7 +95,7 @@ func (c *ConditionStep) execute(ctx context.Context) (*stepWrapper, error) {
 
 	resp, err := requestctx.ExecuteTemplateFromContext(ctx, tmpl)
 	if err != nil {
-		logger.Error("error executing template: "+c.exprString, zap.Error(err))
+		logger.Error(fmt.Sprintf("error executing template %s: %s", c.name, c.exprString), zap.Error(err))
 		logger.Debug("error executing template: "+c.exprString, zap.Any("resp", reqCtx.Variables()))
 		span.RecordError(err)
 		return nil, err

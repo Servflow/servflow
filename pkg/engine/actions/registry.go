@@ -21,6 +21,8 @@ type ActionRegistrationInfo struct {
 
 type FieldType string
 
+// TODO fix support for passing config over replica
+
 const (
 	FieldTypeString      FieldType = "string"
 	FieldTypeIntegration FieldType = "integration"

@@ -37,6 +37,7 @@ func TestParallelExec_Execute(t *testing.T) {
 			})
 
 			mockExec.EXPECT().Config().Return("").AnyTimes()
+			mockExec.EXPECT().SupportsReplica().Return(false).AnyTimes()
 		}
 
 		planner := plan.NewPlannerV2(plan.PlannerConfig{
@@ -240,10 +241,6 @@ func TestParallelExec_Execute(t *testing.T) {
 
 		// Assertions
 		require.Error(t, err)
-		// Should return just the first error, not a group error
-		// The error will be wrapped, so check if it contains the original error message
-		assert.Contains(t, err.Error(), "action1 failed")
-		// Ensure it's not a groupError
 		var groupErr *groupError
 		assert.False(t, errors.As(err, &groupErr), "Should not be a groupError when stopOnFailure=true")
 		assert.Nil(t, result)

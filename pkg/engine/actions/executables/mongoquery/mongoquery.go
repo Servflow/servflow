@@ -44,7 +44,7 @@ func New(config Config) (*MGOQuery, error) {
 		return nil, errors.New("collection is required")
 	}
 
-	i, err := integration.GetIntegration(config.IntegrationID)
+	i, err := integration.GetIntegration(context.Background(), config.IntegrationID)
 	if err != nil {
 		return nil, err
 	}

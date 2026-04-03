@@ -7,9 +7,9 @@ import (
 )
 
 type Filter struct {
-	Field      string
-	Operation  string
-	Comparator interface{}
+	Field      string      `json:"field"`
+	Operation  string      `json:"operation"`
+	Comparator interface{} `json:"comparator"`
 }
 
 const (

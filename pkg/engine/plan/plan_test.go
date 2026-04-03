@@ -73,6 +73,7 @@ func TestPlan_Execute(t *testing.T) {
 			contextSetup: func(ctx context.Context) {},
 			mockAssertions: func(exec1, exec2, exec3 *MockActionExecutable) {
 				exec1.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil, nil)
+				exec1.EXPECT().SupportsReplica().Return(false).AnyTimes()
 			},
 			expectedBody: `{"status": "success"}`,
 			expectedJSON: true,
@@ -86,6 +87,7 @@ func TestPlan_Execute(t *testing.T) {
 			},
 			mockAssertions: func(exec1, exec2, exec3 *MockActionExecutable) {
 				exec2.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil, nil)
+				exec2.EXPECT().SupportsReplica().Return(false).AnyTimes()
 			},
 			expectedBody: "hello",
 		},
@@ -117,7 +119,9 @@ func TestPlan_Execute(t *testing.T) {
 						assert.Equal(t, "test value", string(resp.Body))
 						return string(resp.Body), nil, nil
 					})
+				exec3.EXPECT().SupportsReplica().Return(false).AnyTimes()
 				exec2.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil, nil)
+				exec2.EXPECT().SupportsReplica().Return(false).AnyTimes()
 			},
 			expectedBody: `{"data": "test value"}`,
 			expectedJSON: true,
@@ -132,6 +136,7 @@ func TestPlan_Execute(t *testing.T) {
 			},
 			mockAssertions: func(exec1, exec2, exec3 *MockActionExecutable) {
 				exec2.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil, nil)
+				exec2.EXPECT().SupportsReplica().Return(false).AnyTimes()
 			},
 			expectedBody: "secret",
 		},

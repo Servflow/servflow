@@ -144,6 +144,7 @@ func init() {
 			Placeholder: "GET, POST, PUT, DELETE",
 			Required:    true,
 			Default:     "GET",
+			Values:      []string{"GET", "POST", "PUT", "DELETE"},
 		},
 		"headers": {
 			Type:        actions.FieldTypeMap,

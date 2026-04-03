@@ -1,3 +1,4 @@
+//go:generate mockgen -source integrations.go -destination integrations_mock.go -package integration
 package integration
 
 import (
@@ -6,10 +7,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"text/template"
 
 	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/engine/secrets"
 	"github.com/Servflow/servflow/pkg/logging"
 	"go.uber.org/zap"
@@ -55,11 +58,18 @@ type RegistrationInfo struct {
 type Manager struct {
 	integrations          sync.Map
 	availableConstructors map[string]RegistrationInfo
+	lazyIntegrations      sync.Map
+}
+
+type LazyIntegration struct {
+	Type   string
+	Config json.RawMessage
 }
 
 var integrationManager = &Manager{
 	availableConstructors: make(map[string]RegistrationInfo),
 	integrations:          sync.Map{},
+	lazyIntegrations:      sync.Map{},
 }
 
 type Integration interface {
@@ -131,27 +141,92 @@ func GetInfoForIntegration(integrationType string) (RegistrationInfo, error) {
 	return info, nil
 }
 
-func InitializeIntegration(integrationType, id string, config map[string]any) error {
+func GetLazyLoadedIntegrations() map[string]LazyIntegration {
+	integrations := make(map[string]LazyIntegration)
+	integrationManager.lazyIntegrations.Range(func(key, value interface{}) bool {
+		integration := value.(LazyIntegration)
+		integrations[key.(string)] = integration
+		return true
+	})
+	return integrations
+}
+
+func InitializeIntegration(integrationType, id string, config map[string]any, shouldLazyLoad bool) error {
 	info, ok := integrationManager.availableConstructors[integrationType]
 	if !ok {
 		return fmt.Errorf("integration type %s not registered", integrationType)
 	}
 
-	integration, err := info.Constructor(config)
-	if err != nil {
-		return err
+	if shouldLazyLoad {
+		jsonConfig, err := json.Marshal(config)
+		if err != nil {
+			return err
+		}
+
+		integrationManager.lazyIntegrations.Store(id, LazyIntegration{
+			Type:   integrationType,
+			Config: jsonConfig,
+		})
+	} else {
+		integration, err := info.Constructor(config)
+		if err != nil {
+			return err
+		}
+
+		integrationManager.integrations.Store(id, integration)
 	}
 
-	integrationManager.integrations.Store(id, integration)
 	return nil
 }
 
-func GetIntegration(id string) (Integration, error) {
+// TODO the config is being converted to and from json multiple times, fix that
+
+// GetIntegration gets an initialized registration from the list of integration
+// as an interface
+func GetIntegration(ctx context.Context, id string) (Integration, error) {
+	//var (
+	//	integration any
+	//	ok          bool
+	//)
 	integration, ok := integrationManager.integrations.Load(id)
 	if !ok {
-		return nil, fmt.Errorf("integration %s not found", id)
+		lazyIntegrationConf, ok := integrationManager.lazyIntegrations.Load(id)
+		if !ok {
+			return nil, fmt.Errorf("integration %s not registered", id)
+		}
+
+		lazyIntegration := lazyIntegrationConf.(LazyIntegration)
+		info, err := GetInfoForIntegration(lazyIntegration.Type)
+		if err != nil {
+			return nil, fmt.Errorf("could not find info to lazy load integration for %s: %w", id, err)
+		}
+
+		tmpl, err := requestctx.CreateTextTemplate(ctx, string(lazyIntegration.Config), nil)
+		if err != nil {
+			if errors.Is(err, requestctx.ErrNoContext) {
+				return nil, fmt.Errorf("lazy loaded integration being called early or without a context: %w", err)
+			}
+			return nil, err
+		}
+
+		cfg, err := requestctx.ExecuteTemplateFromContext(ctx, tmpl)
+		if err != nil {
+			return nil, err
+		}
+
+		config := map[string]any{}
+		if err := json.Unmarshal([]byte(cfg), &config); err != nil {
+			return nil, err
+		}
+		integration, err := info.Constructor(config)
+		if err != nil {
+			return nil, fmt.Errorf("could not lazy load integration for %s: %w", id, err)
+		}
+
+		return integration, nil
+	} else {
+		return integration.(Integration), nil
 	}
-	return integration.(Integration), nil
 }
 
 func RegisterIntegrationsFromConfig(integrationsConfig []apiconfig.IntegrationConfig) error {
@@ -172,51 +247,48 @@ func RegisterIntegrationsFromConfig(integrationsConfig []apiconfig.IntegrationCo
 	for _, dsConfig := range integrationsConfig {
 		go func(config *apiconfig.IntegrationConfig) {
 			defer wg.Done()
-			var conf map[string]any
+			var (
+				conf map[string]any
+				buf  bytes.Buffer
+			)
 
-			if dsConfig.Config != nil {
-				if err := json.Unmarshal(dsConfig.Config, &conf); err != nil {
-					errChan <- &errorReport{
-						integrationID: config.ID,
-						error:         fmt.Errorf("error parsing database config: %w", err),
-					}
-					return
-				}
-			} else {
-				conf = dsConfig.NewConfig
-			}
-
-			for k, r := range conf {
-				switch v := r.(type) {
-				case string:
-					tmpl, err := template.New("config").Funcs(template.FuncMap{
-						"secret": func(key string) string {
-							return secrets.FetchSecret(key)
-						},
-					}).Parse(v)
-					if err != nil {
-						errChan <- &errorReport{
-							integrationID: config.ID,
-							error:         fmt.Errorf("error parsing database config: %w", err),
-						}
-						return
-					}
-
-					var buf bytes.Buffer
-					if err := tmpl.Execute(&buf, k); err != nil {
-						errChan <- &errorReport{
-							integrationID: config.ID,
-							error:         fmt.Errorf("error executing database config: %w", err),
-						}
-						return
-					}
-					conf[k] = buf.String()
-				default:
-
+			confStr, err := json.Marshal(config.Config)
+			if err != nil {
+				errChan <- &errorReport{
+					integrationID: config.ID,
+					error:         fmt.Errorf("could not marshal integration config: %w", err),
 				}
 			}
 
-			if err := InitializeIntegration(dsConfig.Type, dsConfig.ID, conf); err != nil {
+			confParsed := parseString(string(confStr))
+			tmpl, err := template.New("config").Funcs(template.FuncMap{
+				"secret": func(key string) string {
+					return secrets.FetchSecret(key)
+				},
+			}).Parse(confParsed)
+
+			if err != nil {
+				errChan <- &errorReport{
+					integrationID: config.ID,
+					error:         err,
+				}
+				return
+			}
+
+			if err := tmpl.Execute(&buf, map[string]string{}); err != nil {
+				errChan <- &errorReport{
+					integrationID: config.ID,
+					error:         err,
+				}
+			}
+			if err := json.Unmarshal(buf.Bytes(), &conf); err != nil {
+				errChan <- &errorReport{
+					integrationID: config.ID,
+					error:         err,
+				}
+			}
+
+			if err := InitializeIntegration(dsConfig.Type, dsConfig.ID, conf, dsConfig.LazyLoad); err != nil {
 				errChan <- &errorReport{
 					integrationID: config.ID,
 					error:         fmt.Errorf("error initializing integration with ID %s and type %s: %w", dsConfig.ID, dsConfig.Type, err),
@@ -243,4 +315,8 @@ func RegisterIntegrationsFromConfig(integrationsConfig []apiconfig.IntegrationCo
 			return nil
 		}
 	}
+}
+
+func parseString(s string) string {
+	return strings.ReplaceAll(s, `\"`, `"`)
 }

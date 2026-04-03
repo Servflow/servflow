@@ -38,6 +38,13 @@
     "mcpTool": {
       "$ref": "#/definitions/MCPToolConfig",
       "description": "MCP tool configuration"
+    },
+    "integrations": {
+      "type": ["object", "null"],
+      "description": "Map of integration configurations",
+      "additionalProperties": {
+        "$ref": "#/definitions/IntegrationConfig"
+      }
     }
   },
   "required": ["id"],
@@ -254,6 +261,24 @@
     "RequestType": {
       "type": "string",
       "enum": ["json", "form-data"]
+    },
+    "IntegrationConfig": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "config": {
+          "type": ["object", "null"]
+        },
+        "type": {
+          "type": "string"
+        },
+        "lazyLoad": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
     }
   }
 }

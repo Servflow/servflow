@@ -33,7 +33,7 @@ func TestFetchVector_Execute(t *testing.T) {
 			return mockIntegration, nil
 		})
 
-		err = integration.InitializeIntegration("mock", "mockid", nil)
+		err = integration.InitializeIntegration("mock", "mockid", nil, false)
 		require.NoError(t, err)
 
 		fetchVectorObj := FetchVector{
@@ -69,7 +69,7 @@ func TestFetchVector_Execute(t *testing.T) {
 			return mockIntegration, nil
 		})
 
-		err = integration.InitializeIntegration("mock", "mockid", nil)
+		err = integration.InitializeIntegration("mock", "mockid", nil, false)
 		require.NoError(t, err)
 
 		fetchVectorObj := FetchVector{

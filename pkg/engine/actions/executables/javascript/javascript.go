@@ -13,8 +13,8 @@ import (
 )
 
 type Executable struct {
-	compiledScript *goja.Program
-	compiledDeps   *goja.Program
+	compiledDeps *goja.Program
+	script       string
 }
 
 type Config struct {
@@ -27,12 +27,10 @@ func NewExecutable(cfg Config) (*Executable, error) {
 		return nil, fmt.Errorf("script is required")
 	}
 
-	compiledScript, err := goja.Compile("script", cfg.Script, false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to compile script: %w", err)
-	}
-
-	var compiledDeps *goja.Program
+	var (
+		err          error
+		compiledDeps *goja.Program
+	)
 	if cfg.Dependencies != "" {
 		compiledDeps, err = goja.Compile("dependencies", cfg.Dependencies, false)
 		if err != nil {
@@ -41,8 +39,8 @@ func NewExecutable(cfg Config) (*Executable, error) {
 	}
 
 	return &Executable{
-		compiledScript: compiledScript,
-		compiledDeps:   compiledDeps,
+		script:       cfg.Script,
+		compiledDeps: compiledDeps,
 	}, nil
 }
 
@@ -54,8 +52,10 @@ func (e *Executable) SupportsReplica() bool {
 	return true
 }
 
+// TODO save config in action not executable
+
 func (e *Executable) Config() string {
-	return ""
+	return e.script
 }
 
 func (e *Executable) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
@@ -71,7 +71,12 @@ func (e *Executable) Execute(ctx context.Context, modifiedConfig string) (interf
 		}
 	}
 
-	_, err := vm.RunProgram(e.compiledScript)
+	compiledScript, err := goja.Compile("script", modifiedConfig, false)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to compile script: %w", err)
+	}
+
+	_, err = vm.RunProgram(compiledScript)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to execute script: %w", err)
 	}

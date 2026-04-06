@@ -83,6 +83,10 @@ func requestTemplateFunctions(req *http.Request) template.FuncMap {
 				}
 				b = body
 			})
+			if len(key) == 0 {
+				quoted := strconv.Quote(string(b))
+				return quoted[1 : len(quoted)-1]
+			}
 			if len(b) > 0 {
 				v := gjson.GetBytes(b, key).String()
 				v = strconv.Quote(v)

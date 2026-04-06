@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
-	"github.com/Servflow/servflow/internal/http"
+	sfhttp "github.com/Servflow/servflow/internal/http"
 	"github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
@@ -17,7 +18,10 @@ import (
 
 type contextKey string
 
-const ContextKey contextKey = "planContextKey"
+const (
+	ContextKey        contextKey = "planContextKey"
+	RequestContextKey contextKey = "planRequestContextKey"
+)
 
 type Plan struct {
 	steps map[string]stepWrapper
@@ -45,6 +49,18 @@ type EndValueSpec struct {
 	FileVal   apiconfig.FileInput
 }
 
+func WithRequest(ctx context.Context, r *http.Request) context.Context {
+	return context.WithValue(ctx, RequestContextKey, r)
+}
+
+func RequestFromContext(ctx context.Context) (*http.Request, error) {
+	r, ok := ctx.Value(RequestContextKey).(*http.Request)
+	if !ok {
+		return nil, errors.New("request context is missing")
+	}
+	return r, nil
+}
+
 func ExecuteSingleAction(actionType string, config json.RawMessage) (any, map[string]string, error) {
 	exec, err := actions.GetActionExecutable(actionType, config)
 	if err != nil {
@@ -54,7 +70,7 @@ func ExecuteSingleAction(actionType string, config json.RawMessage) (any, map[st
 	return exec.Execute(context.Background(), string(config))
 }
 
-func (p *Plan) executeStep(ctx context.Context, step *stepWrapper, endValue *EndValueSpec) (*http.SfResponse, error) {
+func (p *Plan) executeStep(ctx context.Context, step *stepWrapper, endValue *EndValueSpec) (*sfhttp.SfResponse, error) {
 	select {
 	case <-ctx.Done():
 		return nil, ErrContextCanceled
@@ -87,12 +103,12 @@ func (p *Plan) executeStep(ctx context.Context, step *stepWrapper, endValue *End
 	return p.generateEndValue(ctx, logger, endValue)
 }
 
-func (p *Plan) generateEndValue(ctx context.Context, logger *zap.Logger, endValue *EndValueSpec) (*http.SfResponse, error) {
+func (p *Plan) generateEndValue(ctx context.Context, logger *zap.Logger, endValue *EndValueSpec) (*sfhttp.SfResponse, error) {
 	if endValue == nil {
 		return nil, nil
 	}
 
-	resp := &http.SfResponse{}
+	resp := &sfhttp.SfResponse{}
 	switch endValue.ValType {
 	case StringEndValue:
 		tmpl, err := requestctx.CreateTextTemplate(ctx, endValue.StringVal, nil)
@@ -115,7 +131,7 @@ func (p *Plan) generateEndValue(ctx context.Context, logger *zap.Logger, endValu
 	return resp, nil
 }
 
-func (p *Plan) Execute(ctx context.Context, id string, endValue *EndValueSpec) (*http.SfResponse, error) {
+func (p *Plan) Execute(ctx context.Context, id string, endValue *EndValueSpec) (*sfhttp.SfResponse, error) {
 	id = strings.TrimLeft(id, "$")
 	ctx = context.WithValue(ctx, ContextKey, p)
 	step, ok := p.steps[id]
@@ -126,7 +142,7 @@ func (p *Plan) Execute(ctx context.Context, id string, endValue *EndValueSpec) (
 	return p.executeStep(ctx, &step, endValue)
 }
 
-func ExecuteFromContext(ctx context.Context, id string, endValue *EndValueSpec) (*http.SfResponse, error) {
+func ExecuteFromContext(ctx context.Context, id string, endValue *EndValueSpec) (*sfhttp.SfResponse, error) {
 	plan, ok := ctx.Value(ContextKey).(*Plan)
 	if !ok {
 		return nil, errors.New("plan not found")

@@ -172,6 +172,8 @@ func (h *APIHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	ctx = plan.WithRequest(ctx, req)
+
 	resp, err := h.p.Execute(ctx, h.planStart, nil)
 	if err != nil || resp == nil {
 		if span != nil {

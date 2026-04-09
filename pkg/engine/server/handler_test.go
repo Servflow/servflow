@@ -76,6 +76,18 @@ func TestHandler_TemplateFunc(t *testing.T) {
 			expectedValue: "",
 		},
 		{
+			name: "body function returns full body for empty argument",
+			setupRequest: func() *http.Request {
+				jsonBody := `{"test":"value"}`
+				req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(jsonBody))
+				req.Header.Set("Content-Type", "application/json")
+				return req
+			},
+			testFunction:  "body",
+			argument:      "",
+			expectedValue: `{\"test\":\"value\"}`,
+		},
+		{
 			name: "body function returns nested JSON value",
 			setupRequest: func() *http.Request {
 				jsonBody := `{"nested": {"value": "nestedValue"}}`

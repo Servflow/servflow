@@ -85,7 +85,7 @@ func TestHandler_TemplateFunc(t *testing.T) {
 			},
 			testFunction:  "body",
 			argument:      "",
-			expectedValue: `{"test":"value"}`,
+			expectedValue: `{\"test\":\"value\"}`,
 		},
 		{
 			name: "body function returns nested JSON value",

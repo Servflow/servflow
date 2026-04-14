@@ -26,10 +26,20 @@ docker compose up --build --force-recreate -d
 popd
 
 # Run pytest with the Docker services running
+# Temporarily disable exit-on-error to capture exit code
+set +e
 pytest tests/ -v
-
-# Get the pytest exit code
 TEST_EXIT_CODE=$?
+set -e
+
+# Show servflow container logs if tests failed
+if [ $TEST_EXIT_CODE -ne 0 ]; then
+    echo "=== Tests failed. Showing servflow container logs ==="
+    pushd ./compose || exit
+    docker compose logs servflow
+    popd
+    echo "=== End of servflow logs ==="
+fi
 
 # Clean up Docker services
 pushd ./compose || exit

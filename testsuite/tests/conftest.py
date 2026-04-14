@@ -1,8 +1,9 @@
+import time
+from datetime import datetime
+from typing import Generator
+
 import pytest
 import requests
-import time
-from typing import Generator
-from datetime import datetime
 
 
 @pytest.fixture(scope="session")
@@ -38,12 +39,14 @@ def test_user() -> dict:
     return {
         "name": f"test_user_{timestamp}",
         "password": "test",
-        "email": f"test_{timestamp}@test.com"
+        "email": f"test_{timestamp}@test.com",
     }
 
 
 @pytest.fixture(scope="session")
-def api_session(base_url: str, api_health_check) -> Generator[requests.Session, None, None]:
+def api_session(
+    base_url: str, api_health_check
+) -> Generator[requests.Session, None, None]:
     """Fixture providing a session for making API requests."""
     session = requests.Session()
     yield session
@@ -55,23 +58,14 @@ def login_token(base_url: str, api_session: requests.Session, test_user: dict) -
     """Fixture to get a valid login token for the test user."""
     # First ensure the user is registered
     try:
-        api_session.post(
-            f"{base_url}/register",
-            data=test_user
-        )
+        api_session.post(f"{base_url}/register", data=test_user)
     except requests.RequestException:
         # User might already be registered, which is fine
         pass
 
     # Then login to get the token
-    login_data = {
-        "email": test_user["email"],
-        "password": test_user["password"]
-    }
-    response = api_session.post(
-        f"{base_url}/login",
-        data=login_data
-    )
+    login_data = {"email": test_user["email"], "password": test_user["password"]}
+    response = api_session.post(f"{base_url}/login", data=login_data)
     assert response.status_code == 200, "Failed to login and get token"
     json_response = response.json()
 

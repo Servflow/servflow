@@ -4,11 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 
 	"github.com/Servflow/servflow/pkg/engine/actions"
+	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/dop251/goja"
+	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 )
 
@@ -96,14 +99,51 @@ func (e *Executable) Execute(ctx context.Context, modifiedConfig string) (interf
 		return nil, nil, fmt.Errorf("failed to get request variables: %w", err)
 	}
 
-	varsValue := vm.ToValue(variables)
+	requestBody, params := getRequestBodyAndParams(ctx)
 
-	result, err := fn(goja.Undefined(), varsValue)
+	varsValue := vm.ToValue(variables)
+	requestBodyValue := vm.ToValue(requestBody)
+	paramsValue := vm.ToValue(params)
+
+	result, err := fn(goja.Undefined(), varsValue, requestBodyValue, paramsValue)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to execute servflowRun: %w", err)
 	}
 
 	return result.Export(), nil, nil
+}
+
+func getRequestBodyAndParams(ctx context.Context) (string, map[string]string) {
+	params := make(map[string]string)
+	requestBody := ""
+
+	req, err := plan.RequestFromContext(ctx)
+	if err != nil {
+		return requestBody, params
+	}
+
+	requestBody = requestctx.ReadAndRestoreBody(req)
+	params = getRequestParams(req)
+
+	return requestBody, params
+}
+
+func getRequestParams(req *http.Request) map[string]string {
+	params := make(map[string]string)
+
+	// Get URL path params from mux
+	for key, value := range mux.Vars(req) {
+		params[key] = value
+	}
+
+	// Get query params (URL params take precedence if same key exists)
+	for key, values := range req.URL.Query() {
+		if _, exists := params[key]; !exists && len(values) > 0 {
+			params[key] = values[0]
+		}
+	}
+
+	return params
 }
 
 func init() {

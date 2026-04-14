@@ -52,6 +52,48 @@ func TestHttp_Execute(t *testing.T) {
 			},
 		},
 		{
+			Name: "String Body with Special Characters",
+			Config: Config{
+				Method:  http.MethodPost,
+				Headers: map[string]string{"Content-Type": "application/json"},
+				Body:    json.RawMessage(`"string with \"quotes\", \\backslash, \n newline and \t tab"`),
+			},
+			Expected: map[string]interface{}{"received": true},
+			serverSetup: func(t *testing.T) string {
+				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					assert.Equal(t, r.Method, "POST")
+
+					bod, err := io.ReadAll(r.Body)
+					require.NoError(t, err)
+					assert.JSONEq(t, `"string with \"quotes\", \\backslash, \n newline and \t tab"`, string(bod))
+
+					w.Write([]byte(`{"received": true}`))
+				}))
+				return srv.URL
+			},
+		},
+		{
+			Name: "Integer Body",
+			Config: Config{
+				Method:  http.MethodPost,
+				Headers: map[string]string{"Content-Type": "application/json"},
+				Body:    json.RawMessage(`123`),
+			},
+			Expected: map[string]interface{}{"received": true},
+			serverSetup: func(t *testing.T) string {
+				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					assert.Equal(t, r.Method, "POST")
+
+					bod, err := io.ReadAll(r.Body)
+					require.NoError(t, err)
+					assert.Equal(t, "123", string(bod))
+
+					w.Write([]byte(`{"received": true}`))
+				}))
+				return srv.URL
+			},
+		},
+		{
 			Name: "has response path",
 			Config: Config{
 				Method:       http.MethodGet,

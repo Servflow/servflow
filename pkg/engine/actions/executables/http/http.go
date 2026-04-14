@@ -157,6 +157,9 @@ func init() {
 			Label:       "Request Body",
 			Placeholder: "Request body data",
 			Required:    false,
+			Metadata: map[string]string{
+				"type": "httpbody",
+			},
 		},
 		"responsePath": {
 			Type:        actions.FieldTypeString,

@@ -2,9 +2,14 @@ package javascript
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
+	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -193,4 +198,199 @@ func TestExecutable_Execute_NoContext(t *testing.T) {
 	_, _, err = exec.Execute(context.Background(), exec.Config())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get request variables")
+}
+
+func TestExecutable_Execute_RequestBody(t *testing.T) {
+	tests := []struct {
+		name     string
+		script   string
+		body     string
+		expected interface{}
+	}{
+		{
+			name:     "access raw request body",
+			script:   "function servflowRun(vars, request_body) { return request_body; }",
+			body:     `{"message":"hello"}`,
+			expected: `{"message":"hello"}`,
+		},
+		{
+			name:     "parse JSON request body",
+			script:   "function servflowRun(vars, request_body) { var data = JSON.parse(request_body); return data.message; }",
+			body:     `{"message":"hello world"}`,
+			expected: "hello world",
+		},
+		{
+			name:     "empty body returns empty string",
+			script:   "function servflowRun(vars, request_body) { return request_body === ''; }",
+			body:     "",
+			expected: true,
+		},
+		{
+			name:     "access body with nested JSON",
+			script:   "function servflowRun(vars, request_body) { var data = JSON.parse(request_body); return data.user.name; }",
+			body:     `{"user":{"name":"Alice","age":30}}`,
+			expected: "Alice",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			exec, err := NewExecutable(Config{Script: tt.script})
+			require.NoError(t, err)
+
+			ctx := requestctx.NewTestContext()
+			req := httptest.NewRequest(http.MethodPost, "/test", strings.NewReader(tt.body))
+			ctx = plan.WithRequest(ctx, req)
+
+			result, _, err := exec.Execute(ctx, tt.script)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestExecutable_Execute_Params(t *testing.T) {
+	tests := []struct {
+		name     string
+		script   string
+		setupReq func() *http.Request
+		expected interface{}
+	}{
+		{
+			name:   "access query params",
+			script: "function servflowRun(vars, request_body, params) { return params.id; }",
+			setupReq: func() *http.Request {
+				return httptest.NewRequest(http.MethodGet, "/test?id=123", nil)
+			},
+			expected: "123",
+		},
+		{
+			name:   "access multiple query params",
+			script: "function servflowRun(vars, request_body, params) { return params.name + '-' + params.age; }",
+			setupReq: func() *http.Request {
+				return httptest.NewRequest(http.MethodGet, "/test?name=John&age=30", nil)
+			},
+			expected: "John-30",
+		},
+		{
+			name:   "access URL path params",
+			script: "function servflowRun(vars, request_body, params) { return params.userId; }",
+			setupReq: func() *http.Request {
+				req := httptest.NewRequest(http.MethodGet, "/users/456", nil)
+				req = mux.SetURLVars(req, map[string]string{"userId": "456"})
+				return req
+			},
+			expected: "456",
+		},
+		{
+			name:   "URL path params take precedence over query params",
+			script: "function servflowRun(vars, request_body, params) { return params.id; }",
+			setupReq: func() *http.Request {
+				req := httptest.NewRequest(http.MethodGet, "/test?id=query", nil)
+				req = mux.SetURLVars(req, map[string]string{"id": "path"})
+				return req
+			},
+			expected: "path",
+		},
+		{
+			name:   "empty params returns empty object",
+			script: "function servflowRun(vars, request_body, params) { return Object.keys(params).length; }",
+			setupReq: func() *http.Request {
+				return httptest.NewRequest(http.MethodGet, "/test", nil)
+			},
+			expected: int64(0),
+		},
+		{
+			name:   "combined path and query params",
+			script: "function servflowRun(vars, request_body, params) { return params.userId + '-' + params.format; }",
+			setupReq: func() *http.Request {
+				req := httptest.NewRequest(http.MethodGet, "/users/789?format=json", nil)
+				req = mux.SetURLVars(req, map[string]string{"userId": "789"})
+				return req
+			},
+			expected: "789-json",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			exec, err := NewExecutable(Config{Script: tt.script})
+			require.NoError(t, err)
+
+			ctx := requestctx.NewTestContext()
+			req := tt.setupReq()
+			ctx = plan.WithRequest(ctx, req)
+
+			result, _, err := exec.Execute(ctx, tt.script)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestExecutable_Execute_AllParameters(t *testing.T) {
+	script := `function servflowRun(vars, request_body, params) {
+		var body = JSON.parse(request_body);
+		return {
+			varName: vars.name,
+			bodyMessage: body.message,
+			paramId: params.id
+		};
+	}`
+
+	exec, err := NewExecutable(Config{Script: script})
+	require.NoError(t, err)
+
+	ctx := requestctx.NewTestContext()
+	err = requestctx.AddRequestVariables(ctx, map[string]interface{}{"name": "TestUser"}, "")
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/test?id=999", strings.NewReader(`{"message":"hello"}`))
+	ctx = plan.WithRequest(ctx, req)
+
+	result, _, err := exec.Execute(ctx, script)
+	require.NoError(t, err)
+
+	expected := map[string]interface{}{
+		"varName":     "TestUser",
+		"bodyMessage": "hello",
+		"paramId":     "999",
+	}
+	assert.Equal(t, expected, result)
+}
+
+func TestExecutable_Execute_NoRequestInContext(t *testing.T) {
+	script := "function servflowRun(vars, request_body, params) { return { body: request_body, paramsCount: Object.keys(params).length }; }"
+
+	exec, err := NewExecutable(Config{Script: script})
+	require.NoError(t, err)
+
+	ctx := requestctx.NewTestContext()
+
+	result, _, err := exec.Execute(ctx, script)
+	require.NoError(t, err)
+
+	expected := map[string]interface{}{
+		"body":        "",
+		"paramsCount": int64(0),
+	}
+	assert.Equal(t, expected, result)
+}
+
+func TestExecutable_Execute_BackwardCompatibility(t *testing.T) {
+	script := "function servflowRun(vars) { return vars.value; }"
+
+	exec, err := NewExecutable(Config{Script: script})
+	require.NoError(t, err)
+
+	ctx := requestctx.NewTestContext()
+	err = requestctx.AddRequestVariables(ctx, map[string]interface{}{"value": "test"}, "")
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/test?id=123", strings.NewReader(`{"data":"ignored"}`))
+	ctx = plan.WithRequest(ctx, req)
+
+	result, _, err := exec.Execute(ctx, script)
+	require.NoError(t, err)
+	assert.Equal(t, "test", result)
 }

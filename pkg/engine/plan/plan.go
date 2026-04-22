@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
+	"time"
 
 	sfhttp "github.com/Servflow/servflow/internal/http"
 	"github.com/Servflow/servflow/pkg/apiconfig"
@@ -24,7 +26,8 @@ const (
 )
 
 type Plan struct {
-	steps map[string]stepWrapper
+	steps           map[string]stepWrapper
+	dispatchTimeout time.Duration
 }
 
 var (
@@ -149,4 +152,54 @@ func ExecuteFromContext(ctx context.Context, id string, endValue *EndValueSpec) 
 	}
 
 	return plan.Execute(ctx, id, endValue)
+}
+
+// BackgroundManager manages background goroutines for dispatched action chains.
+// It uses a server-level context that only cancels on server shutdown,
+// not when individual HTTP requests complete.
+type BackgroundManager struct {
+	baseCtx context.Context
+	cancel  context.CancelFunc
+	wg      sync.WaitGroup
+}
+
+var (
+	backgroundMgr     *BackgroundManager
+	backgroundMgrOnce sync.Once
+)
+
+// InitBackgroundManager initializes the singleton background manager with the given context.
+// This should be called once during server startup with a context that lives for the
+// lifetime of the server.
+func InitBackgroundManager(ctx context.Context) *BackgroundManager {
+	backgroundMgrOnce.Do(func() {
+		bgCtx, cancel := context.WithCancel(ctx)
+		backgroundMgr = &BackgroundManager{
+			baseCtx: bgCtx,
+			cancel:  cancel,
+		}
+	})
+	return backgroundMgr
+}
+
+// GetBackgroundManager returns the singleton background manager.
+// Returns nil if InitBackgroundManager has not been called.
+func GetBackgroundManager() *BackgroundManager {
+	return backgroundMgr
+}
+
+// Dispatch spawns a background goroutine that executes the given function.
+// The function receives the background context which only cancels on server shutdown.
+func (bm *BackgroundManager) Dispatch(fn func(ctx context.Context)) {
+	bm.wg.Add(1)
+	go func() {
+		defer bm.wg.Done()
+		fn(bm.baseCtx)
+	}()
+}
+
+// Shutdown cancels the background context and waits for all dispatched goroutines to complete.
+func (bm *BackgroundManager) Shutdown() {
+	bm.cancel()
+	bm.wg.Wait()
 }

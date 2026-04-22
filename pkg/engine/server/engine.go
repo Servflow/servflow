@@ -32,6 +32,7 @@ import (
 	_ "github.com/Servflow/servflow/pkg/engine/integration/integrations/openai"
 	_ "github.com/Servflow/servflow/pkg/engine/integration/integrations/qdrant"
 	_ "github.com/Servflow/servflow/pkg/engine/integration/integrations/sql"
+	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/engine/secrets"
 	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/Servflow/servflow/pkg/storage"
@@ -200,6 +201,8 @@ func (e *Engine) DoneChan() <-chan struct{} {
 func (e *Engine) Start() error {
 	e.ctx = logging.WithLogger(e.ctx, e.logger)
 
+	plan.InitBackgroundManager(e.ctx)
+
 	var integrationConfigs []apiconfig.IntegrationConfig
 	if e.directConfigs.EngineConfig != nil {
 		integrationConfigs = e.directConfigs.EngineConfig.GetIntegrationConfigs()
@@ -285,6 +288,10 @@ func (e *Engine) Stop() error {
 		e.idleTimer = nil
 	}
 	e.timerMutex.Unlock()
+
+	if bgMgr := plan.GetBackgroundManager(); bgMgr != nil {
+		bgMgr.Shutdown()
+	}
 
 	if e.tracerShutdown != nil {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

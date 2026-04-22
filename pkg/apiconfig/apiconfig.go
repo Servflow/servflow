@@ -87,6 +87,7 @@ type Action struct {
 	Next       string                 `json:"next" yaml:"next"`
 	Fail       string                 `json:"fail" yaml:"fail"`
 	UseReplica bool                   `json:"useReplica,omitempty" yaml:"useReplica,omitempty"`
+	Dispatch   []string               `json:"dispatch,omitempty" yaml:"dispatch,omitempty"`
 }
 
 type Conditional struct {

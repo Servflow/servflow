@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"sync"
 	"testing"
+	"time"
 
 	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/actions"
@@ -240,4 +242,75 @@ func TestExecuteSingleAction(t *testing.T) {
 		assert.Nil(t, result)
 		assert.Contains(t, err.Error(), "execution failed")
 	})
+}
+
+func resetBackgroundManager() {
+	backgroundMgr = nil
+	backgroundMgrOnce = sync.Once{}
+}
+
+func TestBackgroundManager_Dispatch(t *testing.T) {
+	defer resetBackgroundManager()
+
+	ctx := context.Background()
+	bgMgr := InitBackgroundManager(ctx)
+	require.NotNil(t, bgMgr)
+
+	executed := make(chan bool, 1)
+
+	bgMgr.Dispatch(func(ctx context.Context) {
+		executed <- true
+	})
+
+	select {
+	case <-executed:
+		// Success
+	case <-time.After(time.Second):
+		t.Fatal("dispatch function was not executed")
+	}
+}
+
+func TestBackgroundManager_Shutdown(t *testing.T) {
+	defer resetBackgroundManager()
+
+	ctx := context.Background()
+	bgMgr := InitBackgroundManager(ctx)
+	require.NotNil(t, bgMgr)
+
+	contextCancelled := make(chan bool, 1)
+
+	bgMgr.Dispatch(func(ctx context.Context) {
+		<-ctx.Done()
+		contextCancelled <- true
+	})
+
+	// Give the goroutine time to start
+	time.Sleep(10 * time.Millisecond)
+
+	bgMgr.Shutdown()
+
+	select {
+	case <-contextCancelled:
+		// Success - context was cancelled
+	case <-time.After(time.Second):
+		t.Fatal("context was not cancelled on shutdown")
+	}
+}
+
+func TestBackgroundManager_GetBeforeInit(t *testing.T) {
+	defer resetBackgroundManager()
+
+	bgMgr := GetBackgroundManager()
+	assert.Nil(t, bgMgr)
+}
+
+func TestBackgroundManager_InitReturnsSingleton(t *testing.T) {
+	defer resetBackgroundManager()
+
+	ctx := context.Background()
+	bgMgr1 := InitBackgroundManager(ctx)
+	bgMgr2 := InitBackgroundManager(ctx)
+
+	assert.Same(t, bgMgr1, bgMgr2)
+	assert.Same(t, bgMgr1, GetBackgroundManager())
 }

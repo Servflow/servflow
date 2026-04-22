@@ -29,6 +29,7 @@ type Action struct {
 	id         string
 	name       string
 	useReplica bool
+	dispatch   []string
 }
 
 var (
@@ -146,5 +147,55 @@ func (a *Action) execute(ctx context.Context) (*stepWrapper, error) {
 		}
 	}
 
+	// Fire off dispatch chains in background
+	a.dispatchBackgroundChains(ctx, logger)
+
 	return a.next, nil
+}
+
+// dispatchBackgroundChains spawns background goroutines for each dispatch target.
+// These chains run independently using the server's background context, so they
+// won't be cancelled when the HTTP request completes.
+func (a *Action) dispatchBackgroundChains(ctx context.Context, logger *zap.Logger) {
+	if len(a.dispatch) == 0 {
+		return
+	}
+
+	bgMgr := GetBackgroundManager()
+	if bgMgr == nil {
+		logger.Warn("background manager not initialized, skipping dispatch")
+		return
+	}
+
+	reqCtx, err := requestctx.FromContextOrError(ctx)
+	if err != nil {
+		logger.Error("failed to get request context for dispatch", zap.Error(err))
+		return
+	}
+
+	p, _ := ctx.Value(ContextKey).(*Plan)
+
+	for _, dispatchID := range a.dispatch {
+		dispatchID := dispatchID // capture for goroutine
+
+		logger.Debug("dispatching background chain", zap.String("dispatch_id", dispatchID))
+
+		bgMgr.Dispatch(func(bgCtx context.Context) {
+			// Apply dispatch timeout if configured
+			if p != nil && p.dispatchTimeout > 0 {
+				var cancel context.CancelFunc
+				bgCtx, cancel = context.WithTimeout(bgCtx, p.dispatchTimeout)
+				defer cancel()
+			}
+
+			bgCtx = requestctx.WithAggregationContext(bgCtx, reqCtx)
+			bgCtx = logging.WithLogger(bgCtx, logger.With(zap.String("dispatch_id", dispatchID)))
+			bgCtx = context.WithValue(bgCtx, ContextKey, p)
+
+			_, err := ExecuteFromContext(bgCtx, dispatchID, nil)
+			if err != nil {
+				logging.FromContext(bgCtx).Error("dispatch chain failed", zap.Error(err))
+			}
+		})
+	}
 }

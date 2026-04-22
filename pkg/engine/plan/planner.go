@@ -86,9 +86,14 @@ func (p *PlannerV2) Plan() (*Plan, error) {
 		}
 	}
 
+	dispatchTimeout := p.config.DispatchTimeout
+	if dispatchTimeout == 0 {
+		dispatchTimeout = time.Minute
+	}
+
 	return &Plan{
 		steps:           p.finalSteps,
-		dispatchTimeout: p.config.DispatchTimeout,
+		dispatchTimeout: dispatchTimeout,
 	}, nil
 }
 

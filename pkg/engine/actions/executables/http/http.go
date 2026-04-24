@@ -141,10 +141,10 @@ func init() {
 		"method": {
 			Type:        actions.FieldTypeString,
 			Label:       "HTTP Method",
-			Placeholder: "GET, POST, PUT, DELETE",
+			Placeholder: "GET, POST, PUT, DELETE, PATCH",
 			Required:    true,
 			Default:     "GET",
-			Values:      []string{"GET", "POST", "PUT", "DELETE"},
+			Values:      []string{"GET", "POST", "PUT", "DELETE", "PATCH"},
 		},
 		"headers": {
 			Type:        actions.FieldTypeMap,

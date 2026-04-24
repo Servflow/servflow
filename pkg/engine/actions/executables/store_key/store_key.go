@@ -38,22 +38,35 @@ func (s *StoreKey) SupportsReplica() bool {
 }
 
 func (s *StoreKey) Config() string {
-	return s.value
+	cfg := Config{
+		Key:   s.key,
+		Value: s.value,
+	}
+	configBytes, err := json.Marshal(cfg)
+	if err != nil {
+		return ""
+	}
+	return string(configBytes)
 }
 
 func (s *StoreKey) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
 	logger := logging.FromContext(ctx).With(zap.String("execution_type", s.Type()))
 	_ = logging.WithLogger(ctx, logger)
 
-	if s.key == "" {
+	var cfg Config
+	if err := json.Unmarshal([]byte(modifiedConfig), &cfg); err != nil {
+		return nil, nil, fmt.Errorf("failed to parse config: %w", err)
+	}
+
+	if cfg.Key == "" {
 		return nil, nil, errors.New("key cannot be empty")
 	}
 
-	if err := storage.Set(s.key, modifiedConfig); err != nil {
+	if err := storage.Set(cfg.Key, cfg.Value); err != nil {
 		return nil, nil, fmt.Errorf("failed to store key: %w", err)
 	}
 
-	return modifiedConfig, nil, nil
+	return cfg.Value, nil, nil
 }
 
 func init() {

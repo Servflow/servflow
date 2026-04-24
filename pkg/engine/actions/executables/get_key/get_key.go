@@ -3,26 +3,29 @@ package get_key
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/Servflow/servflow/pkg/engine/actions"
+	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/Servflow/servflow/pkg/storage"
 	"go.uber.org/zap"
 )
 
 type GetKey struct {
-	key string
+	key         string
+	failIfEmpty bool
 }
 
 type Config struct {
-	Key string `json:"key"`
+	Key         string `json:"key"`
+	FailIfEmpty bool   `json:"failIfEmpty"`
 }
 
 func NewExecutable(cfg Config) *GetKey {
 	return &GetKey{
-		key: cfg.Key,
+		key:         cfg.Key,
+		failIfEmpty: cfg.FailIfEmpty,
 	}
 }
 
@@ -35,23 +38,39 @@ func (g *GetKey) SupportsReplica() bool {
 }
 
 func (g *GetKey) Config() string {
-	return g.key
+	cfg := Config{
+		Key:         g.key,
+		FailIfEmpty: g.failIfEmpty,
+	}
+	configBytes, err := json.Marshal(cfg)
+	if err != nil {
+		return ""
+	}
+	return string(configBytes)
 }
 
 func (g *GetKey) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
 	logger := logging.FromContext(ctx).With(zap.String("execution_type", g.Type()))
 	_ = logging.WithLogger(ctx, logger)
 
-	if modifiedConfig == "" {
-		return nil, nil, errors.New("key cannot be empty")
+	var cfg Config
+	if err := json.Unmarshal([]byte(modifiedConfig), &cfg); err != nil {
+		return nil, nil, fmt.Errorf("failed to parse config: %w", err)
 	}
 
-	value, found, err := storage.Get(modifiedConfig)
+	if cfg.Key == "" {
+		return nil, nil, nil
+	}
+
+	value, found, err := storage.Get(cfg.Key)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get key: %w", err)
 	}
 
 	if !found {
+		if cfg.FailIfEmpty {
+			return nil, nil, fmt.Errorf("%w: key '%s' not found", plan.ErrFailure, cfg.Key)
+		}
 		return "", nil, nil
 	}
 
@@ -65,6 +84,13 @@ func init() {
 			Label:       "Key",
 			Placeholder: "Storage key to retrieve",
 			Required:    true,
+		},
+		"failIfEmpty": {
+			Type:        actions.FieldTypeBoolean,
+			Label:       "Fail if Empty",
+			Placeholder: "Treat missing key as failure",
+			Required:    false,
+			Default:     false,
 		},
 	}
 

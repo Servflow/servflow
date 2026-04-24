@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
-	"sync"
 	"testing"
 	"time"
 
@@ -244,16 +243,9 @@ func TestExecuteSingleAction(t *testing.T) {
 	})
 }
 
-func resetBackgroundManager() {
-	backgroundMgr = nil
-	backgroundMgrOnce = sync.Once{}
-}
-
 func TestBackgroundManager_Dispatch(t *testing.T) {
-	defer resetBackgroundManager()
-
 	ctx := context.Background()
-	bgMgr := InitBackgroundManager(ctx)
+	bgMgr := NewBackgroundManager(ctx)
 	require.NotNil(t, bgMgr)
 
 	executed := make(chan bool, 1)
@@ -271,10 +263,8 @@ func TestBackgroundManager_Dispatch(t *testing.T) {
 }
 
 func TestBackgroundManager_Shutdown(t *testing.T) {
-	defer resetBackgroundManager()
-
 	ctx := context.Background()
-	bgMgr := InitBackgroundManager(ctx)
+	bgMgr := NewBackgroundManager(ctx)
 	require.NotNil(t, bgMgr)
 
 	contextCancelled := make(chan bool, 1)
@@ -295,22 +285,4 @@ func TestBackgroundManager_Shutdown(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("context was not cancelled on shutdown")
 	}
-}
-
-func TestBackgroundManager_GetBeforeInit(t *testing.T) {
-	defer resetBackgroundManager()
-
-	bgMgr := GetBackgroundManager()
-	assert.Nil(t, bgMgr)
-}
-
-func TestBackgroundManager_InitReturnsSingleton(t *testing.T) {
-	defer resetBackgroundManager()
-
-	ctx := context.Background()
-	bgMgr1 := InitBackgroundManager(ctx)
-	bgMgr2 := InitBackgroundManager(ctx)
-
-	assert.Same(t, bgMgr1, bgMgr2)
-	assert.Same(t, bgMgr1, GetBackgroundManager())
 }

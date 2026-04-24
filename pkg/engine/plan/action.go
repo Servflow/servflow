@@ -161,9 +161,9 @@ func (a *Action) dispatchBackgroundChains(ctx context.Context, logger *zap.Logge
 		return
 	}
 
-	bgMgr := GetBackgroundManager()
+	bgMgr := BackgroundManagerFromContext(ctx)
 	if bgMgr == nil {
-		logger.Warn("background manager not initialized, skipping dispatch")
+		logger.Warn("background manager not in context, skipping dispatch")
 		return
 	}
 
@@ -174,6 +174,10 @@ func (a *Action) dispatchBackgroundChains(ctx context.Context, logger *zap.Logge
 	}
 
 	p, _ := ctx.Value(ContextKey).(*Plan)
+
+	// Capture the span context from the original request to propagate trace ID
+	// to background goroutines without establishing a parent-child relationship
+	spanCtx := trace.SpanContextFromContext(ctx)
 
 	for _, dispatchID := range a.dispatch {
 		dispatchID := dispatchID // capture for goroutine
@@ -186,6 +190,11 @@ func (a *Action) dispatchBackgroundChains(ctx context.Context, logger *zap.Logge
 				var cancel context.CancelFunc
 				bgCtx, cancel = context.WithTimeout(bgCtx, p.dispatchTimeout)
 				defer cancel()
+			}
+
+			// Embed the original span context so new spans continue the same trace
+			if spanCtx.IsValid() {
+				bgCtx = trace.ContextWithRemoteSpanContext(bgCtx, spanCtx)
 			}
 
 			bgCtx = requestctx.WithAggregationContext(bgCtx, reqCtx)

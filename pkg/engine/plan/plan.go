@@ -163,29 +163,28 @@ type BackgroundManager struct {
 	wg      sync.WaitGroup
 }
 
-var (
-	backgroundMgr     *BackgroundManager
-	backgroundMgrOnce sync.Once
-)
+const BackgroundManagerContextKey contextKey = "backgroundManagerContextKey"
 
-// InitBackgroundManager initializes the singleton background manager with the given context.
-// This should be called once during server startup with a context that lives for the
-// lifetime of the server.
-func InitBackgroundManager(ctx context.Context) *BackgroundManager {
-	backgroundMgrOnce.Do(func() {
-		bgCtx, cancel := context.WithCancel(ctx)
-		backgroundMgr = &BackgroundManager{
-			baseCtx: bgCtx,
-			cancel:  cancel,
-		}
-	})
-	return backgroundMgr
+// NewBackgroundManager creates a new background manager with the given context.
+// Each engine instance should create its own BackgroundManager.
+func NewBackgroundManager(ctx context.Context) *BackgroundManager {
+	bgCtx, cancel := context.WithCancel(ctx)
+	return &BackgroundManager{
+		baseCtx: bgCtx,
+		cancel:  cancel,
+	}
 }
 
-// GetBackgroundManager returns the singleton background manager.
-// Returns nil if InitBackgroundManager has not been called.
-func GetBackgroundManager() *BackgroundManager {
-	return backgroundMgr
+// WithBackgroundManager attaches a BackgroundManager to the context.
+func WithBackgroundManager(ctx context.Context, bm *BackgroundManager) context.Context {
+	return context.WithValue(ctx, BackgroundManagerContextKey, bm)
+}
+
+// BackgroundManagerFromContext retrieves the BackgroundManager from the context.
+// Returns nil if no BackgroundManager is attached.
+func BackgroundManagerFromContext(ctx context.Context) *BackgroundManager {
+	bm, _ := ctx.Value(BackgroundManagerContextKey).(*BackgroundManager)
+	return bm
 }
 
 // Dispatch spawns a background goroutine that executes the given function.

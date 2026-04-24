@@ -8,6 +8,7 @@ import (
 	"time"
 
 	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
+	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/mark3labs/mcp-go/server"
@@ -97,6 +98,9 @@ func (e *Engine) wrapMiddlewareWithReqIDLogger(logger *zap.Logger, handler http.
 		ctx := requestctx.WithAggregationContext(r.Context(), aggCtx)
 		logger := logger.With(zap.String("request_id", requestID), zap.String("method", r.Method), zap.String("path", r.URL.Path))
 		ctx = logging.WithLogger(ctx, logger)
+		if e.backgroundManager != nil {
+			ctx = plan.WithBackgroundManager(ctx, e.backgroundManager)
+		}
 		r = r.WithContext(ctx)
 
 		if e.requestHook != nil {

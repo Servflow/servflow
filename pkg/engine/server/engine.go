@@ -145,21 +145,22 @@ type DirectConfigs struct {
 }
 
 type Engine struct {
-	server         *http.Server
-	port           string
-	env            string
-	directConfigs  *DirectConfigs
-	mcpServer      *server.MCPServer
-	logger         *zap.Logger
-	ctx            context.Context
-	cancel         func()
-	idleTimeout    time.Duration
-	idleTimer      *time.Timer
-	timerMutex     sync.Mutex
-	tracerShutdown func(context.Context) error
-	requestHook    RequestHook
-	externalMode   bool
-	handler        http.HandlerFunc
+	server            *http.Server
+	port              string
+	env               string
+	directConfigs     *DirectConfigs
+	mcpServer         *server.MCPServer
+	logger            *zap.Logger
+	ctx               context.Context
+	cancel            func()
+	idleTimeout       time.Duration
+	idleTimer         *time.Timer
+	timerMutex        sync.Mutex
+	tracerShutdown    func(context.Context) error
+	requestHook       RequestHook
+	externalMode      bool
+	handler           http.HandlerFunc
+	backgroundManager *plan.BackgroundManager
 }
 
 func New(port, env string, opts ...Option) (*Engine, error) {
@@ -201,7 +202,7 @@ func (e *Engine) DoneChan() <-chan struct{} {
 func (e *Engine) Start() error {
 	e.ctx = logging.WithLogger(e.ctx, e.logger)
 
-	plan.InitBackgroundManager(e.ctx)
+	e.backgroundManager = plan.NewBackgroundManager(e.ctx)
 
 	var integrationConfigs []apiconfig.IntegrationConfig
 	if e.directConfigs.EngineConfig != nil {
@@ -289,8 +290,8 @@ func (e *Engine) Stop() error {
 	}
 	e.timerMutex.Unlock()
 
-	if bgMgr := plan.GetBackgroundManager(); bgMgr != nil {
-		bgMgr.Shutdown()
+	if e.backgroundManager != nil {
+		e.backgroundManager.Shutdown()
 	}
 
 	if e.tracerShutdown != nil {
@@ -331,6 +332,10 @@ func (e *Engine) ShutdownServer() error {
 		e.idleTimer = nil
 	}
 	e.timerMutex.Unlock()
+
+	if e.backgroundManager != nil {
+		e.backgroundManager.Shutdown()
+	}
 
 	if e.server != nil {
 		return e.server.Shutdown(context.Background())

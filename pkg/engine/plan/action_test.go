@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -397,19 +396,13 @@ func TestAction_ExecuteWithReplica(t *testing.T) {
 	})
 }
 
-func resetBackgroundManagerForActionTest() {
-	backgroundMgr = nil
-	backgroundMgrOnce = sync.Once{}
-}
-
 func TestAction_ExecuteWithDispatch(t *testing.T) {
 	t.Run("triggers background chains", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
-		defer resetBackgroundManagerForActionTest()
 
 		// Initialize background manager
-		bgMgr := InitBackgroundManager(context.Background())
+		bgMgr := NewBackgroundManager(context.Background())
 		require.NotNil(t, bgMgr)
 
 		mockExec := NewMockActionExecutable(ctrl)
@@ -433,6 +426,7 @@ func TestAction_ExecuteWithDispatch(t *testing.T) {
 		}
 
 		ctx := requestctx.NewTestContext()
+		ctx = WithBackgroundManager(ctx, bgMgr)
 		ctx = context.WithValue(ctx, ContextKey, p)
 
 		// Override the dispatch step to signal when executed
@@ -468,9 +462,8 @@ func TestAction_ExecuteWithDispatch(t *testing.T) {
 	t.Run("shares same RequestContext", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
-		defer resetBackgroundManagerForActionTest()
 
-		bgMgr := InitBackgroundManager(context.Background())
+		bgMgr := NewBackgroundManager(context.Background())
 		require.NotNil(t, bgMgr)
 
 		mockExec := NewMockActionExecutable(ctrl)
@@ -500,6 +493,7 @@ func TestAction_ExecuteWithDispatch(t *testing.T) {
 			},
 		}
 
+		ctx = WithBackgroundManager(ctx, bgMgr)
 		ctx = context.WithValue(ctx, ContextKey, p)
 
 		act := Action{
@@ -523,9 +517,8 @@ func TestAction_ExecuteWithDispatch(t *testing.T) {
 	t.Run("continues main flow without blocking", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
-		defer resetBackgroundManagerForActionTest()
 
-		bgMgr := InitBackgroundManager(context.Background())
+		bgMgr := NewBackgroundManager(context.Background())
 		require.NotNil(t, bgMgr)
 
 		mockExec := NewMockActionExecutable(ctrl)
@@ -537,6 +530,7 @@ func TestAction_ExecuteWithDispatch(t *testing.T) {
 		dispatchContinue := make(chan bool, 1)
 
 		ctx := requestctx.NewTestContext()
+		ctx = WithBackgroundManager(ctx, bgMgr)
 
 		p := &Plan{
 			steps: map[string]stepWrapper{
@@ -584,9 +578,8 @@ func TestAction_ExecuteWithDispatch(t *testing.T) {
 	t.Run("respects dispatch timeout from plan", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
-		defer resetBackgroundManagerForActionTest()
 
-		bgMgr := InitBackgroundManager(context.Background())
+		bgMgr := NewBackgroundManager(context.Background())
 		require.NotNil(t, bgMgr)
 
 		mockExec := NewMockActionExecutable(ctrl)
@@ -597,6 +590,7 @@ func TestAction_ExecuteWithDispatch(t *testing.T) {
 		contextTimedOut := make(chan bool, 1)
 
 		ctx := requestctx.NewTestContext()
+		ctx = WithBackgroundManager(ctx, bgMgr)
 
 		p := &Plan{
 			dispatchTimeout: 50 * time.Millisecond,

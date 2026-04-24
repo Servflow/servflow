@@ -32,7 +32,7 @@ type Write struct {
 }
 
 func (s *Write) Type() string {
-	return "store"
+	return "write"
 }
 
 func (s *Write) SupportsReplica() bool {

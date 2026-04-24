@@ -1,4 +1,5 @@
-package store
+//go:generate mockgen -source write.go -destination write_mock.go -package write
+package write
 
 import (
 	"context"
@@ -25,20 +26,20 @@ type Config struct {
 	Fields            map[string]interface{} `json:"fields"`
 }
 
-type Store struct {
+type Write struct {
 	cfg *Config
 	i   storageIntegrations
 }
 
-func (s *Store) Type() string {
+func (s *Write) Type() string {
 	return "store"
 }
 
-func (s *Store) SupportsReplica() bool {
+func (s *Write) SupportsReplica() bool {
 	return true
 }
 
-func New(config Config) (*Store, error) {
+func New(config Config) (*Write, error) {
 	if config.IntegrationID == "" {
 		return nil, errors.New("datasource is required")
 	}
@@ -55,13 +56,13 @@ func New(config Config) (*Store, error) {
 		return nil, errors.New("integration does not implement storageIntegrations")
 	}
 
-	return &Store{
+	return &Write{
 		cfg: &config,
 		i:   u,
 	}, nil
 }
 
-func (s *Store) Config() string {
+func (s *Write) Config() string {
 	filtersStr, err := json.Marshal(s.cfg.Fields)
 	if err != nil {
 		return ""
@@ -69,7 +70,7 @@ func (s *Store) Config() string {
 	return string(filtersStr)
 }
 
-func (s *Store) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
+func (s *Write) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
 	logger := logging.FromContext(ctx).With(zap.String("execution_type", s.Type()))
 	ctx = logging.WithLogger(ctx, logger)
 
@@ -121,7 +122,7 @@ func init() {
 	}
 
 	if err := actions.RegisterAction("store", actions.ActionRegistrationInfo{
-		Name:        "Store Data",
+		Name:        "Write Data",
 		Description: "Stores data records into database tables with field mapping",
 		Fields:      fields,
 		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {

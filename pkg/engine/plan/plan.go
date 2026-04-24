@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
+	"time"
 
 	sfhttp "github.com/Servflow/servflow/internal/http"
 	"github.com/Servflow/servflow/pkg/apiconfig"
@@ -24,7 +26,8 @@ const (
 )
 
 type Plan struct {
-	steps map[string]stepWrapper
+	steps           map[string]stepWrapper
+	dispatchTimeout time.Duration
 }
 
 var (
@@ -149,4 +152,53 @@ func ExecuteFromContext(ctx context.Context, id string, endValue *EndValueSpec) 
 	}
 
 	return plan.Execute(ctx, id, endValue)
+}
+
+// BackgroundManager manages background goroutines for dispatched action chains.
+// It uses a server-level context that only cancels on server shutdown,
+// not when individual HTTP requests complete.
+type BackgroundManager struct {
+	baseCtx context.Context
+	cancel  context.CancelFunc
+	wg      sync.WaitGroup
+}
+
+const BackgroundManagerContextKey contextKey = "backgroundManagerContextKey"
+
+// NewBackgroundManager creates a new background manager with the given context.
+// Each engine instance should create its own BackgroundManager.
+func NewBackgroundManager(ctx context.Context) *BackgroundManager {
+	bgCtx, cancel := context.WithCancel(ctx)
+	return &BackgroundManager{
+		baseCtx: bgCtx,
+		cancel:  cancel,
+	}
+}
+
+// WithBackgroundManager attaches a BackgroundManager to the context.
+func WithBackgroundManager(ctx context.Context, bm *BackgroundManager) context.Context {
+	return context.WithValue(ctx, BackgroundManagerContextKey, bm)
+}
+
+// BackgroundManagerFromContext retrieves the BackgroundManager from the context.
+// Returns nil if no BackgroundManager is attached.
+func BackgroundManagerFromContext(ctx context.Context) *BackgroundManager {
+	bm, _ := ctx.Value(BackgroundManagerContextKey).(*BackgroundManager)
+	return bm
+}
+
+// Dispatch spawns a background goroutine that executes the given function.
+// The function receives the background context which only cancels on server shutdown.
+func (bm *BackgroundManager) Dispatch(fn func(ctx context.Context)) {
+	bm.wg.Add(1)
+	go func() {
+		defer bm.wg.Done()
+		fn(bm.baseCtx)
+	}()
+}
+
+// Shutdown cancels the background context and waits for all dispatched goroutines to complete.
+func (bm *BackgroundManager) Shutdown() {
+	bm.cancel()
+	bm.wg.Wait()
 }

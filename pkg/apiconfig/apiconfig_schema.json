@@ -144,6 +144,12 @@
         },
         "fail": {
           "type": "string"
+        },
+        "dispatch": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": ["type"],

@@ -8,6 +8,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
@@ -393,6 +394,252 @@ func TestAction_ExecuteWithReplica(t *testing.T) {
 		assert.Nil(t, next)
 		assert.Contains(t, err.Error(), "direct execution error")
 	})
+}
+
+func TestAction_ExecuteWithDispatch(t *testing.T) {
+	t.Run("triggers background chains", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		// Initialize background manager
+		bgMgr := NewBackgroundManager(context.Background())
+		require.NotNil(t, bgMgr)
+
+		mockExec := NewMockActionExecutable(ctrl)
+		mockExec.EXPECT().Config().Return("")
+		mockExec.EXPECT().Execute(gomock.Any(), "").Return("response", nil, nil)
+		mockExec.EXPECT().SupportsReplica().Return(false)
+
+		dispatchExecuted := make(chan bool, 1)
+
+		// Create a mock dispatch step
+		dispatchStep := &testStep{id: "dispatch_action"}
+
+		// Create a plan with the dispatch step
+		p := &Plan{
+			steps: map[string]stepWrapper{
+				"action.dispatch_action": {
+					id:   "action.dispatch_action",
+					step: dispatchStep,
+				},
+			},
+		}
+
+		ctx := requestctx.NewTestContext()
+		ctx = WithBackgroundManager(ctx, bgMgr)
+		ctx = context.WithValue(ctx, ContextKey, p)
+
+		// Override the dispatch step to signal when executed
+		p.steps["action.dispatch_action"] = stepWrapper{
+			id: "action.dispatch_action",
+			step: &executableStep{
+				fn: func(ctx context.Context) (*stepWrapper, error) {
+					dispatchExecuted <- true
+					return nil, nil
+				},
+			},
+		}
+
+		act := Action{
+			exec:     mockExec,
+			id:       "test",
+			out:      "test",
+			dispatch: []string{"action.dispatch_action"},
+		}
+
+		next, err := act.execute(ctx)
+		assert.NoError(t, err)
+		assert.Nil(t, next)
+
+		select {
+		case <-dispatchExecuted:
+			// Success - dispatch was executed
+		case <-time.After(time.Second):
+			t.Fatal("dispatch chain was not executed")
+		}
+	})
+
+	t.Run("shares same RequestContext", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		bgMgr := NewBackgroundManager(context.Background())
+		require.NotNil(t, bgMgr)
+
+		mockExec := NewMockActionExecutable(ctrl)
+		mockExec.EXPECT().Config().Return("")
+		mockExec.EXPECT().Execute(gomock.Any(), "").Return("response", nil, nil)
+		mockExec.EXPECT().SupportsReplica().Return(false)
+
+		var capturedReqCtx *requestctx.RequestContext
+		dispatchDone := make(chan bool, 1)
+
+		ctx := requestctx.NewTestContext()
+		originalReqCtx, ok := requestctx.FromContext(ctx)
+		require.True(t, ok)
+
+		p := &Plan{
+			steps: map[string]stepWrapper{
+				"action.dispatch_action": {
+					id: "action.dispatch_action",
+					step: &executableStep{
+						fn: func(ctx context.Context) (*stepWrapper, error) {
+							capturedReqCtx, _ = requestctx.FromContext(ctx)
+							dispatchDone <- true
+							return nil, nil
+						},
+					},
+				},
+			},
+		}
+
+		ctx = WithBackgroundManager(ctx, bgMgr)
+		ctx = context.WithValue(ctx, ContextKey, p)
+
+		act := Action{
+			exec:     mockExec,
+			id:       "test",
+			out:      "test",
+			dispatch: []string{"action.dispatch_action"},
+		}
+
+		_, err := act.execute(ctx)
+		assert.NoError(t, err)
+
+		select {
+		case <-dispatchDone:
+			assert.Same(t, originalReqCtx, capturedReqCtx, "dispatch should use same RequestContext")
+		case <-time.After(time.Second):
+			t.Fatal("dispatch chain was not executed")
+		}
+	})
+
+	t.Run("continues main flow without blocking", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		bgMgr := NewBackgroundManager(context.Background())
+		require.NotNil(t, bgMgr)
+
+		mockExec := NewMockActionExecutable(ctrl)
+		mockExec.EXPECT().Config().Return("")
+		mockExec.EXPECT().Execute(gomock.Any(), "").Return("response", nil, nil)
+		mockExec.EXPECT().SupportsReplica().Return(false)
+
+		dispatchStarted := make(chan bool, 1)
+		dispatchContinue := make(chan bool, 1)
+
+		ctx := requestctx.NewTestContext()
+		ctx = WithBackgroundManager(ctx, bgMgr)
+
+		p := &Plan{
+			steps: map[string]stepWrapper{
+				"action.slow_dispatch": {
+					id: "action.slow_dispatch",
+					step: &executableStep{
+						fn: func(ctx context.Context) (*stepWrapper, error) {
+							dispatchStarted <- true
+							<-dispatchContinue // Block until signaled
+							return nil, nil
+						},
+					},
+				},
+			},
+		}
+
+		ctx = context.WithValue(ctx, ContextKey, p)
+
+		nextStep := &testStep{id: "next"}
+		act := Action{
+			exec:     mockExec,
+			id:       "test",
+			out:      "test",
+			next:     &stepWrapper{id: "next", step: nextStep},
+			dispatch: []string{"action.slow_dispatch"},
+		}
+
+		// Execute should return immediately without waiting for dispatch
+		next, err := act.execute(ctx)
+		assert.NoError(t, err)
+		assert.Equal(t, &stepWrapper{id: "next", step: nextStep}, next)
+
+		// Wait for dispatch to start
+		select {
+		case <-dispatchStarted:
+			// Good - dispatch started in background
+		case <-time.After(time.Second):
+			t.Fatal("dispatch did not start")
+		}
+
+		// Signal dispatch to continue so test can clean up
+		close(dispatchContinue)
+	})
+
+	t.Run("respects dispatch timeout from plan", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		bgMgr := NewBackgroundManager(context.Background())
+		require.NotNil(t, bgMgr)
+
+		mockExec := NewMockActionExecutable(ctrl)
+		mockExec.EXPECT().Config().Return("")
+		mockExec.EXPECT().Execute(gomock.Any(), "").Return("response", nil, nil)
+		mockExec.EXPECT().SupportsReplica().Return(false)
+
+		contextTimedOut := make(chan bool, 1)
+
+		ctx := requestctx.NewTestContext()
+		ctx = WithBackgroundManager(ctx, bgMgr)
+
+		p := &Plan{
+			dispatchTimeout: 50 * time.Millisecond,
+			steps: map[string]stepWrapper{
+				"action.slow_action": {
+					id: "action.slow_action",
+					step: &executableStep{
+						fn: func(ctx context.Context) (*stepWrapper, error) {
+							select {
+							case <-ctx.Done():
+								contextTimedOut <- true
+							case <-time.After(time.Second):
+								contextTimedOut <- false
+							}
+							return nil, nil
+						},
+					},
+				},
+			},
+		}
+
+		ctx = context.WithValue(ctx, ContextKey, p)
+
+		act := Action{
+			exec:     mockExec,
+			id:       "test",
+			out:      "test",
+			dispatch: []string{"action.slow_action"},
+		}
+
+		_, err := act.execute(ctx)
+		assert.NoError(t, err)
+
+		select {
+		case timedOut := <-contextTimedOut:
+			assert.True(t, timedOut, "dispatch context should have timed out")
+		case <-time.After(time.Second):
+			t.Fatal("test timed out waiting for dispatch")
+		}
+	})
+}
+
+// executableStep is a test helper that wraps a function as a Step
+type executableStep struct {
+	fn func(ctx context.Context) (*stepWrapper, error)
+}
+
+func (e *executableStep) execute(ctx context.Context) (*stepWrapper, error) {
+	return e.fn(ctx)
 }
 
 func TestActionTemplateFunctions(t *testing.T) {

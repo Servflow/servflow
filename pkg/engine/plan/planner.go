@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/actions"
@@ -33,6 +34,10 @@ type PlannerConfig struct {
 	// EndValue is the value to be used as the ending of this plan, it can be
 	// raw string or go template
 	EndValue string
+
+	// DispatchTimeout is the timeout duration for background dispatch chains.
+	// If not set or set to 0, background actions will run without a timeout.
+	DispatchTimeout time.Duration
 
 	CustomRegistry *actions.Registry
 	Actions        map[string]apiconfig.Action
@@ -81,8 +86,14 @@ func (p *PlannerV2) Plan() (*Plan, error) {
 		}
 	}
 
+	dispatchTimeout := p.config.DispatchTimeout
+	if dispatchTimeout == 0 {
+		dispatchTimeout = time.Minute
+	}
+
 	return &Plan{
-		steps: p.finalSteps,
+		steps:           p.finalSteps,
+		dispatchTimeout: dispatchTimeout,
 	}, nil
 }
 
@@ -193,6 +204,7 @@ func (p *PlannerV2) generateActionStep(id string) (*Action, error) {
 		out:        out,
 		exec:       exec,
 		useReplica: a.UseReplica,
+		dispatch:   a.Dispatch,
 	}, nil
 }
 

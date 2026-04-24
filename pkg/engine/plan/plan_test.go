@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"testing"
+	"time"
 
 	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/actions"
@@ -240,4 +241,48 @@ func TestExecuteSingleAction(t *testing.T) {
 		assert.Nil(t, result)
 		assert.Contains(t, err.Error(), "execution failed")
 	})
+}
+
+func TestBackgroundManager_Dispatch(t *testing.T) {
+	ctx := context.Background()
+	bgMgr := NewBackgroundManager(ctx)
+	require.NotNil(t, bgMgr)
+
+	executed := make(chan bool, 1)
+
+	bgMgr.Dispatch(func(ctx context.Context) {
+		executed <- true
+	})
+
+	select {
+	case <-executed:
+		// Success
+	case <-time.After(time.Second):
+		t.Fatal("dispatch function was not executed")
+	}
+}
+
+func TestBackgroundManager_Shutdown(t *testing.T) {
+	ctx := context.Background()
+	bgMgr := NewBackgroundManager(ctx)
+	require.NotNil(t, bgMgr)
+
+	contextCancelled := make(chan bool, 1)
+
+	bgMgr.Dispatch(func(ctx context.Context) {
+		<-ctx.Done()
+		contextCancelled <- true
+	})
+
+	// Give the goroutine time to start
+	time.Sleep(10 * time.Millisecond)
+
+	bgMgr.Shutdown()
+
+	select {
+	case <-contextCancelled:
+		// Success - context was cancelled
+	case <-time.After(time.Second):
+		t.Fatal("context was not cancelled on shutdown")
+	}
 }

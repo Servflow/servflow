@@ -116,12 +116,7 @@ func NewSession(developerInstructions string, llm LLmProvider, options ...Option
 		messages:     make([]any, 0),
 		llmResponses: make([]LLMResponse, 0),
 	}
-
-	agent.messages = append(agent.messages, MessageTypeContent{
-		Message: Message{Type: MessageTypeText},
-		Role:    RoleTypeDeveloper,
-		Content: developerInstructions,
-	})
+	agent.customInstructions = developerInstructions
 
 	for _, option := range options {
 		if err := option(agent); err != nil {
@@ -200,9 +195,6 @@ func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 		for !endTurn {
 			iterations++
 			systemMessage := string(instructions)
-			if a.customInstructions != "" {
-				systemMessage = a.customInstructions
-			}
 			// On the final permitted iteration, withhold tools so the model has to
 			// answer from what it already gathered rather than calling more tools.
 			reqTools := toolList
@@ -216,6 +208,7 @@ func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 				Tools:         reqTools,
 				Messages:      a.messages,
 				SystemMessage: systemMessage,
+				Instruction:   a.customInstructions,
 			})
 			if err != nil {
 				out <- agentOutput{err: fmt.Errorf("error from llm: %w", err)}

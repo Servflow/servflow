@@ -266,6 +266,7 @@ func TestConvertAgentRequestToSDKParams(t *testing.T) {
 	t.Run("basic request with text messages", func(t *testing.T) {
 		req := &agent.LLMRequest{
 			SystemMessage: "You are a helpful assistant.",
+			Instruction:   "Be concise.",
 			Messages: []any{
 				agent.MessageTypeContent{
 					Role:    agent.RoleTypeUser,
@@ -279,8 +280,13 @@ func TestConvertAgentRequestToSDKParams(t *testing.T) {
 
 		assert.Equal(t, "gpt-4", params.Model)
 		assert.Equal(t, "You are a helpful assistant.", params.Instructions.Value)
-		require.Len(t, params.Input.OfInputItemList, 1)
-		inputItem := params.Input.OfInputItemList[0]
+		require.Len(t, params.Input.OfInputItemList, 2)
+		instructionItem := params.Input.OfInputItemList[0]
+		require.NotNil(t, instructionItem.OfMessage)
+		assert.Equal(t, responses.EasyInputMessageRole("developer"), instructionItem.OfMessage.Role)
+		require.Len(t, instructionItem.OfMessage.Content.OfInputItemContentList, 1)
+		assert.Equal(t, "Be concise.", instructionItem.OfMessage.Content.OfInputItemContentList[0].OfInputText.Text)
+		inputItem := params.Input.OfInputItemList[1]
 		require.NotNil(t, inputItem.OfMessage)
 		assert.Equal(t, responses.EasyInputMessageRole("user"), inputItem.OfMessage.Role)
 		require.Len(t, inputItem.OfMessage.Content.OfInputItemContentList, 1)
@@ -374,6 +380,7 @@ func TestConvertAgentRequestToSDKParams(t *testing.T) {
 	t.Run("empty request", func(t *testing.T) {
 		req := &agent.LLMRequest{
 			SystemMessage: "",
+			Instruction:   "",
 			Messages:      []any{},
 			Tools:         []agent.ToolInfo{},
 		}
@@ -384,6 +391,28 @@ func TestConvertAgentRequestToSDKParams(t *testing.T) {
 		assert.Equal(t, "", params.Instructions.Value)
 		assert.Empty(t, params.Input.OfInputItemList)
 		assert.Empty(t, params.Tools)
+	})
+
+	t.Run("instruction is prepended as developer message", func(t *testing.T) {
+		req := &agent.LLMRequest{
+			SystemMessage: "Base system prompt",
+			Instruction:   "Action-level instruction",
+			Messages: []any{
+				agent.MessageTypeContent{
+					Role:    agent.RoleTypeUser,
+					Content: "Hello",
+				},
+			},
+		}
+
+		params := convertAgentRequestToSDKParams(logger, req, "gpt-4")
+
+		require.Len(t, params.Input.OfInputItemList, 2)
+		require.NotNil(t, params.Input.OfInputItemList[0].OfMessage)
+		assert.Equal(t, responses.EasyInputMessageRole("developer"), params.Input.OfInputItemList[0].OfMessage.Role)
+		assert.Equal(t, "Action-level instruction", params.Input.OfInputItemList[0].OfMessage.Content.OfInputItemContentList[0].OfInputText.Text)
+		require.NotNil(t, params.Input.OfInputItemList[1].OfMessage)
+		assert.Equal(t, responses.EasyInputMessageRole("user"), params.Input.OfInputItemList[1].OfMessage.Role)
 	})
 }
 

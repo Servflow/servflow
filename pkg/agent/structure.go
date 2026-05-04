@@ -28,6 +28,7 @@ const (
 
 type LLMRequest struct {
 	SystemMessage string
+	Instruction   string
 	Messages      []any
 	Tools         []ToolInfo `json:"tools"`
 }

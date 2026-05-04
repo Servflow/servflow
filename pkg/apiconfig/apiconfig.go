@@ -33,6 +33,7 @@ const (
 )
 
 type APIConfig struct {
+	Name         string                       `json:"name" yaml:"name"`
 	ID           string                       `json:"id" yaml:"id"`
 	Actions      map[string]Action            `json:"actions" yaml:"actions"`
 	Conditionals map[string]Conditional       `json:"conditionals" yaml:"conditionals"`

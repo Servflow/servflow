@@ -10,6 +10,10 @@
       "minLength": 1,
       "description": "Unique identifier for the API configuration"
     },
+    "name": {
+      "type": "string",
+      "description": "Name of the config for this API"
+    },
     "actions": {
       "type": ["object", "null"],
       "description": "Map of action configurations",

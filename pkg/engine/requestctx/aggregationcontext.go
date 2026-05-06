@@ -114,6 +114,8 @@ func AddRequestVariables(ctx context.Context, variables map[string]interface{}, 
 
 // TODO remove prefix
 func (rc *RequestContext) addRequestVariables(variables map[string]interface{}, prefix string) {
+	rc.Lock()
+	defer rc.Unlock()
 	for k, v := range variables {
 		key := fmt.Sprintf("%s%s", prefix, k)
 		rc.requestVariables[key] = v

@@ -38,15 +38,8 @@ func TestNewOrchestrator(t *testing.T) {
 	mockToolManager := NewMockToolManager(ctrl)
 	orchestrator, err := NewSession("You are an agent for a restaurant review system", nil, WithToolManager(mockToolManager))
 	require.NoError(t, err)
-
-	expectedMessages := []any{
-		MessageTypeContent{
-			Message: Message{Type: MessageTypeText},
-			Role:    RoleTypeDeveloper,
-			Content: "You are an agent for a restaurant review system",
-		},
-	}
-	assert.Equal(t, expectedMessages, orchestrator.messages)
+	assert.Empty(t, orchestrator.messages)
+	assert.Equal(t, "You are an agent for a restaurant review system", orchestrator.customInstructions)
 }
 
 func TestOrchestrator_TestQuery(t *testing.T) {
@@ -388,7 +381,7 @@ func TestSession_ConversationIDMessageRetrieval(t *testing.T) {
 		assert.Contains(t, result, "The weather in New York is cloudy with 22°C")
 
 		// Verify messages were stored in session
-		assert.Equal(t, 6, len(session.messages))
+		assert.Equal(t, 5, len(session.messages))
 
 		t.Run("new session retrieves stored messages and continues conversation", func(t *testing.T) {
 			mockToolManager2 := NewMockToolManager(ctrl)
@@ -431,50 +424,44 @@ func TestSession_ConversationIDMessageRetrieval(t *testing.T) {
 					ProvideResponse(gomock.Any(), gomock.Any()).
 					Do(func(ctx context.Context, req LLMRequest) {
 						// Verify that the retrieved messages include all the previous conversation
-						assert.Equal(t, 7, len(req.Messages)) // Developer + User + Assistant + ToolCall + ToolResponse+ initial response + new User query
+						assert.Equal(t, 6, len(req.Messages))
 
 						// Verify message types and content
 						messages := req.Messages
 
-						// First message should be developer instruction
-						developerMsg, ok := messages[0].(MessageTypeContent)
-						assert.True(t, ok)
-						assert.Equal(t, RoleTypeDeveloper, developerMsg.Role)
-						assert.Equal(t, systemPrompt, developerMsg.Content)
-
-						// Second message should be first user query
-						userMsg1, ok := messages[1].(MessageTypeContent)
+						// First message should be first user query
+						userMsg1, ok := messages[0].(MessageTypeContent)
 						assert.True(t, ok)
 						assert.Equal(t, RoleTypeUser, userMsg1.Role)
 						assert.Equal(t, testQuery1, userMsg1.Content)
 
-						// Third message should be assistant response
-						assistantMsg1, ok := messages[2].(MessageTypeContent)
+						// Second message should be assistant response
+						assistantMsg1, ok := messages[1].(MessageTypeContent)
 						assert.True(t, ok)
 						assert.Equal(t, RoleTypeAssistant, assistantMsg1.Role)
 						assert.Contains(t, assistantMsg1.Content, "I'll check the weather for New York")
 
-						// Fourth message should be tool call
-						toolCallMsg, ok := messages[3].(MessageToolCall)
+						// Third message should be tool call
+						toolCallMsg, ok := messages[2].(MessageToolCall)
 						assert.True(t, ok)
 						assert.Equal(t, "weather_ny_001", toolCallMsg.ID)
 						assert.Equal(t, "get_weather", toolCallMsg.Name)
 						assert.Equal(t, map[string]interface{}{"location": "New York"}, toolCallMsg.Arguments)
 
-						// Fifth message should be tool response
-						toolResponseMsg, ok := messages[4].(MessageToolCallResponse)
+						// Fourth message should be tool response
+						toolResponseMsg, ok := messages[3].(MessageToolCallResponse)
 						assert.True(t, ok)
 						assert.Equal(t, "weather_ny_001", toolResponseMsg.ID)
 						assert.Equal(t, "Temperature: 22°C, Condition: Cloudy", toolResponseMsg.Text)
 
-						//sixth message should be llm second response
-						assistantMsg2, ok := messages[5].(MessageTypeContent)
+						// Fifth message should be llm second response
+						assistantMsg2, ok := messages[4].(MessageTypeContent)
 						assert.True(t, ok)
 						assert.Equal(t, RoleTypeAssistant, assistantMsg2.Role)
 						assert.Equal(t, "The weather in New York is cloudy with 22°C", assistantMsg2.Content)
 
-						// seventh message should be the new user query
-						userMsg2, ok := messages[6].(MessageTypeContent)
+						// Sixth message should be the new user query
+						userMsg2, ok := messages[5].(MessageTypeContent)
 						assert.True(t, ok)
 						assert.Equal(t, RoleTypeUser, userMsg2.Role)
 						assert.Equal(t, testQuery2, userMsg2.Content)
@@ -493,41 +480,35 @@ func TestSession_ConversationIDMessageRetrieval(t *testing.T) {
 			require.NoError(t, err)
 
 			// Verify that messages were loaded from storage + developer message
-			assert.Equal(t, 6, len(newSession.messages))
+			assert.Equal(t, 5, len(newSession.messages))
 
 			// Verify the loaded messages match what we expect
 			messages := newSession.messages
 
-			// Check developer message
-			developerMsg, ok := messages[0].(MessageTypeContent)
-			assert.True(t, ok)
-			assert.Equal(t, RoleTypeDeveloper, developerMsg.Role)
-			assert.Equal(t, systemPrompt, developerMsg.Content)
-
 			// Check first user message
-			userMsg1, ok := messages[1].(MessageTypeContent)
+			userMsg1, ok := messages[0].(MessageTypeContent)
 			assert.True(t, ok)
 			assert.Equal(t, RoleTypeUser, userMsg1.Role)
 			assert.Equal(t, testQuery1, userMsg1.Content)
 
 			// Check assistant message
-			assistantMsg1, ok := messages[2].(MessageTypeContent)
+			assistantMsg1, ok := messages[1].(MessageTypeContent)
 			assert.True(t, ok)
 			assert.Equal(t, RoleTypeAssistant, assistantMsg1.Role)
 
 			// Check tool call message
-			toolCallMsg, ok := messages[3].(MessageToolCall)
+			toolCallMsg, ok := messages[2].(MessageToolCall)
 			assert.True(t, ok)
 			assert.Equal(t, "weather_ny_001", toolCallMsg.ID)
 			assert.Equal(t, "get_weather", toolCallMsg.Name)
 
 			// Check tool response message
-			toolResponseMsg, ok := messages[4].(MessageToolCallResponse)
+			toolResponseMsg, ok := messages[3].(MessageToolCallResponse)
 			assert.True(t, ok)
 			assert.Equal(t, "weather_ny_001", toolResponseMsg.ID)
 
 			// check assistant response
-			assistantMsg2, ok := messages[5].(MessageTypeContent)
+			assistantMsg2, ok := messages[4].(MessageTypeContent)
 			assert.True(t, ok)
 			assert.Equal(t, RoleTypeAssistant, assistantMsg2.Role)
 			assert.Equal(t, "The weather in New York is cloudy with 22°C", assistantMsg2.Content)
@@ -793,7 +774,8 @@ func TestWithInstructions(t *testing.T) {
 	mockLLmHandler.EXPECT().
 		ProvideResponse(gomock.Any(), gomock.Any()).
 		Do(func(ctx context.Context, req LLMRequest) {
-			assert.Equal(t, testInstructions, req.SystemMessage)
+			assert.Equal(t, string(instructions), req.SystemMessage)
+			assert.Equal(t, testInstructions, req.Instruction)
 		}).
 		Return(LLMResponse{
 			Content: []ContentResponse{{Text: "Response using custom instructions"}},

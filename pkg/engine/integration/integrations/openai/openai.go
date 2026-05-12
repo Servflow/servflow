@@ -109,6 +109,9 @@ func convertAgentRequestToSDKParams(logger *zap.Logger, req *agent.LLMRequest, m
 	}
 
 	inputItems := make([]responses.ResponseInputItemUnionParam, 0)
+	if req.Instruction != "" {
+		inputItems = append(inputItems, buildInstructionInput(req.Instruction))
+	}
 
 	for _, m := range req.Messages {
 		switch val := m.(type) {
@@ -149,6 +152,25 @@ func convertAgentRequestToSDKParams(logger *zap.Logger, req *agent.LLMRequest, m
 	}
 
 	return params
+}
+
+func buildInstructionInput(instruction string) responses.ResponseInputItemUnionParam {
+	return responses.ResponseInputItemUnionParam{
+		OfMessage: &responses.EasyInputMessageParam{
+			Role: responses.EasyInputMessageRole("developer"),
+			Content: responses.EasyInputMessageContentUnionParam{
+				OfInputItemContentList: []responses.ResponseInputContentUnionParam{
+					{
+						OfInputText: &responses.ResponseInputTextParam{
+							Type: "input_text",
+							Text: instruction,
+						},
+					},
+				},
+			},
+			Type: "message",
+		},
+	}
 }
 
 func buildMessageInput(logger *zap.Logger, val agent.MessageTypeContent) responses.ResponseInputItemUnionParam {

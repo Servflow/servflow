@@ -114,12 +114,7 @@ func NewSession(developerInstructions string, llm LLmProvider, options ...Option
 		llm:      llm,
 		messages: make([]any, 0),
 	}
-
-	agent.messages = append(agent.messages, MessageTypeContent{
-		Message: Message{Type: MessageTypeText},
-		Role:    RoleTypeDeveloper,
-		Content: developerInstructions,
-	})
+	agent.customInstructions = developerInstructions
 
 	for _, option := range options {
 		if err := option(agent); err != nil {
@@ -178,13 +173,11 @@ func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 		endTurn := false
 		for !endTurn {
 			systemMessage := string(instructions)
-			if a.customInstructions != "" {
-				systemMessage = a.customInstructions
-			}
 			r, err := a.llm.ProvideResponse(ctx, LLMRequest{
 				Tools:         toolList,
 				Messages:      a.messages,
 				SystemMessage: systemMessage,
+				Instruction:   a.customInstructions,
 			})
 			if err != nil {
 				out <- agentOutput{err: fmt.Errorf("error from llm: %w", err)}

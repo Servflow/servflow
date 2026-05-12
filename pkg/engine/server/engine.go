@@ -31,8 +31,8 @@ import (
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/write"
 
 	"github.com/Servflow/servflow/pkg/engine/integration"
-	_ "github.com/Servflow/servflow/pkg/engine/integration/integrations/mongo"
 	_ "github.com/Servflow/servflow/pkg/engine/integration/integrations/claude"
+	_ "github.com/Servflow/servflow/pkg/engine/integration/integrations/mongo"
 	_ "github.com/Servflow/servflow/pkg/engine/integration/integrations/openai"
 	_ "github.com/Servflow/servflow/pkg/engine/integration/integrations/qdrant"
 	_ "github.com/Servflow/servflow/pkg/engine/integration/integrations/sql"

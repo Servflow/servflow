@@ -125,8 +125,8 @@ func TestConvertAgentRequestToSDKParams(t *testing.T) {
 			SystemMessage: "Base system prompt",
 			Messages: []any{
 				agent.MessageTypeContent{
-					Role:        agent.RoleTypeUser,
-					Content:     "Analyze this image",
+					Role:    agent.RoleTypeUser,
+					Content: "Analyze this image",
 					FileContent: requestctx.NewFileValue(io.NopCloser(bytes.NewReader([]byte{
 						0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
 					})), "image.png"),

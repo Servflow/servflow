@@ -67,7 +67,13 @@ func (h *Http) Execute(ctx context.Context, filledInConfig string) (interface{},
 
 	var body io.Reader
 	if cfg.Body != nil {
-		body = bytes.NewBuffer(cfg.Body)
+		// Check if the body is a JSON string and unwrap it
+		var strBody string
+		if err := json.Unmarshal(cfg.Body, &strBody); err == nil {
+			body = bytes.NewBufferString(strBody)
+		} else {
+			body = bytes.NewBuffer(cfg.Body)
+		}
 	}
 
 	req, err := http.NewRequestWithContext(ctx, cfg.Method, cfg.URL, body)
@@ -113,7 +119,7 @@ func (h *Http) Execute(ctx context.Context, filledInConfig string) (interface{},
 	if cfg.ResponsePath == "" {
 		var result interface{}
 		if err := json.Unmarshal(bodyBytes, &result); err != nil {
-			return nil, nil, err
+			return string(bodyBytes), fields, nil
 		}
 		return result, nil, nil
 	}

@@ -65,7 +65,8 @@ func TestHttp_Execute(t *testing.T) {
 
 					bod, err := io.ReadAll(r.Body)
 					require.NoError(t, err)
-					assert.JSONEq(t, `"string with \"quotes\", \\backslash, \n newline and \t tab"`, string(bod))
+					// String body should be unwrapped with special characters preserved
+					assert.Equal(t, "string with \"quotes\", \\backslash, \n newline and \t tab", string(bod))
 
 					w.Write([]byte(`{"received": true}`))
 				}))
@@ -87,6 +88,28 @@ func TestHttp_Execute(t *testing.T) {
 					bod, err := io.ReadAll(r.Body)
 					require.NoError(t, err)
 					assert.Equal(t, "123", string(bod))
+
+					w.Write([]byte(`{"received": true}`))
+				}))
+				return srv.URL
+			},
+		},
+		{
+			Name: "Plain String Body Without Quotes",
+			Config: Config{
+				Method:  http.MethodPost,
+				Headers: map[string]string{"Content-Type": "text/plain"},
+				Body:    json.RawMessage(`"hello world"`),
+			},
+			Expected: map[string]interface{}{"received": true},
+			serverSetup: func(t *testing.T) string {
+				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					assert.Equal(t, r.Method, "POST")
+
+					bod, err := io.ReadAll(r.Body)
+					require.NoError(t, err)
+					// The body should be "hello world" without the surrounding quotes
+					assert.Equal(t, "hello world", string(bod))
 
 					w.Write([]byte(`{"received": true}`))
 				}))

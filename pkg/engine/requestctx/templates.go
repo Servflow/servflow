@@ -49,8 +49,12 @@ func getFuncMap(funcMap template.FuncMap) template.FuncMap {
 // stringEscape escapes a string to be safely used in various contexts
 // by escaping special characters like quotes, backslashes, and control characters.
 // Uses Go's native strconv.Quote and removes the surrounding quotes.
-func stringEscape(s string) string {
-	quoted := strconv.Quote(s)
+func stringEscape(s interface{}) string {
+	str, ok := s.(string)
+	if !ok {
+		return ""
+	}
+	quoted := strconv.Quote(str)
 	return quoted[1 : len(quoted)-1] // Remove surrounding quotes
 }
 

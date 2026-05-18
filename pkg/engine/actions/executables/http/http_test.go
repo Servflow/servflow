@@ -117,6 +117,37 @@ func TestHttp_Execute(t *testing.T) {
 			},
 		},
 		{
+			Name: "JSON Object As String Body",
+			Config: Config{
+				Method:  http.MethodPost,
+				Headers: map[string]string{"Content-Type": "application/json"},
+				Body:    json.RawMessage(`"{\n  \"body\": \"There is a typo in the struct tag for CollectorType: 'envconfig:\\\"collectorype\\\"' should be 'envconfig:\\\"collectortype\\\"'. This typo could prevent reading the value from environment variables as intended.\",\n  \"path\": \"config/config.go\",\n  \"commit_id\": \"c23131b154c538c44a2f196e1b2e02a1ab621ca1\",\n  \"line\": 10,\n  \"side\": \"RIGHT\"\n}"`),
+			},
+			Expected: map[string]interface{}{"received": true},
+			serverSetup: func(t *testing.T) string {
+				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					assert.Equal(t, r.Method, "POST")
+
+					bod, err := io.ReadAll(r.Body)
+					require.NoError(t, err)
+
+					// The body should be valid JSON that the server can parse
+					var parsed map[string]interface{}
+					err = json.Unmarshal(bod, &parsed)
+					require.NoError(t, err, "Server should receive valid JSON, got: %s", string(bod))
+
+					assert.Equal(t, "There is a typo in the struct tag for CollectorType: 'envconfig:\"collectorype\"' should be 'envconfig:\"collectortype\"'. This typo could prevent reading the value from environment variables as intended.", parsed["body"])
+					assert.Equal(t, "config/config.go", parsed["path"])
+					assert.Equal(t, "c23131b154c538c44a2f196e1b2e02a1ab621ca1", parsed["commit_id"])
+					assert.Equal(t, float64(10), parsed["line"])
+					assert.Equal(t, "RIGHT", parsed["side"])
+
+					w.Write([]byte(`{"received": true}`))
+				}))
+				return srv.URL
+			},
+		},
+		{
 			Name: "Double Encoded JSON Body",
 			Config: Config{
 				Method:  http.MethodPost,
@@ -146,6 +177,7 @@ func TestHttp_Execute(t *testing.T) {
 				return srv.URL
 			},
 		},
+
 		{
 			Name: "has response path",
 			Config: Config{
@@ -195,8 +227,9 @@ func TestHttp_Execute(t *testing.T) {
 		{
 			Name: "Error Call",
 			Config: Config{
-				Method:  http.MethodPost,
-				Headers: nil,
+				Method:               http.MethodPost,
+				Headers:              nil,
+				ExpectedResponseCode: "200",
 			},
 			ShouldError: true,
 			serverSetup: func(t *testing.T) string {

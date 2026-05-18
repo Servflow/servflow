@@ -41,20 +41,35 @@ type Config struct {
 }
 
 // transformBody converts a json.RawMessage body into the appropriate byte slice for HTTP requests.
-// It handles three cases:
-// 1. JSON string (e.g., `"hello"`) - unwraps to plain string (`hello`)
-// 2. Double-encoded JSON (e.g., `"{\"key\": \"value\"}"`) - unwraps to valid JSON (`{"key": "value"}`)
-// 3. JSON object/array/other - returns as-is
+// It handles bodies from YAML which can be:
+// 1. Actual key-value object - use as-is
+// 2. Plain string representation of an object - unwrap quotes, parse as JSON
+// 3. Plain string - unwrap quotes, use as-is
+//
+// With json.RawMessage, strings are surrounded by quotes, so we need to unwrap them.
 func transformBody(body json.RawMessage) []byte {
 	if body == nil {
 		return nil
 	}
 
+	// Check if it's already a JSON object/array (not a string)
+	var obj map[string]interface{}
+	if json.Unmarshal(body, &obj) == nil {
+		return body
+	}
+
+	// It's a string, unwrap the surrounding quotes
 	var strBody string
 	if err := json.Unmarshal(body, &strBody); err == nil {
+		// Try to parse as JSON object
+		if json.Unmarshal([]byte(strBody), &obj) == nil {
+			return []byte(strBody)
+		}
+		// Not valid JSON, use the unwrapped string as-is
 		return []byte(strBody)
 	}
 
+	// Fallback: use as-is
 	return body
 }
 

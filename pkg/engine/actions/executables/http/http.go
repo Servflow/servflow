@@ -40,6 +40,24 @@ type Config struct {
 	FailIfResponseEmpty  bool              `json:"failIfResponseEmpty" yaml:"failIfResponseEmpty"`
 }
 
+// transformBody converts a json.RawMessage body into the appropriate byte slice for HTTP requests.
+// It handles three cases:
+// 1. JSON string (e.g., `"hello"`) - unwraps to plain string (`hello`)
+// 2. Double-encoded JSON (e.g., `"{\"key\": \"value\"}"`) - unwraps to valid JSON (`{"key": "value"}`)
+// 3. JSON object/array/other - returns as-is
+func transformBody(body json.RawMessage) []byte {
+	if body == nil {
+		return nil
+	}
+
+	var strBody string
+	if err := json.Unmarshal(body, &strBody); err == nil {
+		return []byte(strBody)
+	}
+
+	return body
+}
+
 func New(cfg Config) *Http {
 	return &Http{
 		client: &http.Client{},
@@ -66,14 +84,8 @@ func (h *Http) Execute(ctx context.Context, filledInConfig string) (interface{},
 	}
 
 	var body io.Reader
-	if cfg.Body != nil {
-		// Check if the body is a JSON string and unwrap it
-		var strBody string
-		if err := json.Unmarshal(cfg.Body, &strBody); err == nil {
-			body = bytes.NewBufferString(strBody)
-		} else {
-			body = bytes.NewBuffer(cfg.Body)
-		}
+	if transformed := transformBody(cfg.Body); transformed != nil {
+		body = bytes.NewBuffer(transformed)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, cfg.Method, cfg.URL, body)

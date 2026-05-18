@@ -117,6 +117,36 @@ func TestHttp_Execute(t *testing.T) {
 			},
 		},
 		{
+			Name: "Double Encoded JSON Body",
+			Config: Config{
+				Method:  http.MethodPost,
+				Headers: map[string]string{"Content-Type": "application/json"},
+				// This is a JSON object wrapped as a JSON string (double-encoded)
+				Body: json.RawMessage(`"{\n  \"body\": \"Test comment\",\n  \"path\": \"config/config.go\",\n  \"line\": 12\n}"`),
+			},
+			Expected: map[string]interface{}{"received": true},
+			serverSetup: func(t *testing.T) string {
+				srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					assert.Equal(t, r.Method, "POST")
+
+					bod, err := io.ReadAll(r.Body)
+					require.NoError(t, err)
+
+					// The body should be valid JSON that the server can parse
+					var parsed map[string]interface{}
+					err = json.Unmarshal(bod, &parsed)
+					require.NoError(t, err, "Server should receive valid JSON, got: %s", string(bod))
+
+					assert.Equal(t, "Test comment", parsed["body"])
+					assert.Equal(t, "config/config.go", parsed["path"])
+					assert.Equal(t, float64(12), parsed["line"])
+
+					w.Write([]byte(`{"received": true}`))
+				}))
+				return srv.URL
+			},
+		},
+		{
 			Name: "has response path",
 			Config: Config{
 				Method:       http.MethodGet,

@@ -100,6 +100,7 @@ func (rc *RequestContext) getFuncMap(funcMap template.FuncMap) template.FuncMap 
 		"hash":         tmplHash,
 		"now":          now,
 		"secret":       secret,
+		"tostring":     tostring,
 		"email":        rc.tmplFuncEmail,
 		"empty":        rc.tmplFuncEmpty,
 		"notempty":     rc.tmplFuncNotEmpty,
@@ -195,6 +196,30 @@ func tmplHash(item any) string {
 
 	hash := md5.Sum(data)
 	return fmt.Sprintf("%x", hash)
+}
+
+// tostring converts any input to a string representation.
+// Strings are returned as-is, nil returns empty string,
+// primitives use fmt.Sprintf, and complex types are marshaled to JSON.
+func tostring(val any) string {
+	switch v := val.(type) {
+	case string:
+		return v
+	case nil:
+		return ""
+	case float64:
+		return strconv.FormatFloat(v, 'f', -1, 64)
+	case float32:
+		return strconv.FormatFloat(float64(v), 'f', -1, 32)
+	case int, int64, int32, int16, int8, uint, uint64, uint32, uint16, uint8, bool:
+		return fmt.Sprintf("%v", v)
+	default:
+		jsonData, err := json.Marshal(v)
+		if err != nil {
+			return fmt.Sprintf("%v", v)
+		}
+		return string(jsonData)
+	}
 }
 
 // tmplJoin joins an array of strings with the specified separator.

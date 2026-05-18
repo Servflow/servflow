@@ -34,7 +34,7 @@ const (
 const (
 	// regexMatchString is for replacing escaped quotes in templates due to json parsing
 	// https://regex101.com/r/MRJoD1/1
-	regexMatchString = `{{[^"]+\\"[^"]*\\".*?}}`
+	regexMatchString = `{{[^"}]+\\"[^"}]*\\"[^}]*}}`
 
 	// https://regex101.com/r/2eSmua/2
 	regexMatchTemplate = `\{\{ ([^{}]+) \}\}`

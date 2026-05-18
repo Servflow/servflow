@@ -256,6 +256,85 @@ func TestTemplateFunctions(t *testing.T) {
 		}
 	})
 
+	t.Run("Tostring function tests", func(t *testing.T) {
+		tostringTests := []struct {
+			name          string
+			templateInput string
+			values        map[string]interface{}
+			expected      string
+		}{
+			{
+				name:          "String input",
+				templateInput: `{{tostring .item}}`,
+				values:        map[string]interface{}{"item": "hello world"},
+				expected:      "hello world",
+			},
+			{
+				name:          "Integer input",
+				templateInput: `{{tostring .item}}`,
+				values:        map[string]interface{}{"item": 12345},
+				expected:      "12345",
+			},
+			{
+				name:          "Float input",
+				templateInput: `{{tostring .item}}`,
+				values:        map[string]interface{}{"item": 3.14},
+				expected:      "3.14",
+			},
+			{
+				name:          "Large float input",
+				templateInput: `{{tostring .item}}`,
+				values:        map[string]interface{}{"item": 4481874772.0},
+				expected:      "4481874772",
+			},
+			{
+				name:          "Boolean true input",
+				templateInput: `{{tostring .item}}`,
+				values:        map[string]interface{}{"item": true},
+				expected:      "true",
+			},
+			{
+				name:          "Boolean false input",
+				templateInput: `{{tostring .item}}`,
+				values:        map[string]interface{}{"item": false},
+				expected:      "false",
+			},
+			{
+				name:          "Nil input",
+				templateInput: `{{tostring .item}}`,
+				values:        map[string]interface{}{"item": nil},
+				expected:      "",
+			},
+			{
+				name:          "Map input",
+				templateInput: `{{tostring .item}}`,
+				values:        map[string]interface{}{"item": map[string]interface{}{"key": "value"}},
+				expected:      `{"key":"value"}`,
+			},
+			{
+				name:          "Slice input",
+				templateInput: `{{tostring .item}}`,
+				values:        map[string]interface{}{"item": []string{"a", "b", "c"}},
+				expected:      `["a","b","c"]`,
+			},
+		}
+
+		for _, tt := range tostringTests {
+			t.Run(tt.name, func(t *testing.T) {
+				tmpl, err := CreateTextTemplate(NewTestContext(), tt.templateInput, nil)
+				require.NoError(t, err)
+
+				ctx := NewTestContext()
+				err = AddRequestVariables(ctx, tt.values, "")
+				require.NoError(t, err)
+
+				result, errExec := ExecuteTemplateFromContext(ctx, tmpl)
+				assert.NoError(t, errExec)
+				assert.Equal(t, tt.expected, result)
+			})
+		}
+	})
+
 	t.Run("Join function tests", func(t *testing.T) {
 		joinTests := []struct {
 			name          string

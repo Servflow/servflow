@@ -61,11 +61,6 @@ func transformBody(body json.RawMessage) []byte {
 	// It's a string, unwrap the surrounding quotes
 	var strBody string
 	if err := json.Unmarshal(body, &strBody); err == nil {
-		// Try to parse as JSON object
-		if json.Unmarshal([]byte(strBody), &obj) == nil {
-			return []byte(strBody)
-		}
-		// Not valid JSON, use the unwrapped string as-is
 		return []byte(strBody)
 	}
 

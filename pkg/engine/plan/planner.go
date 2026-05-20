@@ -150,21 +150,37 @@ func (p *PlannerV2) generateStep(id string) (*stepWrapper, error) {
 	return &stepWr, nil
 }
 
-func (p *PlannerV2) generateActionStep(id string) (*Action, error) {
+func (p *PlannerV2) generateActionStep(id string) (Step, error) {
 	a, ok := p.config.Actions[id]
 	if !ok {
 		return nil, fmt.Errorf("actions not found: %s", id)
 	}
 
-	var (
-		exec actions.ActionExecutable
-		err  error
-	)
-
 	configJson, err := json.Marshal(a.Config)
 	if err != nil {
 		return nil, err
 	}
+
+	// Check if this is a V2 action
+	isV2 := false
+	if p.registry != nil {
+		isV2 = p.registry.IsV2Action(a.Type)
+	} else {
+		isV2 = actions.IsV2Action(a.Type)
+	}
+
+	if isV2 {
+		return p.generateActionStepV2(id, a, configJson)
+	}
+	return p.generateActionStepV1(id, a, configJson)
+}
+
+// generateActionStepV1 creates a V1 action step (template resolution in plan executor)
+func (p *PlannerV2) generateActionStepV1(id string, a apiconfig.Action, configJson []byte) (*Action, error) {
+	var (
+		exec actions.ActionExecutable
+		err  error
+	)
 
 	if p.registry != nil {
 		exec, err = p.registry.GetActionExecutable(a.Type, configJson)
@@ -186,7 +202,6 @@ func (p *PlannerV2) generateActionStep(id string) (*Action, error) {
 		if err != nil {
 			return nil, err
 		}
-
 	}
 
 	out := id
@@ -202,6 +217,51 @@ func (p *PlannerV2) generateActionStep(id string) (*Action, error) {
 		next:       nextStep,
 		fail:       failStep,
 		out:        out,
+		exec:       exec,
+		useReplica: a.UseReplica,
+		dispatch:   a.Dispatch,
+	}, nil
+}
+
+// generateActionStepV2 creates a V2 action step (action handles own template resolution)
+func (p *PlannerV2) generateActionStepV2(id string, a apiconfig.Action, configJson []byte) (*ActionV2, error) {
+	var (
+		exec actions.ActionExecutableV2
+		err  error
+	)
+
+	if p.registry != nil {
+		exec, err = p.registry.GetActionExecutableV2(a.Type, configJson)
+	} else {
+		exec, err = actions.GetActionExecutableV2(a.Type, configJson)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("error creating v2 action %s: %w", id, err)
+	}
+
+	nextStep, err := p.generateStep(a.Next)
+	if err != nil {
+		return nil, err
+	}
+
+	var failStep *stepWrapper
+	if a.Fail != "" {
+		failStep, err = p.generateStep(a.Fail)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	name := a.Name
+	if name == "" {
+		name = id
+	}
+
+	return &ActionV2{
+		id:         id,
+		name:       name,
+		next:       nextStep,
+		fail:       failStep,
 		exec:       exec,
 		useReplica: a.UseReplica,
 		dispatch:   a.Dispatch,

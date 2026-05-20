@@ -6,19 +6,21 @@ import (
 	"fmt"
 
 	"github.com/Servflow/servflow/pkg/engine/actions"
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
 	"go.uber.org/zap"
 )
 
-type Executable struct {
+// ExecutableV2 is the V2 implementation that handles its own template resolution
+type ExecutableV2 struct {
 	Return string
 }
 
-func (s *Executable) Type() string {
+func (s *ExecutableV2) Type() string {
 	return "static"
 }
 
-func (s *Executable) SupportsReplica() bool {
+func (s *ExecutableV2) SupportsReplica() bool {
 	return true
 }
 
@@ -26,21 +28,32 @@ type Config struct {
 	Return string `json:"return"`
 }
 
-func NewExecutable(cfg Config) *Executable {
-	return &Executable{
+func NewExecutableV2(cfg Config) *ExecutableV2 {
+	return &ExecutableV2{
 		Return: cfg.Return,
 	}
 }
 
-func (s *Executable) Config() string {
-	return s.Return
-}
-
-func (s *Executable) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
+// Execute resolves the return value template and returns the result
+func (s *ExecutableV2) Execute(ctx context.Context) (interface{}, map[string]string, error) {
 	logger := logging.FromContext(ctx).With(zap.String("execution_type", s.Type()))
-	_ = logging.WithLogger(ctx, logger)
+	ctx = logging.WithLogger(ctx, logger)
 
-	return modifiedConfig, nil, nil
+	// Get request context for template resolution
+	rc, err := requestctx.FromContextOrError(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get request context: %w", err)
+	}
+
+	// Resolve the return value template
+	resolved, err := rc.Resolve(ctx, s.Return)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to resolve return value: %w", err)
+	}
+
+	logger.Debug("static action resolved", zap.String("original", s.Return), zap.String("resolved", resolved))
+
+	return resolved, nil, nil
 }
 
 func init() {
@@ -63,12 +76,13 @@ func init() {
 		Name:        "Static Value",
 		Description: "Returns a static value configured at setup time",
 		Fields:      fields,
-		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
+		UseV2:       true,
+		ConstructorV2: func(config json.RawMessage) (actions.ActionExecutableV2, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {
 				return nil, fmt.Errorf("error creating static action: %v", err)
 			}
-			return NewExecutable(cfg), nil
+			return NewExecutableV2(cfg), nil
 		},
 	}); err != nil {
 		panic(err)

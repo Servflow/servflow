@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"text/template"
 	"time"
 
 	sfhttp "github.com/Servflow/servflow/internal/http"
@@ -27,6 +28,7 @@ const (
 
 type Plan struct {
 	steps           map[string]stepWrapper
+	actionNameToID  map[string]string
 	dispatchTimeout time.Duration
 }
 
@@ -137,12 +139,37 @@ func (p *Plan) generateEndValue(ctx context.Context, logger *zap.Logger, endValu
 func (p *Plan) Execute(ctx context.Context, id string, endValue *EndValueSpec) (*sfhttp.SfResponse, error) {
 	id = strings.TrimLeft(id, "$")
 	ctx = context.WithValue(ctx, ContextKey, p)
+
+	// Register the action template function with the request context
+	if reqCtx, ok := requestctx.FromContext(ctx); ok {
+		reqCtx.AddRequestTemplateFunctions(template.FuncMap{
+			"action": p.actionFunc(reqCtx),
+		})
+	}
+
 	step, ok := p.steps[id]
 	if !ok {
 		return nil, errors.New("step not found")
 	}
 
 	return p.executeStep(ctx, &step, endValue)
+}
+
+// actionFunc returns a template function that looks up action outputs by name or ID.
+// It first tries a direct lookup (for ID), then checks the name-to-ID mapping.
+func (p *Plan) actionFunc(reqCtx *requestctx.RequestContext) func(string) interface{} {
+	return func(name string) interface{} {
+		vars := reqCtx.Variables()
+		// Try direct lookup first (could be ID)
+		if val, ok := vars[name]; ok {
+			return val
+		}
+		// Try name → ID lookup
+		if id, ok := p.actionNameToID[name]; ok {
+			return vars[id]
+		}
+		return nil
+	}
 }
 
 func ExecuteFromContext(ctx context.Context, id string, endValue *EndValueSpec) (*sfhttp.SfResponse, error) {

@@ -86,7 +86,7 @@ func (c *ConditionStep) execute(ctx context.Context) (*stepWrapper, error) {
 		return nil, errors.New("invalid request context")
 	}
 
-	tmpl, err := requestctx.CreateTextTemplate(ctx, c.exprString, reqCtx.ConditionalTemplateFunctions())
+	tmpl, err := requestctx.CreateTextTemplate(ctx, c.exprString, nil)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())

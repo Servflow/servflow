@@ -1,9 +1,7 @@
 package requestctx
 
 import (
-	"bytes"
 	"testing"
-	"text/template"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -69,15 +67,10 @@ func TestConditionalTemplate(t *testing.T) {
 			rCtx, ok := FromContext(ctx)
 			require.True(t, ok)
 
-			tmpl, err := template.New("template").Funcs(rCtx.ConditionalTemplateFunctions()).Parse(testCase.template)
+			result, err := rCtx.Resolve(ctx, testCase.template)
 			require.NoError(t, err)
 
-			var buf bytes.Buffer
-			err = tmpl.Execute(&buf, rCtx.requestVariables)
-			require.NoError(t, err)
-
-			result := buf.Bytes()
-			assert.Equal(t, testCase.expected, string(result))
+			assert.Equal(t, testCase.expected, result)
 
 			if testCase.expected == "false" {
 				assert.NotEmpty(t, rCtx.validationErrors)

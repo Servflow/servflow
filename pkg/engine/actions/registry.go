@@ -13,10 +13,12 @@ type Registry struct {
 }
 
 type ActionRegistrationInfo struct {
-	Name        string               `json:"name"`
-	Description string               `json:"description"`
-	Fields      map[string]FieldInfo `json:"fields"`
-	Constructor factoryFunc          `json:"-"`
+	Name          string               `json:"name"`
+	Description   string               `json:"description"`
+	Fields        map[string]FieldInfo `json:"fields"`
+	Constructor   factoryFunc          `json:"-"`
+	ConstructorV2 factoryFuncV2        `json:"-"` // V2 constructor (used when UseV2 is true)
+	UseV2         bool                 `json:"-"` // If true, use V2 interface (action handles own template resolution)
 }
 
 type FieldType string
@@ -56,6 +58,7 @@ var actionManager = &Registry{
 }
 
 type factoryFunc func(config json.RawMessage) (ActionExecutable, error)
+type factoryFuncV2 func(config json.RawMessage) (ActionExecutableV2, error)
 
 func (r *Registry) RegisterAction(actionType string, registration ActionRegistrationInfo) error {
 	_, ok := r.availableConstructors[actionType]
@@ -123,6 +126,31 @@ func (r *Registry) GetRegisteredActionTypes() []string {
 	return types
 }
 
+// GetActionExecutableV2 returns a V2 action executable for the given type.
+// Returns an error if the action type is not registered or doesn't use V2.
+func (r *Registry) GetActionExecutableV2(actionType string, config json.RawMessage) (ActionExecutableV2, error) {
+	registration, ok := r.availableConstructors[actionType]
+	if !ok {
+		return nil, fmt.Errorf("action type %s not registered", actionType)
+	}
+	if !registration.UseV2 {
+		return nil, fmt.Errorf("action type %s is not a V2 action", actionType)
+	}
+	if registration.ConstructorV2 == nil {
+		return nil, fmt.Errorf("action type %s has UseV2=true but no ConstructorV2", actionType)
+	}
+	return registration.ConstructorV2(config)
+}
+
+// IsV2Action returns true if the action type uses the V2 interface.
+func (r *Registry) IsV2Action(actionType string) bool {
+	registration, ok := r.availableConstructors[actionType]
+	if !ok {
+		return false
+	}
+	return registration.UseV2
+}
+
 func RegisterAction(actionType string, registration ActionRegistrationInfo) error {
 	return actionManager.RegisterAction(actionType, registration)
 }
@@ -142,4 +170,14 @@ func GetRegisteredActionTypes() []string {
 func HasRegisteredActionType(actionType string) bool {
 	_, ok := actionManager.availableConstructors[actionType]
 	return ok
+}
+
+// IsV2Action returns true if the action type uses the V2 interface.
+func IsV2Action(actionType string) bool {
+	return actionManager.IsV2Action(actionType)
+}
+
+// GetActionExecutableV2 returns a V2 action executable for the given type.
+func GetActionExecutableV2(actionType string, config json.RawMessage) (ActionExecutableV2, error) {
+	return actionManager.GetActionExecutableV2(actionType, config)
 }

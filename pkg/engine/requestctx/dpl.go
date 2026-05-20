@@ -108,14 +108,37 @@ func ReplaceVariableValues(in string, values map[string]interface{}) (string, er
 	return strings.ReplaceAll(buff.String(), noValue, ""), nil
 }
 
+// createTemplate creates a template using base functions only (no request context).
+// For v1 backward compatibility - used by ReplaceVariableValues.
 func createTemplate(in string, funcMap template.FuncMap, wrapJSON bool) (*template.Template, error) {
-	funcMap = getFuncMap(funcMap)
+	funcMap = getBaseFuncMap(funcMap)
 	replaced := replaceEscapedQuotes(in)
 	replaced = normalizeActionVariables(replaced)
 	if wrapJSON {
 		replaced = wrapWithJSON(replaced)
 	}
 	return template.New("input").Option("missingkey=zero").Funcs(funcMap).Parse(replaced)
+}
+
+// getBaseFuncMap returns base template functions without request context.
+// Used for backward compatibility with code that doesn't have a RequestContext.
+func getBaseFuncMap(funcMap template.FuncMap) template.FuncMap {
+	m := template.FuncMap{
+		"strip":        tmplStripText,
+		"jsonout":      jsonOut,
+		"pluck":        tmplPluck,
+		"escape":       stringEscape,
+		"stringescape": stringEscape,
+		"jsonraw":      jsonRaw,
+		"join":         tmplJoin,
+		"hash":         tmplHash,
+		"now":          now,
+		"secret":       secret,
+	}
+	for k, v := range funcMap {
+		m[k] = v
+	}
+	return m
 }
 
 func normalizeActionVariables(in string) string {
@@ -151,21 +174,22 @@ func WrapWithFunction(template, funcWrap string) string {
 }
 
 // CreateTextTemplate is what should be called in config items to create a template;
-// it also loads up the template variables stored in the request context
+// it also loads up the template variables stored in the request context.
+// This is the v1 entry point - uses RequestContext.getFuncMap for all template functions.
 func CreateTextTemplate(reqCtx context.Context, config string, funcMap template.FuncMap) (*template.Template, error) {
 	rCtx, ok := FromContext(reqCtx)
+	if !ok || rCtx == nil {
+		return nil, ErrNoContext
+	}
 	if funcMap == nil {
 		funcMap = template.FuncMap{}
 	}
-	if ok && rCtx != nil {
-		rcFunc := rCtx.TemplateFunctions()
-		for k, v := range rcFunc {
-			funcMap[k] = v
-		}
-	} else {
-		return nil, ErrNoContext
+	// Merge any additional functions provided by caller
+	for k, v := range rCtx.TemplateFunctions() {
+		funcMap[k] = v
 	}
-	return createTemplate(config, funcMap, false)
+	// Use RequestContext's createTemplate which includes all functions (base + request-scoped)
+	return rCtx.createTemplate(config, funcMap)
 }
 
 func BaseParseTextTemplate(rawString string, funcMap template.FuncMap) (string, error) {

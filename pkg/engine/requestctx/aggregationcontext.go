@@ -43,7 +43,12 @@ func AddValidationErrors(ctx context.Context) error {
 }
 
 func (rc *RequestContext) AddRequestTemplateFunctions(templateFuncs template.FuncMap) {
+	rc.Lock()
+	defer rc.Unlock()
 	for k, v := range templateFuncs {
+		if _, exists := rc.requestFuncs[k]; exists {
+			continue
+		}
 		rc.requestFuncs[k] = v
 	}
 }

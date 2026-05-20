@@ -100,7 +100,6 @@ func (rc *RequestContext) getFuncMap(funcMap template.FuncMap) template.FuncMap 
 		"hash":         tmplHash,
 		"now":          now,
 		"secret":       secret,
-		"action":       rc.actionFunc,
 		"email":        rc.tmplFuncEmail,
 		"empty":        rc.tmplFuncEmpty,
 		"notempty":     rc.tmplFuncNotEmpty,
@@ -115,17 +114,6 @@ func (rc *RequestContext) getFuncMap(funcMap template.FuncMap) template.FuncMap 
 		m[k] = v
 	}
 	return m
-}
-
-// actionFunc returns the output of an action by its id
-func (rc *RequestContext) actionFunc(name string) interface{} {
-	rc.Lock()
-	defer rc.Unlock()
-	// Look up action output by name/id
-	if val, ok := rc.requestVariables[name]; ok {
-		return val
-	}
-	return nil
 }
 
 // stringEscape escapes a string to be safely used in various contexts

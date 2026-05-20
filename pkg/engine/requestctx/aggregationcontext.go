@@ -43,25 +43,18 @@ func AddValidationErrors(ctx context.Context) error {
 }
 
 func (rc *RequestContext) AddRequestTemplateFunctions(templateFuncs template.FuncMap) {
+	rc.Lock()
+	defer rc.Unlock()
 	for k, v := range templateFuncs {
+		if _, exists := rc.requestFuncs[k]; exists {
+			continue
+		}
 		rc.requestFuncs[k] = v
 	}
 }
 
 func (rc *RequestContext) TemplateFunctions() template.FuncMap {
 	return rc.requestFuncs
-}
-
-// ConditionalTemplateFunctions returns the conditional template functions.
-// Deprecated: These functions are now included in getFuncMap. This method
-// exists for backward compatibility.
-func (rc *RequestContext) ConditionalTemplateFunctions() template.FuncMap {
-	return template.FuncMap{
-		"email":    rc.tmplFuncEmail,
-		"empty":    rc.tmplFuncEmpty,
-		"notempty": rc.tmplFuncNotEmpty,
-		"bcrypt":   rc.tmplFuncBcrypt,
-	}
 }
 
 func (rc *RequestContext) Variables() map[string]interface{} {

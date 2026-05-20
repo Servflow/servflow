@@ -54,7 +54,12 @@ type PlannerV2 struct {
 }
 
 func NewPlannerV2(config PlannerConfig, logger *zap.Logger) *PlannerV2 {
-	return &PlannerV2{config: config, finalSteps: make(map[string]stepWrapper), registry: config.CustomRegistry, logger: logger}
+	return &PlannerV2{
+		config:     config,
+		finalSteps: make(map[string]stepWrapper),
+		registry:   config.CustomRegistry,
+		logger:     logger,
+	}
 }
 
 func (p *PlannerV2) Plan() (*Plan, error) {
@@ -91,8 +96,17 @@ func (p *PlannerV2) Plan() (*Plan, error) {
 		dispatchTimeout = time.Minute
 	}
 
+	// Build action name to ID mapping
+	actionNameToID := make(map[string]string)
+	for id, action := range p.config.Actions {
+		if action.Name != "" && action.Name != id {
+			actionNameToID[action.Name] = id
+		}
+	}
+
 	return &Plan{
 		steps:           p.finalSteps,
+		actionNameToID:  actionNameToID,
 		dispatchTimeout: dispatchTimeout,
 	}, nil
 }

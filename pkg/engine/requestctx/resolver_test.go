@@ -135,21 +135,52 @@ func TestResolveBatch(t *testing.T) {
 }
 
 func TestActionTemplateFunction(t *testing.T) {
+	// Helper to create an action function with name-to-ID mapping
+	// This simulates what Plan.Execute does
+	createActionFunc := func(rc *RequestContext, nameToID map[string]string) func(string) interface{} {
+		return func(name string) interface{} {
+			vars := rc.Variables()
+			// Try direct lookup first (could be ID)
+			if val, ok := vars[name]; ok {
+				return val
+			}
+			// Try name → ID lookup
+			if id, ok := nameToID[name]; ok {
+				return vars[id]
+			}
+			return nil
+		}
+	}
+
 	tests := []struct {
 		name          string
 		actionOutputs map[string]interface{}
+		nameToID      map[string]string
 		template      string
 		expected      string
 	}{
 		{
-			name: "simple action output",
+			name: "simple action output by ID",
 			actionOutputs: map[string]interface{}{
 				"fetch_user": map[string]interface{}{
 					"id":   123,
 					"name": "John",
 				},
 			},
+			nameToID: map[string]string{},
 			template: `{{ (action "fetch_user").name }}`,
+			expected: "John",
+		},
+		{
+			name: "action output by name",
+			actionOutputs: map[string]interface{}{
+				"fetch_user": map[string]interface{}{
+					"id":   123,
+					"name": "John",
+				},
+			},
+			nameToID: map[string]string{"Fetch User Data": "fetch_user"},
+			template: `{{ (action "Fetch User Data").name }}`,
 			expected: "John",
 		},
 		{
@@ -157,17 +188,19 @@ func TestActionTemplateFunction(t *testing.T) {
 			actionOutputs: map[string]interface{}{
 				"get_token": "abc123",
 			},
+			nameToID: map[string]string{},
 			template: `Token: {{ action "get_token" }}`,
 			expected: "Token: abc123",
 		},
 		{
 			name:          "missing action returns empty",
 			actionOutputs: map[string]interface{}{},
+			nameToID:      map[string]string{},
 			template:      `{{ action "nonexistent" }}`,
 			expected:      "", // missingkey=zero returns empty string
 		},
 		{
-			name: "action with nested access",
+			name: "action with nested access by name",
 			actionOutputs: map[string]interface{}{
 				"api_response": map[string]interface{}{
 					"data": map[string]interface{}{
@@ -175,7 +208,8 @@ func TestActionTemplateFunction(t *testing.T) {
 					},
 				},
 			},
-			template: `{{ index ((action "api_response").data).items 0 }}`,
+			nameToID: map[string]string{"API Response": "api_response"},
+			template: `{{ index ((action "API Response").data).items 0 }}`,
 			expected: "a",
 		},
 	}
@@ -190,6 +224,11 @@ func TestActionTemplateFunction(t *testing.T) {
 
 			rc, ok := FromContext(ctx)
 			require.True(t, ok)
+
+			// Register the action function (simulating what Plan.Execute does)
+			rc.AddRequestTemplateFunctions(map[string]any{
+				"action": createActionFunc(rc, tt.nameToID),
+			})
 
 			result, err := rc.Resolve(ctx, tt.template)
 			require.NoError(t, err)

@@ -46,6 +46,7 @@ type Session struct {
 	conversationID        string
 	returnOnlyLastMessage bool
 	customInstructions    string
+	llmResponses          []LLMResponse
 }
 
 type Option func(*Session) error
@@ -111,8 +112,9 @@ func WithInstructions(instructions string) Option {
 
 func NewSession(developerInstructions string, llm LLmProvider, options ...Option) (*Session, error) {
 	agent := &Session{
-		llm:      llm,
-		messages: make([]any, 0),
+		llm:          llm,
+		messages:     make([]any, 0),
+		llmResponses: make([]LLMResponse, 0),
 	}
 
 	agent.messages = append(agent.messages, MessageTypeContent{
@@ -169,6 +171,13 @@ func (a *Session) Query(ctx context.Context, query string, file *requestctx.File
 	}
 }
 
+// GetMetadata returns the metadata collected during the session
+func (a *Session) GetMetadata() SessionMetadata {
+	return SessionMetadata{
+		LLMResponses: a.llmResponses,
+	}
+}
+
 func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 	logger := logging.FromContext(ctx).With(zap.String("module", "agent"))
 	out := make(chan agentOutput)
@@ -190,6 +199,9 @@ func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 				out <- agentOutput{err: fmt.Errorf("error from llm: %w", err)}
 				break
 			}
+
+			// collect LLM response for metadata
+			a.llmResponses = append(a.llmResponses, r)
 
 			// process content output
 			for _, c := range r.Content {

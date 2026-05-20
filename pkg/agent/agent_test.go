@@ -809,3 +809,46 @@ func TestWithInstructions(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "Response using custom instructions\n", result)
 }
+
+func TestSession_GetMetadata(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockLLmHandler := NewMockLLmProvider(ctrl)
+	mockToolManager := NewMockToolManager(ctrl)
+
+	var toolInfoList []ToolInfo
+	if err := json.Unmarshal([]byte(toolList), &toolInfoList); err != nil {
+		t.Fatal(err)
+	}
+	mockToolManager.EXPECT().ToolList().Return(toolInfoList)
+
+	firstResponse := LLMResponse{
+		Content: []ContentResponse{{Text: "I'll check the weather"}},
+		Tools: []ToolResponseObject{
+			{Name: "get_weather", Input: map[string]any{"location": "lagos"}, ToolID: "tool-1"},
+		},
+	}
+	secondResponse := LLMResponse{
+		Content: []ContentResponse{{Text: "The weather is sunny"}},
+	}
+
+	gomock.InOrder(
+		mockLLmHandler.EXPECT().ProvideResponse(gomock.Any(), gomock.Any()).Return(firstResponse, nil),
+		mockLLmHandler.EXPECT().ProvideResponse(gomock.Any(), gomock.Any()).Return(secondResponse, nil),
+	)
+	mockToolManager.EXPECT().
+		CallTool(gomock.Any(), "get_weather", map[string]any{"location": "lagos"}).
+		Return([]mcp.Content{mcp.TextContent{Type: "text", Text: "Sunny, 28C"}}, nil)
+
+	session, err := NewSession("Test system", mockLLmHandler, WithToolManager(mockToolManager))
+	require.NoError(t, err)
+
+	_, err = session.Query(context.Background(), "What's the weather?", nil)
+	require.NoError(t, err)
+
+	metadata := session.GetMetadata()
+	require.Len(t, metadata.LLMResponses, 2)
+	assert.Equal(t, firstResponse, metadata.LLMResponses[0])
+	assert.Equal(t, secondResponse, metadata.LLMResponses[1])
+}

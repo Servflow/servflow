@@ -87,7 +87,17 @@ func (a *Agent) Execute(ctx context.Context, modifiedConfig string) (interface{}
 		return nil, nil, err
 	}
 
-	return resp, nil, nil
+	// collect metadata for OTel logging
+	metadata := session.GetMetadata()
+	fields := make(map[string]string)
+	for i, llmResp := range metadata.LLMResponses {
+		respBytes, err := json.Marshal(llmResp)
+		if err == nil {
+			fields[fmt.Sprintf("agent.llm_response.%d", i)] = string(respBytes)
+		}
+	}
+
+	return resp, fields, nil
 }
 
 func (a *Agent) Type() string {

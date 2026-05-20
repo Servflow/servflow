@@ -149,7 +149,7 @@ func generateWorkflowToolExec(config *WorkflowToolConfig) functionExec {
 				}
 				return p
 			},
-		})
+		}, true)
 
 		endValueSpec := plan.EndValueSpec{}
 		switch config.Type {

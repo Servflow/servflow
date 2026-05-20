@@ -131,3 +131,8 @@ type ToolResponseObject struct {
 type ContentResponse struct {
 	Text string `json:"text"`
 }
+
+// SessionMetadata contains metadata collected during an agent session
+type SessionMetadata struct {
+	LLMResponses []LLMResponse `json:"llmResponses"`
+}

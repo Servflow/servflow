@@ -42,11 +42,11 @@ func AddValidationErrors(ctx context.Context) error {
 	return nil
 }
 
-func (rc *RequestContext) AddRequestTemplateFunctions(templateFuncs template.FuncMap) {
+func (rc *RequestContext) AddRequestTemplateFunctions(templateFuncs template.FuncMap, overwrite bool) {
 	rc.Lock()
 	defer rc.Unlock()
 	for k, v := range templateFuncs {
-		if _, exists := rc.requestFuncs[k]; exists {
+		if _, exists := rc.requestFuncs[k]; exists && !overwrite {
 			continue
 		}
 		rc.requestFuncs[k] = v

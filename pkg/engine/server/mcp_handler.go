@@ -73,7 +73,7 @@ func (e *Engine) createMCPHandler(config *apiconfig.APIConfig) error {
 
 				return r
 			},
-		})
+		}, true)
 
 		resp, err := p.Execute(ctx, config.McpTool.Start, &plan.EndValueSpec{
 			StringVal: config.McpTool.Result,

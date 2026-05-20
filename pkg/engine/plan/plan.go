@@ -144,7 +144,7 @@ func (p *Plan) Execute(ctx context.Context, id string, endValue *EndValueSpec) (
 	if reqCtx, ok := requestctx.FromContext(ctx); ok {
 		reqCtx.AddRequestTemplateFunctions(template.FuncMap{
 			"action": p.actionFunc(reqCtx),
-		})
+		}, false)
 	}
 
 	step, ok := p.steps[id]

@@ -164,7 +164,7 @@ func (h *APIHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	if span != nil {
 		span.SetAttributes(attribute.String("request_id", rectx.ID()))
 	}
-	rectx.AddRequestTemplateFunctions(requestTemplateFunctions(req))
+	rectx.AddRequestTemplateFunctions(requestTemplateFunctions(req), false)
 
 	err := rectx.LoadRequestFiles(req)
 	if err != nil {

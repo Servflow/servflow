@@ -228,7 +228,7 @@ func TestActionTemplateFunction(t *testing.T) {
 			// Register the action function (simulating what Plan.Execute does)
 			rc.AddRequestTemplateFunctions(map[string]any{
 				"action": createActionFunc(rc, tt.nameToID),
-			})
+			}, false)
 
 			result, err := rc.Resolve(ctx, tt.template)
 			require.NoError(t, err)
@@ -249,7 +249,7 @@ func TestResolveWithRequestFunctions(t *testing.T) {
 		"customFunc": func(s string) string {
 			return "custom:" + s
 		},
-	})
+	}, false)
 
 	result, err := rc.Resolve(ctx, `{{ customFunc "test" }}`)
 	require.NoError(t, err)

@@ -1,6 +1,7 @@
 package requestctx
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/Servflow/servflow/pkg/engine/secrets"
@@ -201,6 +202,18 @@ func TestReplaceVariableValuesInContext(t *testing.T) {
 	}
 }
 
+func TestRegexDoesNotSpanMultipleTemplates(t *testing.T) {
+	// This test confirms the fix: the regex should NOT match across multiple template tags.
+	// The input has no escaped quotes inside the templates, so nothing should match.
+	regex := regexp.MustCompile(`{{[^"}]+\\"[^"}]*\\"[^}]*}}`)
+	input := `{\n  \"message\": \"{{ escape .content | js }}\",\n  \"path\": \"{{ .filepath }}\"\n}`
+
+	matches := regex.FindAllString(input, -1)
+
+	// The regex should match nothing because there are no escaped quotes inside the templates
+	assert.Len(t, matches, 0, "regex should not match when no escaped quotes inside templates")
+}
+
 func TestReplaceEscapedSecretQuotes(t *testing.T) {
 	testCases := []struct {
 		name     string
@@ -216,6 +229,11 @@ func TestReplaceEscapedSecretQuotes(t *testing.T) {
 			name:     "multitag case",
 			in:       `{{ test \"hello\" }} {{ secret "test" }} {{ test \"ho\"}} {{ test "" }} {{ {{ secret \"\" }}`,
 			expected: `{{ test "hello" }} {{ secret "test" }} {{ test "ho"}} {{ test "" }} {{ {{ secret "" }}`,
+		},
+		{
+			name:     "json with newlines and multiple templates - escaped quotes outside should be preserved",
+			in:       `{\n  \"message\": \"{{ escape .content | js }}\",\n  \"path\": \"{{ .filepath }}\"\n}`,
+			expected: `{\n  \"message\": \"{{ escape .content | js }}\",\n  \"path\": \"{{ .filepath }}\"\n}`,
 		},
 	}
 
@@ -347,6 +365,24 @@ func TestExecuteTemplateWithActionFunctionMap(t *testing.T) {
 			values:   map[string]interface{}{"name": "Mr. John"},
 			expected: "Hello, John!",
 			wantErr:  false,
+		},
+		{
+			name: "escape with json nested",
+			input: `
+{
+  "url": "http://127.0.0.1:49244",
+  "body": "{\n  \"message\": \"{{ escape .variable_content | js }}\",\n  \"path\": \"{{ .variable_filepath }}\"\n}"
+}`,
+			values: map[string]interface{}{
+				"variable_content":  `This is a "quoted text"`,
+				"variable_filepath": "path",
+			},
+			expected: `
+{
+  "url": "http://127.0.0.1:49244",
+  "body": "{\n  \"message\": \"This is a \\\"quoted text\\\"\",\n  \"path\": \"path\"\n}"
+}`,
+			wantErr: false,
 		},
 		{
 			name:     "Test jsonout with array of digits",

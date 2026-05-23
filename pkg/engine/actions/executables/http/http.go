@@ -40,6 +40,34 @@ type Config struct {
 	FailIfResponseEmpty  bool              `json:"failIfResponseEmpty" yaml:"failIfResponseEmpty"`
 }
 
+// transformBody converts a json.RawMessage body into the appropriate byte slice for HTTP requests.
+// It handles bodies from YAML which can be:
+// 1. Actual key-value object - use as-is
+// 2. Plain string representation of an object - unwrap quotes, parse as JSON
+// 3. Plain string - unwrap quotes, use as-is
+//
+// With json.RawMessage, strings are surrounded by quotes, so we need to unwrap them.
+func transformBody(body json.RawMessage) []byte {
+	if body == nil {
+		return nil
+	}
+
+	// Check if it's already a JSON object/array (not a string)
+	var obj map[string]interface{}
+	if json.Unmarshal(body, &obj) == nil {
+		return body
+	}
+
+	// It's a string, unwrap the surrounding quotes
+	var strBody string
+	if err := json.Unmarshal(body, &strBody); err == nil {
+		return []byte(strBody)
+	}
+
+	// Fallback: use as-is
+	return body
+}
+
 func New(cfg Config) *Http {
 	return &Http{
 		client: &http.Client{},
@@ -66,8 +94,8 @@ func (h *Http) Execute(ctx context.Context, filledInConfig string) (interface{},
 	}
 
 	var body io.Reader
-	if cfg.Body != nil {
-		body = bytes.NewBuffer(cfg.Body)
+	if transformed := transformBody(cfg.Body); transformed != nil {
+		body = bytes.NewBuffer(transformed)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, cfg.Method, cfg.URL, body)
@@ -113,7 +141,7 @@ func (h *Http) Execute(ctx context.Context, filledInConfig string) (interface{},
 	if cfg.ResponsePath == "" {
 		var result interface{}
 		if err := json.Unmarshal(bodyBytes, &result); err != nil {
-			return nil, nil, err
+			return string(bodyBytes), fields, nil
 		}
 		return result, nil, nil
 	}

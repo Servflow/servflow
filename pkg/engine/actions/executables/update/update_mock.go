@@ -13,7 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	"github.com/Servflow/servflow/pkg/engine/integration/integrations/filters"
+	filters "github.com/Servflow/servflow/pkg/engine/integration/integrations/filters"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -55,15 +55,16 @@ func (mr *MockupdateIntegrationMockRecorder) Type() *gomock.Call {
 }
 
 // Update mocks base method.
-func (m *MockupdateIntegration) Update(ctx context.Context, data map[string]any, options map[string]string, filter ...filters.Filter) error {
+func (m *MockupdateIntegration) Update(ctx context.Context, data map[string]any, options map[string]string, filter ...filters.Filter) (string, error) {
 	m.ctrl.T.Helper()
 	varargs := []any{ctx, data, options}
 	for _, a := range filter {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "Update", varargs...)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // Update indicates an expected call of Update.

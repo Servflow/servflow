@@ -27,7 +27,7 @@ func TestUpdate_Execute(t *testing.T) {
 		}
 
 		mockIntegration := NewMockupdateIntegration(ctr)
-		mockIntegration.EXPECT().Update(gomock.Any(), fields, map[string]string{"collection": "mock_table"}, filtersList[0]).Return(nil)
+		mockIntegration.EXPECT().Update(gomock.Any(), fields, map[string]string{"collection": "mock_table"}, filtersList[0]).Return("123", nil)
 		integration.ReplaceIntegrationType("mock", func(m map[string]any) (integration.Integration, error) {
 			return mockIntegration, nil
 		})
@@ -46,7 +46,7 @@ func TestUpdate_Execute(t *testing.T) {
 
 		resp, _, err := update.Execute(context.Background(), update.Config())
 		require.NoError(t, err)
-		assert.Nil(t, resp)
+		assert.Equal(t, map[string]interface{}{"id": "123"}, resp)
 	})
 
 	t.Run("update fails", func(t *testing.T) {
@@ -63,7 +63,7 @@ func TestUpdate_Execute(t *testing.T) {
 		}
 
 		mockIntegration := NewMockupdateIntegration(ctr)
-		mockIntegration.EXPECT().Update(gomock.Any(), fields, map[string]string{"collection": "mock_table"}, filtersList[0]).Return(errors.New("test error"))
+		mockIntegration.EXPECT().Update(gomock.Any(), fields, map[string]string{"collection": "mock_table"}, filtersList[0]).Return("", errors.New("test error"))
 		integration.ReplaceIntegrationType("mock", func(m map[string]any) (integration.Integration, error) {
 			return mockIntegration, nil
 		})

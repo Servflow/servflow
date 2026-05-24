@@ -13,7 +13,7 @@ import (
 
 type updateIntegration interface {
 	integration.Integration
-	Update(ctx context.Context, data map[string]interface{}, options map[string]string, filter ...filters.Filter) error
+	Update(ctx context.Context, data map[string]interface{}, options map[string]string, filter ...filters.Filter) (string, error)
 }
 
 type Config struct {
@@ -74,11 +74,11 @@ func (u *Update) Execute(ctx context.Context, modifiedConfig string) (interface{
 		return nil, nil, err
 	}
 
-	err := u.i.Update(ctx, cfg.Fields, map[string]string{"collection": u.cfg.Table}, cfg.Filters...)
+	id, err := u.i.Update(ctx, cfg.Fields, map[string]string{"collection": u.cfg.Table}, cfg.Filters...)
 	if err != nil {
 		return nil, nil, fmt.Errorf("update operation failed: %w", err)
 	}
-	return nil, nil, nil
+	return map[string]interface{}{"id": id}, nil, nil
 }
 
 func init() {

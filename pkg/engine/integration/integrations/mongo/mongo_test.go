@@ -345,7 +345,7 @@ func TestMongo_Update(t *testing.T) {
 			docID, cleanup = writeDataAndReturnCleanupFn(mng.client, "servflow", "users", initialDoc)
 			t.Cleanup(cleanup)
 
-			err = mng.Update(context.Background(), updateFields, map[string]string{collectionOption: "users"}, filters...)
+			_, err = mng.Update(context.Background(), updateFields, map[string]string{collectionOption: "users"}, filters...)
 			require.NoError(t, err)
 
 			coll := mng.client.Database("servflow").Collection("users")

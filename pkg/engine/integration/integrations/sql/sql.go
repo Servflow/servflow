@@ -223,17 +223,17 @@ func (s *SQL) Store(ctx context.Context, item map[string]interface{}, options ma
 	return err
 }
 
-func (s *SQL) Update(ctx context.Context, fields map[string]interface{}, options map[string]string, filters ...filters.Filter) error {
+func (s *SQL) Update(ctx context.Context, fields map[string]interface{}, options map[string]string, filters ...filters.Filter) (string, error) {
 	t := s.getTableName(options)
 	if t == "" {
-		return fmt.Errorf("no table name provided")
+		return "", fmt.Errorf("no table name provided")
 	}
 	if err := validateTableName(t); err != nil {
-		return err
+		return "", err
 	}
 
 	if len(fields) < 1 {
-		return nil
+		return "", nil
 	}
 
 	setStatements := make([]string, 0, len(fields))
@@ -246,10 +246,19 @@ func (s *SQL) Update(ctx context.Context, fields map[string]interface{}, options
 
 	whereClause, whereValues, err := generateWhereClause(filters...)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	values = append(values, whereValues...)
+
+	// Extract ID from filters for return value
+	var id string
+	for _, f := range filters {
+		if f.Field == "id" {
+			id = fmt.Sprintf("%v", f.Comparator)
+			break
+		}
+	}
 
 	var query string
 	if whereClause != "" {
@@ -260,5 +269,8 @@ func (s *SQL) Update(ctx context.Context, fields map[string]interface{}, options
 
 	query = s.db.Rebind(query)
 	_, err = s.db.Exec(query, values...)
-	return err
+	if err != nil {
+		return "", err
+	}
+	return id, nil
 }

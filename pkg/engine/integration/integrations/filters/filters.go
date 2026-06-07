@@ -1,10 +1,15 @@
 package filters
 
 import (
+	"errors"
 	"fmt"
 
 	"go.mongodb.org/mongo-driver/bson"
 )
+
+// ErrNoMatch is returned when an update operation matches no documents/rows.
+// Callers can use errors.Is(err, ErrNoMatch) to check for this condition.
+var ErrNoMatch = errors.New("no documents matched the filter")
 
 type Filter struct {
 	Field      string      `json:"field"`

@@ -377,19 +377,46 @@ func TestMongo_Update(t *testing.T) {
 		Comparator: "testName",
 	}))
 
-	t.Run("should not update", runUpdate(map[string]interface{}{
-		"email": "test@gmail.com",
-		"name":  "testName",
-	}, map[string]interface{}{
-		"email": "test@gmail.com",
-		"name":  "testName",
-	}, map[string]interface{}{
-		"email": "test@gmail.coms",
-	}, filters.Filter{
-		Field:      "name",
-		Operation:  "!=",
-		Comparator: "testName",
-	}))
+	t.Run("should not update and return ErrNoMatch", func(t *testing.T) {
+		t.Parallel()
+		uri := startMongoContainer(t)
+		cfg := Config{
+			ConnectionString: uri,
+			DBName:           "servflow",
+		}
+		mng, err := newWrapper(cfg)
+		require.NoError(t, err)
+
+		initialDoc := map[string]interface{}{
+			"email": "test@gmail.com",
+			"name":  "testName",
+		}
+		docID, cleanup := writeDataAndReturnCleanupFn(mng.client, "servflow", "users", initialDoc)
+		t.Cleanup(cleanup)
+
+		// Filter that won't match the document
+		_, err = mng.Update(context.Background(), map[string]interface{}{
+			"email": "test@gmail.coms",
+		}, map[string]string{collectionOption: "users"}, filters.Filter{
+			Field:      "name",
+			Operation:  "!=",
+			Comparator: "testName",
+		})
+		require.ErrorIs(t, err, filters.ErrNoMatch)
+
+		// Verify document was not changed
+		coll := mng.client.Database("servflow").Collection("users")
+		cursor, err := coll.Find(context.Background(), bson.M{"_id": docID})
+		require.NoError(t, err)
+
+		var mResults []bson.M
+		err = cursor.All(context.Background(), &mResults)
+		require.NoError(t, err)
+
+		gotten := map[string]interface{}(mResults[0])
+		delete(gotten, "_id")
+		assert.Equal(t, initialDoc, gotten)
+	})
 
 	t.Run("update with number", runUpdate(map[string]interface{}{
 		"email": "test@gmail.com",

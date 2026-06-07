@@ -286,3 +286,145 @@ func TestBackgroundManager_Shutdown(t *testing.T) {
 		t.Fatal("context was not cancelled on shutdown")
 	}
 }
+
+func TestPlan_WorkspacePassedToActions(t *testing.T) {
+	// Create a temp directory for the custom workspace test
+	tempWorkspace, err := os.MkdirTemp("", "servflow-workspace-test-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(tempWorkspace)
+
+	testCases := []struct {
+		name              string
+		workspace         string
+		expectedWorkspace string
+	}{
+		{
+			name:              "workspace is passed to request context",
+			workspace:         tempWorkspace,
+			expectedWorkspace: tempWorkspace,
+		},
+		{
+			name:              "empty workspace uses default",
+			workspace:         "",
+			expectedWorkspace: requestctx2.DefaultWorkspacePath,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			var capturedWorkspace string
+
+			mockExec := NewMockActionExecutable(ctrl)
+			mockExec.EXPECT().Config().Return("").AnyTimes()
+			mockExec.EXPECT().SupportsReplica().Return(false).AnyTimes()
+			mockExec.EXPECT().Execute(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(ctx context.Context, _ string) (interface{}, map[string]string, error) {
+					workspace, err := requestctx2.GetWorkspace(ctx)
+					require.NoError(t, err)
+					capturedWorkspace = workspace
+					return "done", nil, nil
+				})
+
+			registry := actions.NewRegistry()
+			registry.ReplaceActionType("workspace_test", func(config json.RawMessage) (actions.ActionExecutable, error) {
+				return mockExec, nil
+			})
+
+			cfg := apiconfig.APIConfig{
+				Actions: map[string]apiconfig.Action{
+					"test_action": {
+						Type: "workspace_test",
+						Next: "response.success",
+					},
+				},
+				Responses: map[string]apiconfig.ResponseConfig{
+					"success": {
+						Code: 200,
+						Object: apiconfig.ResponseObject{
+							Fields: map[string]apiconfig.ResponseObject{
+								"status": {Value: "ok"},
+							},
+						},
+					},
+				},
+			}
+
+			planner := NewPlannerV2(PlannerConfig{
+				Actions:        cfg.Actions,
+				Responses:      cfg.Responses,
+				CustomRegistry: registry,
+				Workspace:      tc.workspace,
+			}, logging.GetNewLogger())
+
+			plan, err := planner.Plan()
+			require.NoError(t, err)
+
+			ctx := requestctx2.NewTestContext()
+			_, err = plan.Execute(ctx, requestctx2.ActionConfigPrefix+"test_action", nil)
+			require.NoError(t, err)
+
+			assert.Equal(t, tc.expectedWorkspace, capturedWorkspace)
+		})
+	}
+}
+
+func TestPlan_WorkspaceTemplateFunction(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// Create a temp directory for the workspace
+	workspacePath, err := os.MkdirTemp("", "servflow-workspace-tmpl-test-*")
+	require.NoError(t, err)
+	defer os.RemoveAll(workspacePath)
+
+	mockExec := NewMockActionExecutable(ctrl)
+	mockExec.EXPECT().Config().Return(`{"path": "{{ workspace }}"}`).AnyTimes()
+	mockExec.EXPECT().SupportsReplica().Return(false).AnyTimes()
+	mockExec.EXPECT().Execute(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, config string) (interface{}, map[string]string, error) {
+			// Verify the workspace template was resolved in the config
+			assert.Contains(t, config, workspacePath)
+			return "done", nil, nil
+		})
+
+	registry := actions.NewRegistry()
+	registry.ReplaceActionType("workspace_tmpl_test", func(config json.RawMessage) (actions.ActionExecutable, error) {
+		return mockExec, nil
+	})
+
+	cfg := apiconfig.APIConfig{
+		Actions: map[string]apiconfig.Action{
+			"test_action": {
+				Type: "workspace_tmpl_test",
+				Next: "response.success",
+			},
+		},
+		Responses: map[string]apiconfig.ResponseConfig{
+			"success": {
+				Code: 200,
+				Object: apiconfig.ResponseObject{
+					Fields: map[string]apiconfig.ResponseObject{
+						"status": {Value: "ok"},
+					},
+				},
+			},
+		},
+	}
+
+	planner := NewPlannerV2(PlannerConfig{
+		Actions:        cfg.Actions,
+		Responses:      cfg.Responses,
+		CustomRegistry: registry,
+		Workspace:      workspacePath,
+	}, logging.GetNewLogger())
+
+	plan, err := planner.Plan()
+	require.NoError(t, err)
+
+	ctx := requestctx2.NewTestContext()
+	_, err = plan.Execute(ctx, requestctx2.ActionConfigPrefix+"test_action", nil)
+	require.NoError(t, err)
+}

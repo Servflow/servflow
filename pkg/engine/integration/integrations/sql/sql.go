@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/Servflow/servflow/pkg/engine/integration"
-	"github.com/Servflow/servflow/pkg/engine/integration/integrations/filters"
+	dbfilters "github.com/Servflow/servflow/pkg/engine/integration/integrations/filters"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
@@ -32,7 +32,7 @@ type SQL struct {
 	db *sqlx.DB
 }
 
-func (s *SQL) Delete(ctx context.Context, options map[string]string, filters ...filters.Filter) error {
+func (s *SQL) Delete(ctx context.Context, options map[string]string, filters ...dbfilters.Filter) error {
 	t := s.getTableName(options)
 	if t == "" {
 		return fmt.Errorf("no table name provided")
@@ -136,7 +136,7 @@ func validateTableName(tableName string) error {
 	return nil
 }
 
-func (s *SQL) Fetch(ctx context.Context, options map[string]string, filters ...filters.Filter) (items []map[string]interface{}, err error) {
+func (s *SQL) Fetch(ctx context.Context, options map[string]string, filters ...dbfilters.Filter) (items []map[string]interface{}, err error) {
 	t := s.getTableName(options)
 	if t == "" {
 		return nil, fmt.Errorf("no table name provided")
@@ -182,7 +182,7 @@ func (s *SQL) getTableName(options map[string]string) string {
 	return t
 }
 
-func generateWhereClause(filters ...filters.Filter) (string, []interface{}, error) {
+func generateWhereClause(filters ...dbfilters.Filter) (string, []interface{}, error) {
 	single := make([]string, len(filters))
 	values := make([]interface{}, len(filters))
 	for i, filter := range filters {
@@ -223,7 +223,7 @@ func (s *SQL) Store(ctx context.Context, item map[string]interface{}, options ma
 	return err
 }
 
-func (s *SQL) Update(ctx context.Context, fields map[string]interface{}, options map[string]string, filters ...filters.Filter) (string, error) {
+func (s *SQL) Update(ctx context.Context, fields map[string]interface{}, options map[string]string, filters ...dbfilters.Filter) (string, error) {
 	t := s.getTableName(options)
 	if t == "" {
 		return "", fmt.Errorf("no table name provided")
@@ -268,9 +268,18 @@ func (s *SQL) Update(ctx context.Context, fields map[string]interface{}, options
 	}
 
 	query = s.db.Rebind(query)
-	_, err = s.db.Exec(query, values...)
+	result, err := s.db.Exec(query, values...)
 	if err != nil {
 		return "", err
 	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return "", fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		return "", dbfilters.ErrNoMatch
+	}
+
 	return id, nil
 }

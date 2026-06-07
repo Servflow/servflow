@@ -213,8 +213,7 @@ func (m *Mongo) Update(ctx context.Context, fields map[string]interface{}, opts 
 	err = m.client.Database(m.dbName).Collection(c).FindOneAndUpdate(ctx, bsonFilter, bson.M{"$set": fields}, updateOpts).Decode(&updatedDoc)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			// No document matched the filter - this is not an error, just no update happened
-			return "", nil
+			return "", dbfilters.ErrNoMatch
 		}
 		return "", fmt.Errorf("error with update: %w", err)
 	}

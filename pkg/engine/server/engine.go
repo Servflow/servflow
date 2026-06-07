@@ -23,6 +23,7 @@ import (
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/jwt"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/mongoquery"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/parallel"
+	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/save"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/static"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/store_key"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/storevector"

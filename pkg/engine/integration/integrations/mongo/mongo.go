@@ -194,25 +194,39 @@ func newWrapper(cfg Config) (*Mongo, error) {
 	return m, nil
 }
 
-func (m *Mongo) Update(ctx context.Context, fields map[string]interface{}, options map[string]string, filters ...dbfilters.Filter) error {
+func (m *Mongo) Update(ctx context.Context, fields map[string]interface{}, opts map[string]string, filters ...dbfilters.Filter) (string, error) {
 	if err := m.ensureConnected(ctx); err != nil {
-		return fmt.Errorf("connection error: %w", err)
+		return "", fmt.Errorf("connection error: %w", err)
 	}
 
-	c, ok := options[collectionOption]
+	c, ok := opts[collectionOption]
 	if !ok {
-		return fmt.Errorf("invalid collection")
+		return "", fmt.Errorf("invalid collection")
 	}
 	bsonFilter, err := dbfilters.FiltersToBSON(filters)
 	if err != nil {
-		return fmt.Errorf("invalid filters: %w", err)
+		return "", fmt.Errorf("invalid filters: %w", err)
 	}
 
-	_, err = m.client.Database(m.dbName).Collection(c).UpdateOne(ctx, bsonFilter, bson.M{"$set": fields})
+	updateOpts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+	var updatedDoc bson.M
+	err = m.client.Database(m.dbName).Collection(c).FindOneAndUpdate(ctx, bsonFilter, bson.M{"$set": fields}, updateOpts).Decode(&updatedDoc)
 	if err != nil {
-		return fmt.Errorf("error with update: %w", err)
+		if err == mongo.ErrNoDocuments {
+			return "", dbfilters.ErrNoMatch
+		}
+		return "", fmt.Errorf("error with update: %w", err)
 	}
-	return nil
+
+	// Extract ID from updated document
+	var id string
+	if oid, ok := updatedDoc["_id"]; ok {
+		id = fmt.Sprintf("%v", oid)
+	} else if idField, ok := updatedDoc["id"]; ok {
+		id = fmt.Sprintf("%v", idField)
+	}
+
+	return id, nil
 }
 
 func (m *Mongo) Fetch(ctx context.Context, options map[string]string, filters ...dbfilters.Filter) (items []map[string]interface{}, err error) {

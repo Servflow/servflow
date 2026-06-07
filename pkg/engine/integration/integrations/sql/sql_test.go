@@ -844,7 +844,7 @@ func TestSQL_Update(t *testing.T) {
 			}
 
 			// Execute the update operation
-			err := s.Update(context.Background(), tc.fields, tc.options, tc.filters...)
+			_, err := s.Update(context.Background(), tc.fields, tc.options, tc.filters...)
 
 			// Check results
 			if tc.wantErr {

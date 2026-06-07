@@ -105,6 +105,7 @@ func (rc *RequestContext) getFuncMap(funcMap template.FuncMap) template.FuncMap 
 		"empty":        rc.tmplFuncEmpty,
 		"notempty":     rc.tmplFuncNotEmpty,
 		"bcrypt":       rc.tmplFuncBcrypt,
+		"workspace":    rc.tmplFuncWorkspace,
 	}
 	// Add request-scoped functions (param, header, body, urlparam, etc.)
 	for k, v := range rc.requestFuncs {
@@ -326,4 +327,10 @@ func (rc *RequestContext) tmplFuncBcrypt(val, hashed, name string) bool {
 		return false
 	}
 	return true
+}
+
+// tmplFuncWorkspace returns the workspace directory path.
+func (rc *RequestContext) tmplFuncWorkspace() string {
+	path, _ := rc.GetWorkspace()
+	return path
 }

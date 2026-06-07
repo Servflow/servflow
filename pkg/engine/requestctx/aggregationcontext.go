@@ -4,11 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"sync"
 	"text/template"
 )
 
 var ErrNoContext = errors.New("no context provided in request")
+
+// DefaultWorkspacePath is the default workspace directory when none is specified.
+const DefaultWorkspacePath = "/tmp/servflow-workspace"
 
 type contextKey string
 
@@ -21,6 +25,7 @@ type RequestContext struct {
 	requestFuncs     template.FuncMap
 	validationErrors []error
 	availableFiles   map[string]*FileValue
+	workspace        string
 }
 
 // TODO move this and dpl together
@@ -59,6 +64,44 @@ func (rc *RequestContext) TemplateFunctions() template.FuncMap {
 
 func (rc *RequestContext) Variables() map[string]interface{} {
 	return rc.requestVariables
+}
+
+// SetWorkspace sets the workspace directory path for this request.
+func (rc *RequestContext) SetWorkspace(path string) {
+	rc.Lock()
+	defer rc.Unlock()
+	rc.workspace = path
+}
+
+// GetWorkspace returns the workspace directory path for this request.
+// If the directory doesn't exist, it will be created.
+// If no workspace was set, it uses DefaultWorkspacePath.
+func (rc *RequestContext) GetWorkspace() (string, error) {
+	rc.Lock()
+	path := rc.workspace
+	rc.Unlock()
+
+	if path == "" {
+		path = DefaultWorkspacePath
+	}
+
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		if err := os.MkdirAll(path, 0755); err != nil {
+			return "", fmt.Errorf("failed to create workspace directory: %w", err)
+		}
+	}
+
+	return path, nil
+}
+
+// GetWorkspace retrieves the workspace path from context.
+// This is the helper function actions should call.
+func GetWorkspace(ctx context.Context) (string, error) {
+	reqCtx, err := FromContextOrError(ctx)
+	if err != nil {
+		return "", err
+	}
+	return reqCtx.GetWorkspace()
 }
 
 func NewRequestContext(id string) *RequestContext {

@@ -39,6 +39,9 @@ type PlannerConfig struct {
 	// If not set or set to 0, background actions will run without a timeout.
 	DispatchTimeout time.Duration
 
+	// Workspace is the directory path where workspace-aware actions will execute.
+	Workspace string
+
 	CustomRegistry *actions.Registry
 	Actions        map[string]apiconfig.Action
 	Conditions     map[string]apiconfig.Conditional
@@ -108,6 +111,7 @@ func (p *PlannerV2) Plan() (*Plan, error) {
 		steps:           p.finalSteps,
 		actionNameToID:  actionNameToID,
 		dispatchTimeout: dispatchTimeout,
+		workspace:       p.config.Workspace,
 	}, nil
 }
 

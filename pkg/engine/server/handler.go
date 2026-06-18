@@ -32,11 +32,17 @@ func (e *Engine) createBasicHandler(config *apiconfig.APIConfig) (http.Handler, 
 	logger := logging.FromContext(e.ctx)
 	logger.Debug("Loading API configuration", zap.String("api", config.ID), zap.String("path", config.HttpConfig.ListenPath), zap.String("method", config.HttpConfig.Method))
 
+	ws, err := e.resolveWorkspace(config)
+	if err != nil {
+		return nil, err
+	}
+
 	planner := plan.NewPlannerV2(plan.PlannerConfig{
 		Actions:      config.Actions,
 		Conditions:   config.Conditionals,
 		Responses:    config.Responses,
 		Integrations: config.Integrations,
+		Workspace:    ws,
 	}, logger)
 	p, err := planner.Plan()
 	if err != nil {

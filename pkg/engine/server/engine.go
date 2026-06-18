@@ -30,6 +30,7 @@ import (
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/stub"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/update"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/write"
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
 
 	"github.com/Servflow/servflow/pkg/engine/integration"
 	_ "github.com/Servflow/servflow/pkg/engine/integration/integrations/mongo"
@@ -143,6 +144,30 @@ func WithRequestHook(hook RequestHook) Option {
 	}
 }
 
+// WorkspaceProvider resolves the file capability for a given API config, from
+// the workspace assigned to the agent that owns the config. Returning (nil, nil)
+// means the config has no workspace and its file actions will fail with
+// requestctx.ErrNoWorkspace.
+type WorkspaceProvider func(config *apiconfig.APIConfig) (requestctx.Workspace, error)
+
+// WithWorkspaceProvider installs a resolver that supplies each config's workspace
+// capability. The resolved workspace is baked into the config's plan and applied
+// to every request's context before execution.
+func WithWorkspaceProvider(provider WorkspaceProvider) Option {
+	return func(e *Engine) {
+		e.workspaceProvider = provider
+	}
+}
+
+// resolveWorkspace resolves the workspace capability for a config via the
+// configured provider, returning nil when no provider is installed.
+func (e *Engine) resolveWorkspace(config *apiconfig.APIConfig) (requestctx.Workspace, error) {
+	if e.workspaceProvider == nil {
+		return nil, nil
+	}
+	return e.workspaceProvider(config)
+}
+
 type DirectConfigs struct {
 	APIConfigs   []*apiconfig.APIConfig
 	EngineConfig *EngineConfig
@@ -165,6 +190,7 @@ type Engine struct {
 	externalMode      bool
 	handler           http.HandlerFunc
 	backgroundManager *plan.BackgroundManager
+	workspaceProvider WorkspaceProvider
 }
 
 func New(port, env string, opts ...Option) (*Engine, error) {

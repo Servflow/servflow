@@ -105,7 +105,7 @@ func (rc *RequestContext) getFuncMap(funcMap template.FuncMap) template.FuncMap 
 		"empty":        rc.tmplFuncEmpty,
 		"notempty":     rc.tmplFuncNotEmpty,
 		"bcrypt":       rc.tmplFuncBcrypt,
-		"workspace":    rc.tmplFuncWorkspace,
+		"file":         rc.tmplFuncFile,
 	}
 	// Add request-scoped functions (param, header, body, urlparam, etc.)
 	for k, v := range rc.requestFuncs {
@@ -329,8 +329,18 @@ func (rc *RequestContext) tmplFuncBcrypt(val, hashed, name string) bool {
 	return true
 }
 
-// tmplFuncWorkspace returns the workspace directory path.
-func (rc *RequestContext) tmplFuncWorkspace() string {
-	path, _ := rc.GetWorkspace()
-	return path
+// tmplFuncFile reads a file from the request's workspace and returns its
+// contents as a string. The path is workspace-relative; reads outside the
+// workspace are impossible by construction. Returning an error aborts template
+// execution so a missing file surfaces rather than silently yielding "".
+func (rc *RequestContext) tmplFuncFile(path string) (string, error) {
+	ws := rc.GetWorkspace()
+	if ws == nil {
+		return "", ErrNoWorkspace
+	}
+	data, err := ws.Read(context.Background(), path)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
 }

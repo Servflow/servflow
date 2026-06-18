@@ -20,6 +20,7 @@ type RequestType string
 const (
 	FileInputTypeRequest = "request"
 	FileInputTypeAction  = "action"
+	FileInputTypeStorage = "storage"
 )
 
 type FileInput struct {

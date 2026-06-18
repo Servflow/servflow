@@ -105,6 +105,16 @@ func GetFileFromContext(ctx context.Context, fileInput apiconfig.FileInput) (*Fi
 		key = fileKeyRequestPrefix + fileInput.Identifier
 	case apiconfig.FileInputTypeAction:
 		key = fileKeyActionPrefix + strings.TrimPrefix(fileInput.Identifier, ActionConfigPrefix)
+	case apiconfig.FileInputTypeStorage:
+		ws := reqCtx.GetWorkspace()
+		if ws == nil {
+			return nil, ErrNoWorkspace
+		}
+		data, err := ws.Read(ctx, fileInput.Identifier)
+		if err != nil {
+			return nil, err
+		}
+		return NewFileValue(io.NopCloser(bytes.NewReader(data)), fileInput.Identifier), nil
 	default:
 		return nil, nil
 	}

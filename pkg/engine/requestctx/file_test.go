@@ -2,6 +2,7 @@ package requestctx
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -502,5 +503,124 @@ func TestFileValue_CloseBehavior(t *testing.T) {
 		if !bytes.Equal(readContent, content) {
 			t.Errorf("Cached content mismatch. Expected: %s, Got: %s", string(content), string(readContent))
 		}
+	})
+}
+
+// mockWorkspace implements requestctx.Workspace for testing storage-type file
+// inputs, which now read from the request's workspace capability.
+type mockWorkspace struct {
+	files map[string][]byte
+	err   error
+}
+
+func (m *mockWorkspace) Read(ctx context.Context, path string) ([]byte, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	content, ok := m.files[path]
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrWorkspaceNotExist, path)
+	}
+	return content, nil
+}
+
+func (m *mockWorkspace) Write(ctx context.Context, path string, data []byte) error { return nil }
+func (m *mockWorkspace) Delete(ctx context.Context, path string) error             { return nil }
+func (m *mockWorkspace) List(ctx context.Context, prefix string) ([]WorkspaceEntry, error) {
+	return nil, nil
+}
+func (m *mockWorkspace) Stat(ctx context.Context, path string) (WorkspaceEntry, error) {
+	return WorkspaceEntry{}, nil
+}
+
+func TestGetFileFromContext_StorageWorkspace(t *testing.T) {
+	t.Run("no workspace returns error", func(t *testing.T) {
+		ctx := NewTestContext()
+
+		fv, err := GetFileFromContext(ctx, apiconfig.FileInput{
+			Type:       apiconfig.FileInputTypeStorage,
+			Identifier: "some-file-id",
+		})
+
+		assert.Nil(t, fv)
+		assert.ErrorIs(t, err, ErrNoWorkspace)
+	})
+
+	t.Run("workspace returns file", func(t *testing.T) {
+		ctx := NewTestContext()
+		reqCtx, err := FromContextOrError(ctx)
+		require.NoError(t, err)
+
+		expectedContent := []byte("file from storage")
+		reqCtx.SetWorkspace(&mockWorkspace{
+			files: map[string][]byte{
+				"my-file-id": expectedContent,
+			},
+		})
+
+		fv, err := GetFileFromContext(ctx, apiconfig.FileInput{
+			Type:       apiconfig.FileInputTypeStorage,
+			Identifier: "my-file-id",
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, fv)
+
+		assert.Equal(t, "my-file-id", fv.Name)
+
+		content, err := fv.GetContent()
+		require.NoError(t, err)
+		assert.Equal(t, expectedContent, content)
+
+		fv.Close()
+	})
+
+	t.Run("workspace returns error", func(t *testing.T) {
+		ctx := NewTestContext()
+		reqCtx, err := FromContextOrError(ctx)
+		require.NoError(t, err)
+
+		workspaceErr := fmt.Errorf("storage unavailable")
+		reqCtx.SetWorkspace(&mockWorkspace{err: workspaceErr})
+
+		fv, err := GetFileFromContext(ctx, apiconfig.FileInput{
+			Type:       apiconfig.FileInputTypeStorage,
+			Identifier: "any-id",
+		})
+
+		assert.Nil(t, fv)
+		assert.ErrorIs(t, err, workspaceErr)
+	})
+
+	t.Run("workspace file not found", func(t *testing.T) {
+		ctx := NewTestContext()
+		reqCtx, err := FromContextOrError(ctx)
+		require.NoError(t, err)
+
+		reqCtx.SetWorkspace(&mockWorkspace{files: map[string][]byte{}})
+
+		fv, err := GetFileFromContext(ctx, apiconfig.FileInput{
+			Type:       apiconfig.FileInputTypeStorage,
+			Identifier: "nonexistent",
+		})
+
+		assert.Nil(t, fv)
+		assert.ErrorIs(t, err, ErrWorkspaceNotExist)
+	})
+}
+
+func TestRequestContext_Workspace(t *testing.T) {
+	t.Run("get workspace returns nil when not set", func(t *testing.T) {
+		reqCtx := NewRequestContext("test")
+		assert.Nil(t, reqCtx.GetWorkspace())
+	})
+
+	t.Run("set and get workspace", func(t *testing.T) {
+		reqCtx := NewRequestContext("test")
+		ws := &mockWorkspace{}
+
+		reqCtx.SetWorkspace(ws)
+
+		assert.Equal(t, Workspace(ws), reqCtx.GetWorkspace())
 	})
 }

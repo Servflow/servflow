@@ -17,10 +17,17 @@ import (
 
 func (e *Engine) createMCPHandler(config *apiconfig.APIConfig) error {
 	logger := e.logger.With(zap.String("type", "mcp"), zap.String("tool", config.McpTool.Name))
+
+	ws, err := e.resolveWorkspace(config)
+	if err != nil {
+		return fmt.Errorf("could not resolve workspace: %v", err)
+	}
+
 	//generate plan
 	planner := plan.NewPlannerV2(plan.PlannerConfig{
 		Actions:    config.Actions,
 		Conditions: config.Conditionals,
+		Workspace:  ws,
 	}, logger)
 
 	p, err := planner.Plan()

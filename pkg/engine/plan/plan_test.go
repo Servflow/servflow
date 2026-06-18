@@ -287,26 +287,37 @@ func TestBackgroundManager_Shutdown(t *testing.T) {
 	}
 }
 
+// fakePlanWorkspace is a minimal requestctx.Workspace used to assert the
+// capability is threaded through the plan into the request context.
+type fakePlanWorkspace struct {
+	content []byte
+}
+
+func (f *fakePlanWorkspace) Read(ctx context.Context, path string) ([]byte, error) {
+	return f.content, nil
+}
+func (f *fakePlanWorkspace) Write(ctx context.Context, path string, data []byte) error { return nil }
+func (f *fakePlanWorkspace) Stat(ctx context.Context, path string) (requestctx2.WorkspaceEntry, error) {
+	return requestctx2.WorkspaceEntry{}, nil
+}
+
 func TestPlan_WorkspacePassedToActions(t *testing.T) {
-	// Create a temp directory for the custom workspace test
-	tempWorkspace, err := os.MkdirTemp("", "servflow-workspace-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tempWorkspace)
+	fake := &fakePlanWorkspace{}
 
 	testCases := []struct {
-		name              string
-		workspace         string
-		expectedWorkspace string
+		name      string
+		workspace requestctx2.Workspace
+		expectNil bool
 	}{
 		{
-			name:              "workspace is passed to request context",
-			workspace:         tempWorkspace,
-			expectedWorkspace: tempWorkspace,
+			name:      "workspace capability is passed to request context",
+			workspace: fake,
+			expectNil: false,
 		},
 		{
-			name:              "empty workspace uses default",
-			workspace:         "",
-			expectedWorkspace: requestctx2.DefaultWorkspacePath,
+			name:      "nil workspace yields ErrNoWorkspace",
+			workspace: nil,
+			expectNil: true,
 		},
 	}
 
@@ -315,16 +326,17 @@ func TestPlan_WorkspacePassedToActions(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			var capturedWorkspace string
+			var (
+				captured    requestctx2.Workspace
+				capturedErr error
+			)
 
 			mockExec := NewMockActionExecutable(ctrl)
 			mockExec.EXPECT().Config().Return("").AnyTimes()
 			mockExec.EXPECT().SupportsReplica().Return(false).AnyTimes()
 			mockExec.EXPECT().Execute(gomock.Any(), gomock.Any()).
 				DoAndReturn(func(ctx context.Context, _ string) (interface{}, map[string]string, error) {
-					workspace, err := requestctx2.GetWorkspace(ctx)
-					require.NoError(t, err)
-					capturedWorkspace = workspace
+					captured, capturedErr = requestctx2.WorkspaceFromContext(ctx)
 					return "done", nil, nil
 				})
 
@@ -366,7 +378,13 @@ func TestPlan_WorkspacePassedToActions(t *testing.T) {
 			_, err = plan.Execute(ctx, requestctx2.ActionConfigPrefix+"test_action", nil)
 			require.NoError(t, err)
 
-			assert.Equal(t, tc.expectedWorkspace, capturedWorkspace)
+			if tc.expectNil {
+				assert.ErrorIs(t, capturedErr, requestctx2.ErrNoWorkspace)
+				assert.Nil(t, captured)
+			} else {
+				require.NoError(t, capturedErr)
+				assert.Equal(t, requestctx2.Workspace(fake), captured)
+			}
 		})
 	}
 }
@@ -375,18 +393,15 @@ func TestPlan_WorkspaceTemplateFunction(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	// Create a temp directory for the workspace
-	workspacePath, err := os.MkdirTemp("", "servflow-workspace-tmpl-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(workspacePath)
+	fake := &fakePlanWorkspace{content: []byte("hello from workspace")}
 
 	mockExec := NewMockActionExecutable(ctrl)
-	mockExec.EXPECT().Config().Return(`{"path": "{{ workspace }}"}`).AnyTimes()
+	mockExec.EXPECT().Config().Return(`{"content": "{{ file \"hello.txt\" }}"}`).AnyTimes()
 	mockExec.EXPECT().SupportsReplica().Return(false).AnyTimes()
 	mockExec.EXPECT().Execute(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(ctx context.Context, config string) (interface{}, map[string]string, error) {
-			// Verify the workspace template was resolved in the config
-			assert.Contains(t, config, workspacePath)
+			// The {{ file }} template function reads from the workspace capability.
+			assert.Contains(t, config, "hello from workspace")
 			return "done", nil, nil
 		})
 
@@ -418,7 +433,7 @@ func TestPlan_WorkspaceTemplateFunction(t *testing.T) {
 		Actions:        cfg.Actions,
 		Responses:      cfg.Responses,
 		CustomRegistry: registry,
-		Workspace:      workspacePath,
+		Workspace:      fake,
 	}, logging.GetNewLogger())
 
 	plan, err := planner.Plan()

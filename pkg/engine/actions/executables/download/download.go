@@ -3,11 +3,8 @@ package download
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
-	"os"
-	"path/filepath"
+	"path"
 
 	"github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/actions"
@@ -45,9 +42,6 @@ func (d *Download) Config() string {
 }
 
 func New(config Config) (*Download, error) {
-	if config.DestinationPath == "" {
-		return nil, errors.New("destinationPath is required")
-	}
 	return &Download{
 		cfg: &config,
 	}, nil
@@ -60,6 +54,13 @@ func (d *Download) Execute(ctx context.Context, modifiedConfig string) (interfac
 	var cfg Config
 	if err := json.Unmarshal([]byte(modifiedConfig), &cfg); err != nil {
 		return nil, nil, err
+	}
+
+	// The workspace is the only filesystem an action may touch; the destination
+	// path is interpreted relative to its root, never the host filesystem.
+	ws, err := requestctx.WorkspaceFromContext(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("%w: %v", plan.ErrFailure, err)
 	}
 
 	fileValue, err := requestctx.GetFileFromContext(ctx, cfg.File)
@@ -77,36 +78,28 @@ func (d *Download) Execute(ctx context.Context, modifiedConfig string) (interfac
 		return nil, nil, fmt.Errorf("%w: no filename specified and original filename is empty", plan.ErrFailure)
 	}
 
-	if err := os.MkdirAll(cfg.DestinationPath, 0755); err != nil {
-		return nil, nil, fmt.Errorf("failed to create destination directory: %w", err)
-	}
-
-	fullPath := filepath.Join(cfg.DestinationPath, fileName)
+	// path.Join cleans the workspace-relative path; confinement (".." rejection)
+	// is enforced by the workspace implementation, not here.
+	destPath := path.Join(cfg.DestinationPath, fileName)
 
 	if !cfg.Overwrite {
-		if _, err := os.Stat(fullPath); err == nil {
-			return nil, nil, fmt.Errorf("%w: file already exists: %s", plan.ErrFailure, fullPath)
+		if _, err := ws.Stat(ctx, destPath); err == nil {
+			return nil, nil, fmt.Errorf("%w: file already exists: %s", plan.ErrFailure, destPath)
 		}
 	}
 
-	file, err := os.Create(fullPath)
+	data, err := fileValue.GetContent()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create file: %w", err)
-	}
-	defer file.Close()
-
-	reader, err := fileValue.NewReader()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get file reader: %w", err)
+		return nil, nil, fmt.Errorf("failed to read file content: %w", err)
 	}
 
-	if _, err := io.Copy(file, reader); err != nil {
+	if err := ws.Write(ctx, destPath, data); err != nil {
 		return nil, nil, fmt.Errorf("failed to write file: %w", err)
 	}
 
-	logger.Debug("file downloaded successfully", zap.String("path", fullPath))
+	logger.Debug("file downloaded successfully", zap.String("path", destPath))
 
-	return fullPath, nil, nil
+	return destPath, nil, nil
 }
 
 func init() {

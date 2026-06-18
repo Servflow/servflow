@@ -2,9 +2,9 @@ package download
 
 import (
 	"context"
+	"fmt"
 	"io"
-	"os"
-	"path/filepath"
+	"path"
 	"strings"
 	"testing"
 
@@ -15,11 +15,52 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// memWorkspace is an in-memory requestctx.Workspace for exercising the download
+// action without touching the host filesystem. Paths are workspace-relative.
+type memWorkspace struct {
+	files map[string][]byte
+}
+
+func newMemWorkspace() *memWorkspace {
+	return &memWorkspace{files: make(map[string][]byte)}
+}
+
+func (m *memWorkspace) Read(ctx context.Context, p string) ([]byte, error) {
+	d, ok := m.files[p]
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", requestctx.ErrWorkspaceNotExist, p)
+	}
+	return d, nil
+}
+
+func (m *memWorkspace) Write(ctx context.Context, p string, data []byte) error {
+	m.files[p] = data
+	return nil
+}
+
+func (m *memWorkspace) Delete(ctx context.Context, p string) error {
+	delete(m.files, p)
+	return nil
+}
+
+func (m *memWorkspace) List(ctx context.Context, prefix string) ([]requestctx.WorkspaceEntry, error) {
+	return nil, nil
+}
+
+func (m *memWorkspace) Stat(ctx context.Context, p string) (requestctx.WorkspaceEntry, error) {
+	if _, ok := m.files[p]; !ok {
+		return requestctx.WorkspaceEntry{}, fmt.Errorf("%w: %s", requestctx.ErrWorkspaceNotExist, p)
+	}
+	return requestctx.WorkspaceEntry{Path: p}, nil
+}
+
 func TestDownload_Execute(t *testing.T) {
 	tests := []struct {
 		name           string
-		setupContext   func(t *testing.T, ctx context.Context) context.Context
-		setupFS        func(t *testing.T, destPath string)
+		destinationDir string
+		setupContext   func(t *testing.T, ctx context.Context)
+		setupFS        func(t *testing.T, ws *memWorkspace, destPath string)
+		noWorkspace    bool
 		config         Config
 		expectedResult string
 		expectError    bool
@@ -27,86 +68,61 @@ func TestDownload_Execute(t *testing.T) {
 	}{
 		{
 			name: "successful download with specified filename",
-			setupContext: func(t *testing.T, ctx context.Context) context.Context {
+			setupContext: func(t *testing.T, ctx context.Context) {
 				reqCtx, _ := requestctx.FromContextOrError(ctx)
-				fileContent := "test file content"
-				file := io.NopCloser(strings.NewReader(fileContent))
+				file := io.NopCloser(strings.NewReader("test file content"))
 				reqCtx.AddRequestFile("testfile", requestctx.NewFileValue(file, "original.txt"))
-				return ctx
 			},
 			config: Config{
-				File: apiconfig.FileInput{
-					Type:       apiconfig.FileInputTypeRequest,
-					Identifier: "testfile",
-				},
+				File:      apiconfig.FileInput{Type: apiconfig.FileInputTypeRequest, Identifier: "testfile"},
 				FileName:  "custom.txt",
 				Overwrite: false,
 			},
 			expectedResult: "custom.txt",
-			expectError:    false,
 		},
 		{
 			name: "successful download using original filename",
-			setupContext: func(t *testing.T, ctx context.Context) context.Context {
+			setupContext: func(t *testing.T, ctx context.Context) {
 				reqCtx, _ := requestctx.FromContextOrError(ctx)
-				fileContent := "test file content"
-				file := io.NopCloser(strings.NewReader(fileContent))
+				file := io.NopCloser(strings.NewReader("test file content"))
 				reqCtx.AddRequestFile("testfile", requestctx.NewFileValue(file, "original.txt"))
-				return ctx
 			},
 			config: Config{
-				File: apiconfig.FileInput{
-					Type:       apiconfig.FileInputTypeRequest,
-					Identifier: "testfile",
-				},
+				File:      apiconfig.FileInput{Type: apiconfig.FileInputTypeRequest, Identifier: "testfile"},
 				FileName:  "",
 				Overwrite: false,
 			},
 			expectedResult: "original.txt",
-			expectError:    false,
 		},
 		{
 			name: "overwrite enabled replaces existing file",
-			setupContext: func(t *testing.T, ctx context.Context) context.Context {
+			setupContext: func(t *testing.T, ctx context.Context) {
 				reqCtx, _ := requestctx.FromContextOrError(ctx)
-				fileContent := "new content"
-				file := io.NopCloser(strings.NewReader(fileContent))
+				file := io.NopCloser(strings.NewReader("new content"))
 				reqCtx.AddRequestFile("testfile", requestctx.NewFileValue(file, "existing.txt"))
-				return ctx
 			},
-			setupFS: func(t *testing.T, destPath string) {
-				err := os.WriteFile(filepath.Join(destPath, "existing.txt"), []byte("old content"), 0644)
-				require.NoError(t, err)
+			setupFS: func(t *testing.T, ws *memWorkspace, destPath string) {
+				ws.files[path.Join(destPath, "existing.txt")] = []byte("old content")
 			},
 			config: Config{
-				File: apiconfig.FileInput{
-					Type:       apiconfig.FileInputTypeRequest,
-					Identifier: "testfile",
-				},
+				File:      apiconfig.FileInput{Type: apiconfig.FileInputTypeRequest, Identifier: "testfile"},
 				FileName:  "existing.txt",
 				Overwrite: true,
 			},
 			expectedResult: "existing.txt",
-			expectError:    false,
 		},
 		{
 			name: "overwrite disabled fails when file exists",
-			setupContext: func(t *testing.T, ctx context.Context) context.Context {
+			setupContext: func(t *testing.T, ctx context.Context) {
 				reqCtx, _ := requestctx.FromContextOrError(ctx)
-				fileContent := "new content"
-				file := io.NopCloser(strings.NewReader(fileContent))
+				file := io.NopCloser(strings.NewReader("new content"))
 				reqCtx.AddRequestFile("testfile", requestctx.NewFileValue(file, "existing.txt"))
-				return ctx
 			},
-			setupFS: func(t *testing.T, destPath string) {
-				err := os.WriteFile(filepath.Join(destPath, "existing.txt"), []byte("old content"), 0644)
-				require.NoError(t, err)
+			setupFS: func(t *testing.T, ws *memWorkspace, destPath string) {
+				ws.files[path.Join(destPath, "existing.txt")] = []byte("old content")
 			},
 			config: Config{
-				File: apiconfig.FileInput{
-					Type:       apiconfig.FileInputTypeRequest,
-					Identifier: "testfile",
-				},
+				File:      apiconfig.FileInput{Type: apiconfig.FileInputTypeRequest, Identifier: "testfile"},
 				FileName:  "existing.txt",
 				Overwrite: false,
 			},
@@ -115,14 +131,8 @@ func TestDownload_Execute(t *testing.T) {
 		},
 		{
 			name: "missing file input",
-			setupContext: func(t *testing.T, ctx context.Context) context.Context {
-				return ctx
-			},
 			config: Config{
-				File: apiconfig.FileInput{
-					Type:       apiconfig.FileInputTypeRequest,
-					Identifier: "nonexistent",
-				},
+				File:      apiconfig.FileInput{Type: apiconfig.FileInputTypeRequest, Identifier: "nonexistent"},
 				FileName:  "output.txt",
 				Overwrite: false,
 			},
@@ -130,52 +140,57 @@ func TestDownload_Execute(t *testing.T) {
 			errorContains: "file not found",
 		},
 		{
-			name: "creates destination directory",
-			setupContext: func(t *testing.T, ctx context.Context) context.Context {
+			name:           "writes into nested destination directory",
+			destinationDir: "nested/directory",
+			setupContext: func(t *testing.T, ctx context.Context) {
 				reqCtx, _ := requestctx.FromContextOrError(ctx)
-				fileContent := "test file content"
-				file := io.NopCloser(strings.NewReader(fileContent))
+				file := io.NopCloser(strings.NewReader("test file content"))
 				reqCtx.AddRequestFile("testfile", requestctx.NewFileValue(file, "test.txt"))
-				return ctx
 			},
 			config: Config{
-				File: apiconfig.FileInput{
-					Type:       apiconfig.FileInputTypeRequest,
-					Identifier: "testfile",
-				},
+				File:      apiconfig.FileInput{Type: apiconfig.FileInputTypeRequest, Identifier: "testfile"},
 				FileName:  "test.txt",
 				Overwrite: false,
 			},
 			expectedResult: "test.txt",
-			expectError:    false,
+		},
+		{
+			name: "no workspace configured fails",
+			setupContext: func(t *testing.T, ctx context.Context) {
+				reqCtx, _ := requestctx.FromContextOrError(ctx)
+				file := io.NopCloser(strings.NewReader("test file content"))
+				reqCtx.AddRequestFile("testfile", requestctx.NewFileValue(file, "test.txt"))
+			},
+			noWorkspace: true,
+			config: Config{
+				File:      apiconfig.FileInput{Type: apiconfig.FileInputTypeRequest, Identifier: "testfile"},
+				FileName:  "test.txt",
+				Overwrite: false,
+			},
+			expectError:   true,
+			errorContains: requestctx.ErrNoWorkspace.Error(),
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			tempDir := t.TempDir()
-
-			destPath := tc.config.DestinationPath
-			if destPath == "" {
-				if tc.name == "creates destination directory" {
-					destPath = filepath.Join(tempDir, "nested", "directory")
-				} else {
-					destPath = tempDir
-				}
-			}
-
 			ctx := requestctx.NewTestContext()
+			ws := newMemWorkspace()
+
+			if !tc.noWorkspace {
+				reqCtx, _ := requestctx.FromContextOrError(ctx)
+				reqCtx.SetWorkspace(ws)
+			}
 
 			if tc.setupContext != nil {
-				ctx = tc.setupContext(t, ctx)
+				tc.setupContext(t, ctx)
 			}
-
 			if tc.setupFS != nil {
-				tc.setupFS(t, destPath)
+				tc.setupFS(t, ws, tc.destinationDir)
 			}
 
 			cfg := tc.config
-			cfg.DestinationPath = destPath
+			cfg.DestinationPath = tc.destinationDir
 
 			download, err := New(cfg)
 			require.NoError(t, err)
@@ -193,16 +208,14 @@ func TestDownload_Execute(t *testing.T) {
 
 			require.NoError(t, err)
 
-			expectedPath := filepath.Join(destPath, tc.expectedResult)
+			expectedPath := path.Join(tc.destinationDir, tc.expectedResult)
 			assert.Equal(t, expectedPath, result)
 
-			_, err = os.Stat(expectedPath)
-			assert.NoError(t, err, "file should exist at destination")
+			data, err := ws.Read(ctx, expectedPath)
+			require.NoError(t, err, "file should exist in workspace")
 
 			if tc.name == "overwrite enabled replaces existing file" {
-				content, err := os.ReadFile(expectedPath)
-				require.NoError(t, err)
-				assert.Equal(t, "new content", string(content))
+				assert.Equal(t, "new content", string(data))
 			}
 		})
 	}

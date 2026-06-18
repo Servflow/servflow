@@ -39,8 +39,12 @@ type PlannerConfig struct {
 	// If not set or set to 0, background actions will run without a timeout.
 	DispatchTimeout time.Duration
 
-	// Workspace is the directory path where workspace-aware actions will execute.
-	Workspace string
+	// Workspace is the file capability that workspace-aware actions and template
+	// functions use. It is resolved per config (from the owning agent's assigned
+	// workspace) and applied to each request's context before the plan runs. A
+	// nil value means the config has no workspace; file actions then fail with
+	// requestctx.ErrNoWorkspace.
+	Workspace requestctx.Workspace
 
 	CustomRegistry *actions.Registry
 	Actions        map[string]apiconfig.Action

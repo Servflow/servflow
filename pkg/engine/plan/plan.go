@@ -30,7 +30,7 @@ type Plan struct {
 	steps           map[string]stepWrapper
 	actionNameToID  map[string]string
 	dispatchTimeout time.Duration
-	workspace       string
+	workspace       requestctx.Workspace
 }
 
 var (
@@ -143,7 +143,7 @@ func (p *Plan) Execute(ctx context.Context, id string, endValue *EndValueSpec) (
 
 	// Register the action template function and set workspace on the request context
 	if reqCtx, ok := requestctx.FromContext(ctx); ok {
-		if p.workspace != "" {
+		if p.workspace != nil {
 			reqCtx.SetWorkspace(p.workspace)
 		}
 		reqCtx.AddRequestTemplateFunctions(template.FuncMap{

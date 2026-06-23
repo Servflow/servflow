@@ -42,7 +42,7 @@ var sampleConfig = &apiconfig.APIConfig{
 		},
 		"action4": {
 			Type:   "mock",
-			Next:   "end",
+			Next:   "",
 			Config: map[string]interface{}{"key": "value"},
 		},
 		"action5": {
@@ -97,7 +97,6 @@ func BenchmarkTestPlannerV2_Generate(b *testing.B) {
 		Actions:        sampleConfig.Actions,
 		Conditions:     sampleConfig.Conditionals,
 		Responses:      sampleConfig.Responses,
-		TerminateTag:   "end",
 		CustomRegistry: mockRegistry,
 	}, logging.GetNewLogger())
 
@@ -369,7 +368,6 @@ func TestPlannerV2_generateConditionalStep(t *testing.T) {
 		Actions:        config.Actions,
 		Conditions:     config.Conditionals,
 		Responses:      config.Responses,
-		TerminateTag:   "end",
 		CustomRegistry: mockRegistry,
 	}, silentLogger())
 
@@ -412,7 +410,6 @@ func TestPlannerV2_generateResponseStep(t *testing.T) {
 		Actions:        config.Actions,
 		Conditions:     config.Conditionals,
 		Responses:      config.Responses,
-		TerminateTag:   "end",
 		CustomRegistry: mockRegistry,
 	}, silentLogger())
 

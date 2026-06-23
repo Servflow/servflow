@@ -23,9 +23,6 @@ type ActionProvider interface {
 type PlannerConfig struct {
 	// ResultTag is the key that holds the value copied from EndLookupKey
 	ResultTag string
-	// TerminateTag is the tag that stops the plan generation
-	// Deprecated: can work without it
-	TerminateTag string
 	// EndLookupKey is the key that should be looked up to get the value copied to
 	// the ResultTag, without the "."
 	// Deprecated: use EndValue instead
@@ -133,7 +130,7 @@ func (p *PlannerV2) generate(id string) error {
 }
 
 func (p *PlannerV2) generateStep(id string) (*stepWrapper, error) {
-	if id == "" || id == p.config.TerminateTag {
+	if id == "" {
 		return nil, nil
 	}
 	// Note: This is called during plan generation, not execution, so no context available

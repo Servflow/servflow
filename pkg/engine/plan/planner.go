@@ -5,7 +5,6 @@ package plan
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
@@ -74,21 +73,21 @@ func (p *PlannerV2) Plan() (*Plan, error) {
 		}
 	}
 	for id := range p.config.Actions {
-		id = requestctx.ActionConfigPrefix + id
+		id = apiconfig.ActionConfigPrefix + id
 		err := p.generate(id)
 		if err != nil {
 			return nil, err
 		}
 	}
 	for id := range p.config.Conditions {
-		id = requestctx.ConditionalConfigPrefix + id
+		id = apiconfig.ConditionalConfigPrefix + id
 		err := p.generate(id)
 		if err != nil {
 			return nil, err
 		}
 	}
 	for id := range p.config.Responses {
-		id = requestctx.ResponsesConfigPrefix + id
+		id = apiconfig.ResponsesConfigPrefix + id
 		err := p.generate(id)
 		if err != nil {
 			return nil, err
@@ -130,42 +129,41 @@ func (p *PlannerV2) generate(id string) error {
 }
 
 func (p *PlannerV2) generateStep(id string) (*stepWrapper, error) {
-	if id == "" {
-		return nil, nil
-	}
 	// Note: This is called during plan generation, not execution, so no context available
 	p.logger.Debug("Generating planner v2 step", zap.String("id", id))
 
-	// backwards compatibility
-	id = strings.TrimPrefix(id, "$")
+	kind, bareID, terminal, err := apiconfig.ParseStepRef(id)
+	if err != nil {
+		return nil, err
+	}
+	if terminal {
+		return nil, nil
+	}
 
-	if st, ok := p.finalSteps[id]; ok {
+	// canonical id (with any leading "$" stripped) is the step map key
+	canonical := apiconfig.CanonicalStepID(id)
+	if st, ok := p.finalSteps[canonical]; ok {
 		return &st, nil
 	}
 
-	var (
-		err  error
-		step Step
-	)
-	switch {
-	case strings.HasPrefix(id, requestctx.ActionConfigPrefix):
-		step, err = p.generateActionStep(strings.TrimPrefix(id, requestctx.ActionConfigPrefix))
-	case strings.HasPrefix(id, requestctx.ConditionalConfigPrefix):
-		step, err = p.generateConditionalStep(strings.TrimPrefix(id, requestctx.ConditionalConfigPrefix))
-	case strings.HasPrefix(id, requestctx.ResponsesConfigPrefix):
-		step, err = p.generateResponseStep(strings.TrimPrefix(id, requestctx.ResponsesConfigPrefix))
-	default:
-		err = fmt.Errorf("unknown step type: %s", id)
+	var step Step
+	switch kind {
+	case apiconfig.StepKindAction:
+		step, err = p.generateActionStep(bareID)
+	case apiconfig.StepKindConditional:
+		step, err = p.generateConditionalStep(bareID)
+	case apiconfig.StepKindResponse:
+		step, err = p.generateResponseStep(bareID)
 	}
 	if err != nil {
 		return nil, err
 	}
 
 	stepWr := stepWrapper{
-		id:   id,
+		id:   canonical,
 		step: step,
 	}
-	p.finalSteps[id] = stepWr
+	p.finalSteps[canonical] = stepWr
 	return &stepWr, nil
 }
 

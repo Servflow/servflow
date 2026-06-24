@@ -151,7 +151,7 @@ func TestAPIConfig_Validate(t *testing.T) {
 				}
 				return cfg
 			},
-			errMessage: "action 'action1': field query is required",
+			errMessage: "action 'action1': missing required field \"query\"",
 		},
 		{
 			name: "invalid config - empty required field",
@@ -169,7 +169,7 @@ func TestAPIConfig_Validate(t *testing.T) {
 				}
 				return cfg
 			},
-			errMessage: "action 'action1': field query is required",
+			errMessage: "action 'action1': missing required field \"query\"",
 		},
 		{
 			name: "valid config - all required fields present",
@@ -203,7 +203,7 @@ func TestAPIConfig_Validate(t *testing.T) {
 					},
 				}
 			},
-			errMessage: "path 'id': String length must be greater than or equal to 1",
+			errMessage: "field \"id\": minLength: got 0, want 1",
 		},
 		{
 			name: "invalid config - invalid HTTP method",
@@ -212,7 +212,7 @@ func TestAPIConfig_Validate(t *testing.T) {
 				cfg.HttpConfig.Method = "test"
 				return cfg
 			},
-			errMessage: "path 'http.method': http.method must be one of the following:",
+			errMessage: "field \"http.method\" has an invalid value; allowed:",
 		},
 		{
 			name: "invalid config - invalid response code",
@@ -225,7 +225,7 @@ func TestAPIConfig_Validate(t *testing.T) {
 				}
 				return cfg
 			},
-			errMessage: "path 'responses.success.code': Must be less than or equal to 599",
+			errMessage: "response \"success\" field \"code\": maximum: got 900, want 599",
 		},
 		{
 			name: "valid config with structured conditional",
@@ -347,7 +347,7 @@ func TestActionConfigError_Extraction(t *testing.T) {
 				},
 			},
 			expectedActionID: "failing-action",
-			expectedMessage:  "field required_field is required",
+			expectedMessage:  "missing required field \"required_field\"",
 		},
 	}
 
@@ -386,8 +386,8 @@ func TestSchemaValidationError_Extraction(t *testing.T) {
 			config: APIConfig{
 				ID: "",
 			},
-			expectedPath:    "id",
-			expectedMessage: "String length must be greater than or equal to 1",
+			expectedPath:    "/id",
+			expectedMessage: "minLength: got 0, want 1",
 		},
 		{
 			name: "invalid HTTP method returns SchemaValidationError with path",
@@ -397,8 +397,8 @@ func TestSchemaValidationError_Extraction(t *testing.T) {
 					Method: "INVALID",
 				},
 			},
-			expectedPath:    "http.method",
-			expectedMessage: "http.method must be one of the following",
+			expectedPath:    "/http/method",
+			expectedMessage: "has an invalid value; allowed:",
 		},
 		{
 			name: "invalid response code returns SchemaValidationError with path",
@@ -410,8 +410,8 @@ func TestSchemaValidationError_Extraction(t *testing.T) {
 					},
 				},
 			},
-			expectedPath:    "responses.error.code",
-			expectedMessage: "Must be less than or equal to 599",
+			expectedPath:    "/responses/error/code",
+			expectedMessage: "maximum: got 999, want 599",
 		},
 	}
 
@@ -482,9 +482,9 @@ func TestValidationErrors_CollectsBothSchemaAndActionErrors(t *testing.T) {
 
 	foundSchemaError := false
 	for _, schemaErr := range schemaErrors {
-		if schemaErr.Path == "id" {
+		if schemaErr.Path == "/id" {
 			foundSchemaError = true
-			assert.Contains(t, schemaErr.Message, "String length must be greater than or equal to 1")
+			assert.Contains(t, schemaErr.Message, "minLength: got 0, want 1")
 		}
 	}
 	assert.True(t, foundSchemaError, "expected to find SchemaValidationError for empty ID")
@@ -493,7 +493,7 @@ func TestValidationErrors_CollectsBothSchemaAndActionErrors(t *testing.T) {
 	for _, actionErr := range actionErrors {
 		if actionErr.ActionID == "my-action" {
 			foundActionError = true
-			assert.Contains(t, actionErr.Message, "field required_field is required")
+			assert.Contains(t, actionErr.Message, "missing required field \"required_field\"")
 		}
 	}
 	assert.True(t, foundActionError, "expected to find ActionConfigError for missing required field")

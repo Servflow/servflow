@@ -160,12 +160,14 @@ func TestCreateCustomMuxHandler(t *testing.T) {
 		},
 		Actions: map[string]apiconfig.Action{
 			"action2": {
+				Name: "action2",
 				Type: "stub",
 				Config: map[string]interface{}{
 					"key": "value",
 				},
 			},
 			"action1": {
+				Name: "action1",
 				Type: "stub",
 				Next: "action.action2",
 				Config: map[string]interface{}{
@@ -298,6 +300,7 @@ func TestExtractURLParam(t *testing.T) {
 		},
 		Actions: map[string]apiconfig.Action{
 			"action1": {
+				Name: "action1",
 				Type: "stub",
 				Next: "response.finish",
 				Config: map[string]interface{}{
@@ -307,6 +310,7 @@ func TestExtractURLParam(t *testing.T) {
 		},
 		Responses: map[string]apiconfig.ResponseConfig{
 			"finish": {
+				Name:     "finish",
 				Type:     "template",
 				Code:     200,
 				Template: `{{ urlparam "id" }}`,
@@ -336,6 +340,7 @@ func TestMultipartFormWithTemplatedAction(t *testing.T) {
 		},
 		Actions: map[string]apiconfig.Action{
 			"process_form": {
+				Name: "process_form",
 				Type: "static",
 				Config: map[string]interface{}{
 					"return": `{{ param "testfield" }}`,
@@ -345,6 +350,7 @@ func TestMultipartFormWithTemplatedAction(t *testing.T) {
 		},
 		Responses: map[string]apiconfig.ResponseConfig{
 			"success": {
+				Name:     "success",
 				Type:     "template",
 				Code:     200,
 				Template: `Field value: {{  .variable_actions_process_form }}`,

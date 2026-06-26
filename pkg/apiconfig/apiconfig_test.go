@@ -58,6 +58,7 @@ func TestAPIConfig_Validate(t *testing.T) {
 		ID: "test-api",
 		Actions: map[string]Action{
 			"action1": {
+				Name: "action1",
 				Type: "http",
 				Config: map[string]interface{}{
 					"url":    "http://example.com",
@@ -68,6 +69,7 @@ func TestAPIConfig_Validate(t *testing.T) {
 		},
 		Conditionals: map[string]Conditional{
 			"cond1": {
+				Name:       "cond1",
 				OnTrue:     "action1",
 				OnFalse:    "action2",
 				Expression: "request.id == 'test'",
@@ -75,6 +77,7 @@ func TestAPIConfig_Validate(t *testing.T) {
 		},
 		Responses: map[string]ResponseConfig{
 			"success": {
+				Name: "success",
 				Code: 200,
 				Type: "template",
 				Object: ResponseObject{
@@ -127,6 +130,7 @@ func TestAPIConfig_Validate(t *testing.T) {
 				newConfig := validConfig
 				newConfig.Actions = map[string]Action{
 					"action1": {
+						Name: "action1",
 						Type: "invalid-action-type",
 						Next: "action2",
 					},
@@ -141,6 +145,7 @@ func TestAPIConfig_Validate(t *testing.T) {
 				cfg := validConfig
 				cfg.Actions = map[string]Action{
 					"action1": {
+						Name: "action1",
 						Type: "database",
 						Config: map[string]interface{}{
 							"table": "users",
@@ -159,6 +164,7 @@ func TestAPIConfig_Validate(t *testing.T) {
 				cfg := validConfig
 				cfg.Actions = map[string]Action{
 					"action1": {
+						Name: "action1",
 						Type: "database",
 						Config: map[string]interface{}{
 							"query": "",
@@ -177,6 +183,7 @@ func TestAPIConfig_Validate(t *testing.T) {
 				cfg := validConfig
 				cfg.Actions = map[string]Action{
 					"action1": {
+						Name: "action1",
 						Type: "database",
 						Config: map[string]interface{}{
 							"query": "SELECT * FROM users",
@@ -195,6 +202,7 @@ func TestAPIConfig_Validate(t *testing.T) {
 					ID: "",
 					Actions: map[string]Action{
 						"action1": {
+							Name: "action1",
 							Type: "http",
 							Config: map[string]interface{}{
 								"url": "http://example.com",
@@ -220,6 +228,7 @@ func TestAPIConfig_Validate(t *testing.T) {
 				cfg := validConfig
 				cfg.Responses = map[string]ResponseConfig{
 					"success": {
+						Name: "success",
 						Code: 900,
 					},
 				}
@@ -239,6 +248,7 @@ func TestAPIConfig_Validate(t *testing.T) {
 					},
 					Conditionals: map[string]Conditional{
 						"cond1": {
+							Name: "cond1",
 							Type: "structured",
 							Structure: [][]ConditionItem{
 								{
@@ -251,8 +261,8 @@ func TestAPIConfig_Validate(t *testing.T) {
 						},
 					},
 					Responses: map[string]ResponseConfig{
-						"response1": {Code: 200, Type: "template", Template: "Success"},
-						"response2": {Code: 400, Type: "template", Template: "Failed"},
+						"response1": {Name: "response1", Code: 200, Type: "template", Template: "Success"},
+						"response2": {Name: "response2", Code: 400, Type: "template", Template: "Failed"},
 					},
 				}
 			},
@@ -326,6 +336,7 @@ func TestActionConfigError_Extraction(t *testing.T) {
 				ID: "test-api",
 				Actions: map[string]Action{
 					"my-action": {
+						Name: "my-action",
 						Type: "nonexistent-type",
 						Next: "response",
 					},
@@ -340,6 +351,7 @@ func TestActionConfigError_Extraction(t *testing.T) {
 				ID: "test-api",
 				Actions: map[string]Action{
 					"failing-action": {
+						Name:   "failing-action",
 						Type:   "test-action",
 						Config: map[string]interface{}{},
 						Next:   "response",
@@ -406,6 +418,7 @@ func TestSchemaValidationError_Extraction(t *testing.T) {
 				ID: "test-api",
 				Responses: map[string]ResponseConfig{
 					"error": {
+						Name: "error",
 						Code: 999,
 					},
 				},
@@ -461,6 +474,7 @@ func TestValidationErrors_CollectsBothSchemaAndActionErrors(t *testing.T) {
 		ID: "",
 		Actions: map[string]Action{
 			"my-action": {
+				Name:   "my-action",
 				Type:   "combined-test-action",
 				Config: map[string]interface{}{},
 				Next:   "response",

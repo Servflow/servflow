@@ -31,6 +31,7 @@ func TestDirectConfigEngine_Integration(t *testing.T) {
 			},
 			Actions: map[string]apiconfig.Action{
 				"greet": {
+					Name: "greet",
 					Type: "stub",
 					Next: "response.success",
 					Config: map[string]interface{}{
@@ -40,6 +41,7 @@ func TestDirectConfigEngine_Integration(t *testing.T) {
 			},
 			Responses: map[string]apiconfig.ResponseConfig{
 				"success": {
+					Name:     "success",
 					Code:     200,
 					Type:     "template",
 					Template: `{"greeting": "{{ .variable_actions_greet.message }}"}`,
@@ -55,6 +57,7 @@ func TestDirectConfigEngine_Integration(t *testing.T) {
 			},
 			Actions: map[string]apiconfig.Action{
 				"echo": {
+					Name: "echo",
 					Type: "stub",
 					Next: "response.echo",
 					Config: map[string]interface{}{
@@ -64,6 +67,7 @@ func TestDirectConfigEngine_Integration(t *testing.T) {
 			},
 			Responses: map[string]apiconfig.ResponseConfig{
 				"echo": {
+					Name:     "echo",
 					Code:     200,
 					Type:     "template",
 					Template: `{"echoed": "{{ .variable_actions_echo.input }}"}`,
@@ -199,6 +203,7 @@ func TestDirectConfigEngine_ContextCancellation(t *testing.T) {
 			},
 			Actions: map[string]apiconfig.Action{
 				"test": {
+					Name: "test",
 					Type: "stub",
 					Next: "response.ok",
 					Config: map[string]interface{}{
@@ -208,6 +213,7 @@ func TestDirectConfigEngine_ContextCancellation(t *testing.T) {
 			},
 			Responses: map[string]apiconfig.ResponseConfig{
 				"ok": {
+					Name:     "ok",
 					Code:     200,
 					Type:     "template",
 					Template: "OK",
@@ -251,6 +257,7 @@ func TestDirectConfigEngine_IdleTimeout(t *testing.T) {
 			},
 			Actions: map[string]apiconfig.Action{
 				"test": {
+					Name: "test",
 					Type: "stub",
 					Next: "response.ok",
 					Config: map[string]interface{}{
@@ -260,6 +267,7 @@ func TestDirectConfigEngine_IdleTimeout(t *testing.T) {
 			},
 			Responses: map[string]apiconfig.ResponseConfig{
 				"ok": {
+					Name:     "ok",
 					Code:     200,
 					Type:     "template",
 					Template: "OK",

@@ -21,19 +21,23 @@ func TestPlan_Execute(t *testing.T) {
 	cfg := apiconfig.APIConfig{
 		Actions: map[string]apiconfig.Action{
 			"action1": {
+				Name: "action1",
 				Next: "response.success",
 				Type: "action1",
 			},
 			"action2": {
+				Name: "action2",
 				Type: "action2",
 			},
 			"action3": {
+				Name: "action3",
 				Type: "action3",
 				Next: "response.second",
 			},
 		},
 		Responses: map[string]apiconfig.ResponseConfig{
 			"success": {
+				Name: "success",
 				Code: 200,
 				Object: apiconfig.ResponseObject{
 					Fields: map[string]apiconfig.ResponseObject{
@@ -44,6 +48,7 @@ func TestPlan_Execute(t *testing.T) {
 				},
 			},
 			"second": {
+				Name: "second",
 				Code: 200,
 				Object: apiconfig.ResponseObject{
 					Fields: map[string]apiconfig.ResponseObject{
@@ -348,12 +353,14 @@ func TestPlan_WorkspacePassedToActions(t *testing.T) {
 			cfg := apiconfig.APIConfig{
 				Actions: map[string]apiconfig.Action{
 					"test_action": {
+						Name: "test_action",
 						Type: "workspace_test",
 						Next: "response.success",
 					},
 				},
 				Responses: map[string]apiconfig.ResponseConfig{
 					"success": {
+						Name: "success",
 						Code: 200,
 						Object: apiconfig.ResponseObject{
 							Fields: map[string]apiconfig.ResponseObject{
@@ -413,12 +420,14 @@ func TestPlan_WorkspaceTemplateFunction(t *testing.T) {
 	cfg := apiconfig.APIConfig{
 		Actions: map[string]apiconfig.Action{
 			"test_action": {
+				Name: "test_action",
 				Type: "workspace_tmpl_test",
 				Next: "response.success",
 			},
 		},
 		Responses: map[string]apiconfig.ResponseConfig{
 			"success": {
+				Name: "success",
 				Code: 200,
 				Object: apiconfig.ResponseObject{
 					Fields: map[string]apiconfig.ResponseObject{

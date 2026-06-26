@@ -375,6 +375,7 @@ func TestHTTPActionWithEscapeTemplateViaPlanExecute(t *testing.T) {
 	apiCfg := apiconfig.APIConfig{
 		Actions: map[string]apiconfig.Action{
 			"test_http": {
+				Name: "test_http",
 				Type: "http",
 				Config: map[string]interface{}{
 					"url":     srv.URL,
@@ -387,6 +388,7 @@ func TestHTTPActionWithEscapeTemplateViaPlanExecute(t *testing.T) {
 		},
 		Responses: map[string]apiconfig.ResponseConfig{
 			"success": {
+				Name: "success",
 				Code: 200,
 				Object: apiconfig.ResponseObject{
 					Fields: map[string]apiconfig.ResponseObject{

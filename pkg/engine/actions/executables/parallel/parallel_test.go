@@ -29,6 +29,7 @@ func TestParallelExec_Execute(t *testing.T) {
 		// Register mock actions
 		for actionID, mockExec := range mockActions {
 			cfg.Actions[actionID] = apiconfig.Action{
+				Name: actionID,
 				Type: actionID + "_type",
 			}
 

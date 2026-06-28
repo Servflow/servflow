@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"text/template"
+	"time"
 
 	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
@@ -163,6 +164,10 @@ func InitializeIntegration(integrationType, id string, config map[string]any, sh
 			return err
 		}
 
+		// Purge any prior instance/config for this id (shutting down a live one)
+		// before storing, so a reload doesn't leak the old integration or leave a
+		// stale eager entry that would shadow this lazy config.
+		integrationManager.removeIntegration(id)
 		integrationManager.lazyIntegrations.Store(id, LazyIntegration{
 			Type:   integrationType,
 			Config: jsonConfig,
@@ -173,10 +178,33 @@ func InitializeIntegration(integrationType, id string, config map[string]any, sh
 			return err
 		}
 
+		// Construct first; only once the new instance is ready do we shut down and
+		// remove the old one, so a failed reload leaves the working integration intact.
+		integrationManager.removeIntegration(id)
 		integrationManager.integrations.Store(id, integration)
 	}
 
 	return nil
+}
+
+// removeIntegration drops any existing instance and lazy config registered under
+// id. A live instance implementing Shutdownable is shut down (bounded by a short
+// timeout) before removal so reloads don't leak resources. Removing from both
+// maps also clears stale cross-map entries when an integration switches between
+// eager and lazy loading.
+func (m *Manager) removeIntegration(id string) {
+	if existing, ok := m.integrations.Load(id); ok {
+		if shutdownable, ok := existing.(Shutdownable); ok {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			if err := shutdownable.Shutdown(ctx); err != nil {
+				logging.FromContext(ctx).Error("failed to shutdown integration on reload",
+					zap.String("id", id), zap.Error(err))
+			}
+			cancel()
+		}
+		m.integrations.Delete(id)
+	}
+	m.lazyIntegrations.Delete(id)
 }
 
 // TODO the config is being converted to and from json multiple times, fix that

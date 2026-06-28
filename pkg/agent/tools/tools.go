@@ -34,14 +34,14 @@ type Manager struct {
 
 type ServerConfig struct {
 	Endpoint  string            `json:"endpoint"`
-	ToolsList []string          `json:"toolsList"`
-	Headers   map[string]string `json:"headers"`
+	ToolsList []string          `json:"toolsList,omitempty"`
+	Headers   map[string]string `json:"headers,omitempty"`
 }
 
 type WorkflowToolConfig struct {
 	Name        string              `json:"name"`
 	Description string              `json:"description"`
-	Params      []string            `json:"params"`
+	Params      []string            `json:"params,omitempty"`
 	ReturnValue string              `json:"returnValue"`
 	ReturnFile  apiconfig.FileInput `json:"returnFile"`
 	Start       string              `json:"start"`

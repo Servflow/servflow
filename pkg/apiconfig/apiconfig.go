@@ -2,14 +2,13 @@ package apiconfig
 
 import (
 	_ "embed"
-	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"git.servflow.io/servflow/definitions/proto"
 	"github.com/Servflow/servflow/pkg/engine/actions"
-	"github.com/xeipuuv/gojsonschema"
 )
 
 //go:embed apiconfig_schema.json
@@ -36,12 +35,12 @@ const (
 type APIConfig struct {
 	Name         string                       `json:"name" yaml:"name"`
 	ID           string                       `json:"id" yaml:"id"`
-	Actions      map[string]Action            `json:"actions" yaml:"actions"`
-	Conditionals map[string]Conditional       `json:"conditionals" yaml:"conditionals"`
-	Responses    map[string]ResponseConfig    `json:"responses" yaml:"responses"`
+	Actions      map[string]Action            `json:"actions,omitempty" yaml:"actions,omitempty"`
+	Conditionals map[string]Conditional       `json:"conditionals,omitempty" yaml:"conditionals,omitempty"`
+	Responses    map[string]ResponseConfig    `json:"responses,omitempty" yaml:"responses,omitempty"`
 	HttpConfig   HttpConfig                   `json:"http" yaml:"http"`
 	McpTool      MCPToolConfig                `json:"mcpTool" yaml:"mcpTool"`
-	Integrations map[string]IntegrationConfig `json:"integrations" yaml:"integrations"`
+	Integrations map[string]IntegrationConfig `json:"integrations,omitempty" yaml:"integrations,omitempty"`
 }
 
 func (a *APIConfig) IsMCPConfig() bool {
@@ -52,18 +51,18 @@ type HttpConfig struct {
 	ListenPath         string   `json:"listenPath" yaml:"listenPath"`
 	Method             string   `json:"method" yaml:"method"`
 	Next               string   `json:"next" yaml:"next"`
-	CORSAllowedOrigins []string `json:"corsAllowedOrigins" yaml:"corsAllowedOrigins"`
+	CORSAllowedOrigins []string `json:"corsAllowedOrigins,omitempty" yaml:"corsAllowedOrigins,omitempty"`
 }
 
 type McpConfig struct {
-	Tools map[string]MCPToolConfig `json:"tools" yaml:"tools"`
+	Tools map[string]MCPToolConfig `json:"tools,omitempty" yaml:"tools,omitempty"`
 }
 
 type MCPToolConfig struct {
 	Enabled     bool               `json:"enabled" yaml:"enabled"`
 	Name        string             `json:"name" yaml:"name"`
 	Description string             `json:"description" yaml:"description"`
-	Args        map[string]ArgType `json:"args" yaml:"args"`
+	Args        map[string]ArgType `json:"args,omitempty" yaml:"args,omitempty"`
 	// Result is the expression to be used to get the result
 	Result string `json:"result" yaml:"result"`
 	Start  string `json:"start" yaml:"start"`
@@ -77,15 +76,15 @@ type ArgType struct {
 type RequestConfig struct {
 	Type               RequestType `json:"type" yaml:"type"`
 	Schema             string      `json:"schema" yaml:"schema"`
-	FormValues         []string    `json:"formValues" yaml:"formValues"`
+	FormValues         []string    `json:"formValues,omitempty" yaml:"formValues,omitempty"`
 	Next               string      `json:"next" yaml:"next"`
-	CORSAllowedOrigins []string    `json:"corsAllowedOrigins" yaml:"corsAllowedOrigins"`
+	CORSAllowedOrigins []string    `json:"corsAllowedOrigins,omitempty" yaml:"corsAllowedOrigins,omitempty"`
 }
 
 type Action struct {
-	Name       string                 `json:"name,omitempty" yaml:"name,omitempty"`
+	Name       string                 `json:"name,omitempty" yaml:"name,omitempty" jsonschema:"required"`
 	Type       string                 `json:"type" yaml:"type"`
-	Config     map[string]interface{} `json:"config" yaml:"config"`
+	Config     map[string]interface{} `json:"config,omitempty" yaml:"config,omitempty"`
 	Next       string                 `json:"next" yaml:"next"`
 	Fail       string                 `json:"fail" yaml:"fail"`
 	UseReplica bool                   `json:"useReplica,omitempty" yaml:"useReplica,omitempty"`
@@ -93,7 +92,7 @@ type Action struct {
 }
 
 type Conditional struct {
-	Name       string            `json:"name,omitempty" yaml:"name,omitempty"`
+	Name       string            `json:"name,omitempty" yaml:"name,omitempty" jsonschema:"required"`
 	OnTrue     string            `json:"onTrue" yaml:"onTrue"`
 	OnFalse    string            `json:"onFalse" yaml:"onFalse"`
 	Expression string            `json:"expression" yaml:"expression"`
@@ -109,7 +108,7 @@ type ConditionItem struct {
 }
 
 type ResponseConfig struct {
-	Name     string         `json:"name,omitempty" yaml:"name,omitempty"`
+	Name     string         `json:"name,omitempty" yaml:"name,omitempty" jsonschema:"required"`
 	Code     int            `json:"code" yaml:"code"`
 	Template string         `json:"template" yaml:"template"`
 	Type     string         `json:"type" yaml:"type"`
@@ -119,7 +118,7 @@ type ResponseConfig struct {
 
 type ResponseObject struct {
 	Value  string                    `json:"value" yaml:"value"`
-	Fields map[string]ResponseObject `json:"fields" yaml:"fields"`
+	Fields map[string]ResponseObject `json:"fields,omitempty" yaml:"fields,omitempty"`
 }
 
 func (o *ResponseObject) ToProto() *proto.ResponseObject {
@@ -137,7 +136,7 @@ func (o *ResponseObject) ToProto() *proto.ResponseObject {
 
 type IntegrationConfig struct {
 	ID       string                 `json:"id" yaml:"id"`
-	Config   map[string]interface{} `json:"config" yaml:"config"`
+	Config   map[string]interface{} `json:"config,omitempty" yaml:"config,omitempty"`
 	Type     string                 `json:"type" yaml:"type"`
 	LazyLoad bool                   `json:"lazyLoad" yaml:"lazyLoad"`
 }
@@ -164,10 +163,18 @@ type IntegrationConfig struct {
 //		return nil
 //	}
 func (a *APIConfig) Validate() error {
+	return a.ValidateWithEntries()
+}
+
+// ValidateWithEntries validates the config, treating each extra root as an
+// additional entry point into the step graph (used by the pro layer to feed a
+// trigger's start step, which the engine config has no other knowledge of).
+func (a *APIConfig) ValidateWithEntries(extraRoots ...string) error {
 	var validationErrors ValidationErrors
 
 	a.collectSchemaErrors(&validationErrors)
 	a.collectActionErrors(&validationErrors)
+	a.collectGraphErrors(&validationErrors, extraRoots)
 
 	if validationErrors.HasErrors() {
 		return &validationErrors
@@ -175,36 +182,11 @@ func (a *APIConfig) Validate() error {
 	return nil
 }
 
-func (a *APIConfig) collectSchemaErrors(validationErrors *ValidationErrors) {
-	schemaLoader := gojsonschema.NewStringLoader(apiConfigSchema)
-
-	configJSON, err := json.Marshal(a)
-	if err != nil {
-		validationErrors.Add(fmt.Errorf("failed to marshal APIConfig to JSON: %w", err))
-		return
-	}
-
-	documentLoader := gojsonschema.NewBytesLoader(configJSON)
-
-	result, err := gojsonschema.Validate(schemaLoader, documentLoader)
-	if err != nil {
-		validationErrors.Add(fmt.Errorf("failed to validate schema: %w", err))
-		return
-	}
-
-	if !result.Valid() {
-		for _, desc := range result.Errors() {
-			validationErrors.Add(&SchemaValidationError{
-				Path:    desc.Field(),
-				Message: desc.Description(),
-			})
-		}
-	}
-}
-
 type ActionConfigError struct {
 	ActionID string
-	Message  string
+	// Field is the offending config field, when the error is field-specific.
+	Field   string
+	Message string
 }
 
 func (e *ActionConfigError) Error() string {
@@ -212,16 +194,21 @@ func (e *ActionConfigError) Error() string {
 }
 
 type SchemaValidationError struct {
-	Path    string
+	// Path is the instance location of the offending value (JSON-pointer style).
+	Path string
+	// Keyword is the failing schema keyword (e.g. "required", "enum", "type").
+	Keyword string
+	// Message is the humanized, domain-aware message.
 	Message string
 }
 
 func (e *SchemaValidationError) Error() string {
-	return fmt.Sprintf("path '%s': %s", e.Path, e.Message)
+	return e.Message
 }
 
 type ValidationErrors struct {
-	errors []error
+	errors   []error
+	warnings []error
 }
 
 func (ve *ValidationErrors) Error() string {
@@ -237,6 +224,17 @@ func (ve *ValidationErrors) Error() string {
 
 func (ve *ValidationErrors) Add(err error) {
 	ve.errors = append(ve.errors, err)
+}
+
+// AddWarning records a non-fatal finding. Warnings do not count towards
+// HasErrors, so a config with only warnings still validates.
+func (ve *ValidationErrors) AddWarning(err error) {
+	ve.warnings = append(ve.warnings, err)
+}
+
+// Warnings returns the non-fatal findings collected during validation.
+func (ve *ValidationErrors) Warnings() []error {
+	return ve.warnings
 }
 
 func (ve *ValidationErrors) HasErrors() bool {
@@ -281,30 +279,45 @@ func (a *APIConfig) collectActionErrors(validationErrors *ValidationErrors) {
 				ActionID: actionID,
 				Message:  err.Error(),
 			})
-		} else {
-			if err := validateFields(actionID, fields, action.Config); err != nil {
-				validationErrors.Add(&ActionConfigError{
-					ActionID: actionID,
-					Message:  err.Error(),
-				})
-			}
+			continue
+		}
+		for _, field := range missingRequiredFields(fields, action.Config) {
+			validationErrors.Add(&ActionConfigError{
+				ActionID: actionID,
+				Field:    field,
+				Message:  fmt.Sprintf("missing required field %q", field),
+			})
 		}
 	}
 }
 
-func validateFields(actionID string, fieldsRequiredMap map[string]actions.FieldInfo, fieldsValues map[string]interface{}) error {
-	for k, v := range fieldsRequiredMap {
-		if !v.Required {
+// missingRequiredFields returns the names of required fields that are absent or
+// empty in the action config. We only check presence, not type: a field holding
+// a Go template (e.g. "{{ body \"x\" }}") is a non-empty string and so counts as
+// provided. Field names are sorted for stable, deterministic error output.
+func missingRequiredFields(fields map[string]actions.FieldInfo, values map[string]interface{}) []string {
+	var missing []string
+	for name, info := range fields {
+		if !info.Required {
 			continue
 		}
-		if val, ok := fieldsValues[k]; ok {
-			valStr, okStr := val.(string)
-			if okStr && valStr == "" {
-				return fmt.Errorf("field %s is required", k)
-			}
-		} else {
-			return fmt.Errorf("field %s is required", k)
+		if isEmptyFieldValue(values[name]) {
+			missing = append(missing, name)
 		}
 	}
-	return nil
+	sort.Strings(missing)
+	return missing
+}
+
+// isEmptyFieldValue reports whether a config value should count as "not
+// provided". A missing key (nil) and an empty string are empty; any other
+// present value counts as provided.
+func isEmptyFieldValue(val interface{}) bool {
+	if val == nil {
+		return true
+	}
+	if s, ok := val.(string); ok {
+		return s == ""
+	}
+	return false
 }

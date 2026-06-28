@@ -28,30 +28,36 @@ func (m *mockPlannerIntegration) Type() string {
 var sampleConfig = &apiconfig.APIConfig{
 	Actions: map[string]apiconfig.Action{
 		"action1": {
+			Name:   "action1",
 			Type:   "action1",
 			Next:   "action.action2",
 			Config: map[string]interface{}{"key": "value"},
 		},
 		"action2": {
+			Name:   "action2",
 			Next:   "action.action3",
 			Config: map[string]interface{}{"key": "value"},
 		},
 		"action3": {
+			Name:   "action3",
 			Next:   "conditional.cond1",
 			Config: map[string]interface{}{"key": "value2"},
 		},
 		"action4": {
+			Name:   "action4",
 			Type:   "mock",
 			Next:   "",
 			Config: map[string]interface{}{"key": "value"},
 		},
 		"action5": {
+			Name:   "action5",
 			Next:   "action.action4",
 			Config: map[string]interface{}{"key": "value"},
 		},
 	},
 	Conditionals: map[string]apiconfig.Conditional{
 		"cond1": {
+			Name:       "cond1",
 			Expression: "true",
 			OnTrue:     "response.success",
 			OnFalse:    "response.failure",
@@ -59,11 +65,13 @@ var sampleConfig = &apiconfig.APIConfig{
 	},
 	Responses: map[string]apiconfig.ResponseConfig{
 		"success": {
+			Name:     "success",
 			Code:     200,
 			Template: `{"status": "success"}`,
 			Type:     "template",
 		},
 		"failure": {
+			Name:     "failure",
 			Code:     400,
 			Template: `{"status": "failure"}`,
 			Type:     "template",
@@ -114,16 +122,19 @@ func TestPlannerV2_Generate(t *testing.T) {
 		config := &apiconfig.APIConfig{
 			Actions: map[string]apiconfig.Action{
 				"action1": {
+					Name:   "action1",
 					Next:   "conditional.cond1",
 					Config: map[string]interface{}{"key": "value"},
 				},
 				"action2": {
+					Name:   "action2",
 					Config: map[string]interface{}{"key": "value2"},
 					Fail:   "response.failure",
 				},
 			},
 			Conditionals: map[string]apiconfig.Conditional{
 				"cond1": {
+					Name:       "cond1",
 					Expression: "true",
 					OnTrue:     "response.success",
 					OnFalse:    "response.failure",
@@ -131,11 +142,13 @@ func TestPlannerV2_Generate(t *testing.T) {
 			},
 			Responses: map[string]apiconfig.ResponseConfig{
 				"success": {
+					Name:     "success",
 					Code:     200,
 					Template: `{"status": "success"}`,
 					Type:     "template",
 				},
 				"failure": {
+					Name:     "failure",
 					Code:     400,
 					Template: `{"status": "failure"}`,
 					Type:     "template",
@@ -213,11 +226,13 @@ func TestPlannerV2_Generate(t *testing.T) {
 			Conditionals: map[string]apiconfig.Conditional{},
 			Responses: map[string]apiconfig.ResponseConfig{
 				"success": {
+					Name:     "success",
 					Code:     200,
 					Template: `{"status": "success"}`,
 					Type:     "template",
 				},
 				"failure": {
+					Name:     "failure",
 					Code:     400,
 					Template: `{"status": "failure"}`,
 					Type:     "template",
@@ -329,11 +344,13 @@ func TestPlannerV2_generateConditionalStep(t *testing.T) {
 	config := &apiconfig.APIConfig{
 		Conditionals: map[string]apiconfig.Conditional{
 			"cond1": {
+				Name:       "cond1",
 				Expression: `{{  (and (email (printf "%s" .email) "email" false) (eq (printf "%s" .field1) (printf "hello" ))) }}`,
 				OnTrue:     "response.success",
 				OnFalse:    "response.failure",
 			},
 			"cond2": {
+				Name: "cond2",
 				Type: ConditionalTypeStructured,
 				Structure: [][]apiconfig.ConditionItem{
 					{
@@ -347,11 +364,13 @@ func TestPlannerV2_generateConditionalStep(t *testing.T) {
 		},
 		Responses: map[string]apiconfig.ResponseConfig{
 			"success": {
+				Name:     "success",
 				Code:     200,
 				Template: `{"status": "success"}`,
 				Type:     "template",
 			},
 			"failure": {
+				Name:     "failure",
 				Code:     400,
 				Template: `{"status": "failure"}`,
 				Type:     "template",
@@ -394,6 +413,7 @@ func TestPlannerV2_generateResponseStep(t *testing.T) {
 	config := &apiconfig.APIConfig{
 		Responses: map[string]apiconfig.ResponseConfig{
 			"success": {
+				Name:     "success",
 				Code:     200,
 				Template: `{"status": "success"}`,
 				Type:     "template",

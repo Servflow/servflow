@@ -156,12 +156,16 @@
           }
         }
       },
-      "required": ["type"],
+      "required": ["name", "type"],
       "additionalProperties": false
     },
     "Conditional": {
       "type": "object",
-      "required": ["expression"],
+      "required": ["name"],
+      "anyOf": [
+        { "required": ["expression"] },
+        { "required": ["structure"] }
+      ],
       "properties": {
         "name": {
           "type": "string"
@@ -193,7 +197,7 @@
     },
     "ResponseConfig": {
       "type": "object",
-      "required": ["code"],
+      "required": ["name", "code"],
       "properties": {
         "name": {
           "type": "string"

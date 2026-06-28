@@ -300,6 +300,18 @@ func (e *Engine) ReloadConfigs(newDirectConfigs *DirectConfigs) error {
 
 	logging.DebugContext(e.ctx, "Reloading API configurations...")
 
+	// Register integrations before rebuilding the handler: planning resolves each
+	// action's integration eagerly, so a newly added integration must be in the
+	// manager before its config is planned. Without this, reloads that add an
+	// agent + integration log "integration <id> not registered" until restart.
+	var integrationConfigs []apiconfig.IntegrationConfig
+	if newDirectConfigs.EngineConfig != nil {
+		integrationConfigs = newDirectConfigs.EngineConfig.GetIntegrationConfigs()
+	}
+	if err := integration.RegisterIntegrationsFromConfig(integrationConfigs); err != nil {
+		return fmt.Errorf("failed to register integrations on reload: %w", err)
+	}
+
 	newHandler := e.createMuxHandler(newDirectConfigs.APIConfigs)
 
 	e.handler = newHandler.ServeHTTP

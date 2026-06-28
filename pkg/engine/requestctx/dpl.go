@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"strings"
 	"text/template"
+
+	"github.com/Servflow/servflow/pkg/apiconfig"
 )
 
 // TODO move to same package as requestctx
@@ -23,9 +25,11 @@ type DataType int
 const noValue = "<no value>"
 
 const (
-	ActionConfigPrefix          = "action."
-	ConditionalConfigPrefix     = "conditional."
-	ResponsesConfigPrefix       = "response."
+	// Step-reference prefixes moved to the apiconfig package (canonical home).
+	// Aliased here for backwards compatibility; prefer apiconfig.* in new code.
+	ActionConfigPrefix          = apiconfig.ActionConfigPrefix
+	ConditionalConfigPrefix     = apiconfig.ConditionalConfigPrefix
+	ResponsesConfigPrefix       = apiconfig.ResponsesConfigPrefix
 	BareVariablesPrefixStripped = "variable_"
 	VariableActionPrefix        = BareVariablesPrefixStripped + "actions_"
 	ErrorTagStripped            = "error"

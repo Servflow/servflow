@@ -253,6 +253,7 @@ func TestNewClient(t *testing.T) {
 		cfg := apiconfig.APIConfig{
 			Actions: map[string]apiconfig.Action{
 				"workflow_action": {
+					Name: "workflow_action",
 					Type: "workflow_action",
 				},
 			},
@@ -345,6 +346,7 @@ func TestNewClient(t *testing.T) {
 		cfg := apiconfig.APIConfig{
 			Actions: map[string]apiconfig.Action{
 				"file_action": {
+					Name: "file_action",
 					Type: "file_action",
 				},
 			},

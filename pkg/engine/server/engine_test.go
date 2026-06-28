@@ -56,6 +56,7 @@ func TestDirectConfigs_APIConfigsIntegrity(t *testing.T) {
 		},
 		Actions: map[string]apiconfig.Action{
 			"action1": {
+				Name: "action1",
 				Type: "stub",
 				Config: map[string]interface{}{
 					"key": "value",

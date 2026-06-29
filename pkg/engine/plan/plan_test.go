@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"os"
 	"testing"
 	"time"
 
+	sfhttp "github.com/Servflow/servflow/internal/http"
 	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	requestctx2 "github.com/Servflow/servflow/pkg/engine/requestctx"
@@ -64,7 +64,6 @@ func TestPlan_Execute(t *testing.T) {
 	testCases := []struct {
 		name            string
 		startAction     string
-		endValue        *EndValueSpec
 		contextSetup    func(context.Context)
 		mockAssertions  func(*MockActionExecutable, *MockActionExecutable, *MockActionExecutable)
 		expectedBody    string
@@ -75,7 +74,6 @@ func TestPlan_Execute(t *testing.T) {
 		{
 			name:         "success from response template",
 			startAction:  requestctx2.ActionConfigPrefix + "action1",
-			endValue:     nil,
 			contextSetup: func(ctx context.Context) {},
 			mockAssertions: func(exec1, exec2, exec3 *MockActionExecutable) {
 				exec1.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil, nil)
@@ -85,22 +83,18 @@ func TestPlan_Execute(t *testing.T) {
 			expectedJSON: true,
 		},
 		{
-			name:        "success from end value",
-			startAction: requestctx2.ActionConfigPrefix + "action2",
-			endValue:    &EndValueSpec{ValType: StringEndValue, StringVal: "{{ .testValue }}"},
-			contextSetup: func(ctx context.Context) {
-				requestctx2.AddRequestVariables(ctx, map[string]interface{}{"testValue": "hello"}, "")
-			},
+			name:         "chain without response step yields nil result",
+			startAction:  requestctx2.ActionConfigPrefix + "action2",
+			contextSetup: func(ctx context.Context) {},
 			mockAssertions: func(exec1, exec2, exec3 *MockActionExecutable) {
 				exec2.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil, nil)
 				exec2.EXPECT().SupportsReplica().Return(false).AnyTimes()
 			},
-			expectedBody: "hello",
+			expectedNilResp: true,
 		},
 		{
 			name:         "invalid step",
 			startAction:  "invalidID",
-			endValue:     nil,
 			contextSetup: func(ctx context.Context) {},
 			mockAssertions: func(exec1, exec2, exec3 *MockActionExecutable) {
 				// No mock expectations for invalid action
@@ -111,19 +105,18 @@ func TestPlan_Execute(t *testing.T) {
 		{
 			name:        "execute in action",
 			startAction: requestctx2.ActionConfigPrefix + "action3",
-			endValue:    nil,
 			contextSetup: func(ctx context.Context) {
 				requestctx2.AddRequestVariables(ctx, map[string]interface{}{"testValue": "test value"}, "")
 			},
 			mockAssertions: func(exec1, exec2, exec3 *MockActionExecutable) {
 				exec3.EXPECT().Execute(gomock.Any(), gomock.Any()).
 					DoAndReturn(func(ctx context.Context, _ string) (interface{}, map[string]string, error) {
-						resp, err := ExecuteFromContext(ctx, requestctx2.ActionConfigPrefix+"action2", &EndValueSpec{
-							StringVal: "{{ .testValue }}",
-						})
+						// An action can re-enter the plan to run a sub-chain; the
+						// sub-chain has no response step, so it returns a nil result.
+						resp, err := ExecuteFromContext(ctx, requestctx2.ActionConfigPrefix+"action2")
 						require.NoError(t, err)
-						assert.Equal(t, "test value", string(resp.Body))
-						return string(resp.Body), nil, nil
+						assert.Nil(t, resp)
+						return "test value", nil, nil
 					})
 				exec3.EXPECT().SupportsReplica().Return(false).AnyTimes()
 				exec2.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil, nil)
@@ -131,20 +124,6 @@ func TestPlan_Execute(t *testing.T) {
 			},
 			expectedBody: `{"data": "test value"}`,
 			expectedJSON: true,
-		},
-		{
-			name:        "get from secret",
-			startAction: requestctx2.ActionConfigPrefix + "action2",
-			endValue:    &EndValueSpec{ValType: StringEndValue, StringVal: `{{ secret "MONGO_PASS" }}`},
-			contextSetup: func(ctx context.Context) {
-				os.Setenv("MONGO_PASS", "secret")
-				requestctx2.AddRequestVariables(ctx, map[string]interface{}{"testValue": "hello"}, "")
-			},
-			mockAssertions: func(exec1, exec2, exec3 *MockActionExecutable) {
-				exec2.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil, nil)
-				exec2.EXPECT().SupportsReplica().Return(false).AnyTimes()
-			},
-			expectedBody: "secret",
 		},
 	}
 
@@ -185,7 +164,7 @@ func TestPlan_Execute(t *testing.T) {
 			ctx := requestctx2.NewTestContext()
 			tc.contextSetup(ctx)
 
-			resp, err := plan.Execute(ctx, tc.startAction, tc.endValue)
+			resp, err := plan.Execute(ctx, tc.startAction)
 
 			if tc.expectedErr {
 				require.Error(t, err)
@@ -196,10 +175,12 @@ func TestPlan_Execute(t *testing.T) {
 			if tc.expectedNilResp {
 				require.Nil(t, resp)
 			} else {
+				sfResp, ok := resp.(*sfhttp.SfResponse)
+				require.True(t, ok)
 				if tc.expectedJSON {
-					assert.JSONEq(t, tc.expectedBody, string(resp.Body))
+					assert.JSONEq(t, tc.expectedBody, string(sfResp.Body))
 				} else {
-					assert.Equal(t, tc.expectedBody, string(resp.Body))
+					assert.Equal(t, tc.expectedBody, string(sfResp.Body))
 				}
 			}
 		})
@@ -382,7 +363,7 @@ func TestPlan_WorkspacePassedToActions(t *testing.T) {
 			require.NoError(t, err)
 
 			ctx := requestctx2.NewTestContext()
-			_, err = plan.Execute(ctx, requestctx2.ActionConfigPrefix+"test_action", nil)
+			_, err = plan.Execute(ctx, requestctx2.ActionConfigPrefix+"test_action")
 			require.NoError(t, err)
 
 			if tc.expectNil {
@@ -449,6 +430,6 @@ func TestPlan_WorkspaceTemplateFunction(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := requestctx2.NewTestContext()
-	_, err = plan.Execute(ctx, requestctx2.ActionConfigPrefix+"test_action", nil)
+	_, err = plan.Execute(ctx, requestctx2.ActionConfigPrefix+"test_action")
 	require.NoError(t, err)
 }

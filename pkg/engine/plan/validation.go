@@ -15,6 +15,7 @@ import (
 
 	"github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/actions"
+	"github.com/Servflow/servflow/pkg/engine/responses"
 	"github.com/Servflow/servflow/pkg/schemavalidate"
 )
 
@@ -37,6 +38,7 @@ func ValidateWithEntries(a *apiconfig.APIConfig, extraRoots ...string) error {
 
 	collectSchemaErrors(a, &validationErrors)
 	collectActionErrors(a, &validationErrors)
+	collectResponseErrors(a, &validationErrors)
 	collectGraphErrors(a, &validationErrors, extraRoots)
 
 	if validationErrors.HasErrors() {
@@ -54,6 +56,17 @@ type ActionConfigError struct {
 
 func (e *ActionConfigError) Error() string {
 	return fmt.Sprintf("action '%s': %s", e.ActionID, e.Message)
+}
+
+type ResponseConfigError struct {
+	ResponseID string
+	// Field is the offending config field, when the error is field-specific.
+	Field   string
+	Message string
+}
+
+func (e *ResponseConfigError) Error() string {
+	return fmt.Sprintf("response '%s': %s", e.ResponseID, e.Message)
 }
 
 type ValidationErrors struct {
@@ -100,6 +113,17 @@ func (ve *ValidationErrors) GetActionConfigErrors() []*ActionConfigError {
 		}
 	}
 	return actionErrors
+}
+
+func (ve *ValidationErrors) GetResponseConfigErrors() []*ResponseConfigError {
+	var responseErrors []*ResponseConfigError
+	for _, err := range ve.errors {
+		var responseErr *ResponseConfigError
+		if errors.As(err, &responseErr) {
+			responseErrors = append(responseErrors, responseErr)
+		}
+	}
+	return responseErrors
 }
 
 func (ve *ValidationErrors) GetSchemaValidationErrors() []*schemavalidate.SchemaValidationError {
@@ -179,6 +203,22 @@ func collectActionErrors(a *apiconfig.APIConfig, validationErrors *ValidationErr
 				ActionID: actionID,
 				Field:    field,
 				Message:  fmt.Sprintf("missing required field %q", field),
+			})
+		}
+	}
+}
+
+// collectResponseErrors checks that every response names a registered response
+// kind. An empty kind defaults to "http". This runs in the validate cascade
+// (not just at plan-build) so validate-only paths like the CLI's --dry-run
+// reject an unknown kind. Mirrors collectActionErrors.
+func collectResponseErrors(a *apiconfig.APIConfig, validationErrors *ValidationErrors) {
+	for responseID, response := range a.Responses {
+		kind := responses.ResolveKind(response.Kind)
+		if !responses.HasRegisteredType(kind) {
+			validationErrors.Add(&ResponseConfigError{
+				ResponseID: responseID,
+				Message:    fmt.Sprintf("invalid response kind: %s", kind),
 			})
 		}
 	}

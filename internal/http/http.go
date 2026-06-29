@@ -19,3 +19,8 @@ func (s *SfResponse) SetHeader(key, value string) {
 	}
 	s.Headers.Set(key, value)
 }
+
+// Kind implements responses.Result. SfResponse is the HTTP result type.
+func (s *SfResponse) Kind() string {
+	return "http"
+}

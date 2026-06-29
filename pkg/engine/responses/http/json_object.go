@@ -8,6 +8,7 @@ import (
 	sfhttp "github.com/Servflow/servflow/internal/http"
 	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
+	"github.com/Servflow/servflow/pkg/engine/responses"
 	"github.com/Servflow/servflow/pkg/logging"
 	"go.uber.org/zap"
 )
@@ -24,7 +25,7 @@ func NewObjectBuilder(object *apiconfig.ResponseObject, code int) *JSONObjectBui
 	}
 }
 
-func (o *JSONObjectBuilder) BuildResponse(ctx context.Context) (*sfhttp.SfResponse, error) {
+func (o *JSONObjectBuilder) BuildResponse(ctx context.Context) (responses.Result, error) {
 	logger := logging.FromContext(ctx).With(zap.String("builder_type", "json_object"))
 	ctx = logging.WithLogger(ctx, logger)
 
@@ -74,14 +75,9 @@ func extractValue(ctx context.Context, value string) (any, error) {
 	}
 
 	value = requestctx.WrapWithFunction(value, "jsonraw")
-	template, err := requestctx.CreateTextTemplate(ctx, value, nil)
+	tmp, err := requestctx.ExecuteTemplateString(ctx, value)
 	if err != nil {
-		return nil, fmt.Errorf("error creating template: %w", err)
-	}
-
-	tmp, err := requestctx.ExecuteTemplateFromContext(ctx, template)
-	if err != nil {
-		return nil, fmt.Errorf("error executing template: %w", err)
+		return nil, fmt.Errorf("error rendering template: %w", err)
 	}
 
 	var val interface{}

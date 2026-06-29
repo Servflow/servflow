@@ -454,6 +454,42 @@ func TestSchemaValidationError_Extraction(t *testing.T) {
 	}
 }
 
+func TestResponseConfigError_UnknownKind(t *testing.T) {
+	cfg := apiconfig.APIConfig{
+		ID: "test-api",
+		Responses: map[string]apiconfig.ResponseConfig{
+			"bad": {
+				Name: "bad",
+				Kind: "not-a-real-kind",
+				Code: 200,
+			},
+			"ok": {
+				Name: "ok",
+				Code: 200, // no kind -> defaults to "http" (registered)
+			},
+		},
+	}
+
+	err := Validate(&cfg)
+	require.Error(t, err)
+
+	var validationErrs *ValidationErrors
+	require.True(t, errors.As(err, &validationErrs), "expected ValidationErrors type")
+
+	respErrs := validationErrs.GetResponseConfigErrors()
+	require.NotEmpty(t, respErrs, "expected at least one ResponseConfigError")
+
+	found := false
+	for _, re := range respErrs {
+		if re.ResponseID == "bad" {
+			found = true
+			assert.Contains(t, re.Message, "invalid response kind: not-a-real-kind")
+		}
+		assert.NotEqual(t, "ok", re.ResponseID, "a default-http response must validate")
+	}
+	assert.True(t, found, "expected a ResponseConfigError for response 'bad'")
+}
+
 func TestValidationErrors_CollectsBothSchemaAndActionErrors(t *testing.T) {
 	registerTestAction(t, "combined-test-action", actions.ActionRegistrationInfo{
 		Name:        "Combined Test Action",

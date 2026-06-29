@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Servflow/servflow/internal/http"
 	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/responses"
 	"github.com/Servflow/servflow/pkg/logging"
@@ -35,10 +34,7 @@ func (r *Response) DisplayName() string {
 // from the responses registry. An empty kind defaults to "http". The kind's
 // factory owns body-format selection (template/json_object) and code validation.
 func newResponse(id, name string, resp apiconfig.ResponseConfig) (*Response, error) {
-	kind := resp.Kind
-	if kind == "" {
-		kind = "http"
-	}
+	kind := responses.ResolveKind(resp.Kind)
 	factory, ok := responses.Get(kind)
 	if !ok {
 		return nil, fmt.Errorf("unknown response kind: %s", kind)
@@ -59,7 +55,7 @@ func (r *Response) execute(ctx context.Context) (*stepWrapper, error) {
 	return nil, nil
 }
 
-func (r *Response) WriteResponse(ctx context.Context) (*http.SfResponse, error) {
+func (r *Response) WriteResponse(ctx context.Context) (responses.Result, error) {
 	ctx, span := tracing.SpanCtxFromContext(ctx, "response."+r.DisplayName())
 	defer span.End()
 
@@ -73,7 +69,7 @@ func (r *Response) WriteResponse(ctx context.Context) (*http.SfResponse, error) 
 		return nil, err
 	}
 
-	span.SetAttributes(attribute.String("result", string(resp.Body)))
+	span.SetAttributes(attribute.String("result.kind", resp.Kind()))
 
 	return resp, nil
 }

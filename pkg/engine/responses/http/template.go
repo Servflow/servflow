@@ -6,6 +6,7 @@ import (
 
 	sfhttp "github.com/Servflow/servflow/internal/http"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
+	"github.com/Servflow/servflow/pkg/engine/responses"
 	"github.com/Servflow/servflow/pkg/logging"
 	"go.uber.org/zap"
 )
@@ -19,20 +20,15 @@ func NewTemplateBuilder(code int, template string) *TemplateBuilder {
 	return &TemplateBuilder{Code: code, template: template}
 }
 
-func (J *TemplateBuilder) BuildResponse(ctx context.Context) (*sfhttp.SfResponse, error) {
+func (J *TemplateBuilder) BuildResponse(ctx context.Context) (responses.Result, error) {
 	logger := logging.FromContext(ctx).With(zap.String("builder_type", "template"))
 	ctx = logging.WithLogger(ctx, logger)
 
 	logger.Debug("running template response builder")
 	logger.Debug("build response body", zap.String("template", J.template))
-	template, err := requestctx.CreateTextTemplate(ctx, J.template, nil)
+	tmp, err := requestctx.ExecuteTemplateString(ctx, J.template)
 	if err != nil {
-		return nil, fmt.Errorf("error creating template '%s': %w", J.template, err)
-	}
-
-	tmp, err := requestctx.ExecuteTemplateFromContext(ctx, template)
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error rendering template '%s': %w", J.template, err)
 	}
 	logger.Debug("built response body", zap.String("template", tmp))
 

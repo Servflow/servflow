@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"testing"
 
+	sfhttp "github.com/Servflow/servflow/internal/http"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 
 	"github.com/Servflow/servflow/pkg/apiconfig"
@@ -999,11 +1000,13 @@ func TestObjectBuilder(t *testing.T) {
 			require.NoError(t, err)
 			builder := NewObjectBuilder(&tc.in, tc.code)
 
-			sfResponse, err := builder.BuildResponse(ctx)
+			result, err := builder.BuildResponse(ctx)
 			if tc.expectErr {
 				assert.Error(t, err)
 				return
 			}
+			sfResponse, ok := result.(*sfhttp.SfResponse)
+			require.True(t, ok)
 			assert.JSONEq(t, tc.compareJson, string(sfResponse.Body))
 			assert.Equal(t, tc.code, sfResponse.Code)
 		})

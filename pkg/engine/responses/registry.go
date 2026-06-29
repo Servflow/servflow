@@ -11,13 +11,33 @@ import (
 	"sort"
 	"sync"
 
-	sfhttp "github.com/Servflow/servflow/internal/http"
 	"github.com/Servflow/servflow/pkg/apiconfig"
 )
 
+// Result is the polymorphic output of a workflow's response step. Each response
+// kind returns its own concrete Result (the built-in "http" kind returns
+// *sfhttp.SfResponse); consumers type-assert to the concrete type they expect.
+// Kind is for logging/tracing only — it is NOT a render fallback.
+type Result interface {
+	Kind() string
+}
+
+// DefaultKind is the response kind used when a response config leaves Kind empty.
+const DefaultKind = "http"
+
+// ResolveKind returns the effective response kind for a config value, applying
+// the default. Plan-build and validation both call it so they cannot diverge on
+// what an empty kind means.
+func ResolveKind(kind string) string {
+	if kind == "" {
+		return DefaultKind
+	}
+	return kind
+}
+
 // ResponseBuilder turns the request context into a concrete response.
 type ResponseBuilder interface {
-	BuildResponse(ctx context.Context) (*sfhttp.SfResponse, error)
+	BuildResponse(ctx context.Context) (Result, error)
 }
 
 // Factory constructs a ResponseBuilder for a configured response. It is

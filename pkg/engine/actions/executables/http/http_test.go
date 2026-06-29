@@ -419,7 +419,7 @@ func TestHTTPActionWithEscapeTemplateViaPlanExecute(t *testing.T) {
 	require.NoError(t, err)
 
 	// Execute the plan
-	_, err = p.Execute(ctx, requestctx.ActionConfigPrefix+"test_http", nil)
+	_, err = p.Execute(ctx, requestctx.ActionConfigPrefix+"test_http")
 	require.NoError(t, err)
 
 	// Verify the server was called

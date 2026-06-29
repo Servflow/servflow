@@ -151,34 +151,36 @@ func generateWorkflowToolExec(config *WorkflowToolConfig) functionExec {
 			},
 		}, true)
 
-		endValueSpec := plan.EndValueSpec{}
-		switch config.Type {
-		case workflowToolResponseString:
-			endValueSpec.ValType = plan.StringEndValue
-			endValueSpec.StringVal = config.ReturnValue
-		case workflowToolResponseFile:
-			endValueSpec.ValType = plan.FileEndValue
-			endValueSpec.FileVal = config.ReturnFile
-		default:
-		}
-		resp, err := plan.ExecuteFromContext(ctx, config.Start, &endValueSpec)
-		if err != nil {
+		if _, err := plan.ExecuteFromContext(ctx, config.Start); err != nil {
 			return nil, err
 		}
 
-		if resp.File != nil {
-			data, err := resp.File.GetContent()
+		// The workflow tool renders its own result from the request context once
+		// the workflow has run, rather than terminating in a response step.
+		switch config.Type {
+		case workflowToolResponseFile:
+			fileVal, err := requestctx.GetFileFromContext(ctx, config.ReturnFile)
+			if err != nil {
+				return nil, err
+			}
+			data, err := fileVal.GetContent()
+			if err != nil {
+				return nil, err
+			}
+			mimeType, err := fileVal.GetMimeType()
+			if err != nil {
+				return nil, err
+			}
 			base64Content := base64.StdEncoding.EncodeToString(data)
-			if err != nil {
-				return nil, err
-			}
-			mimeType, err := resp.File.GetMimeType()
-			if err != nil {
-				return nil, err
-			}
 			return []mcp.Content{mcp.NewImageContent(base64Content, mimeType)}, nil
-		} else {
-			return []mcp.Content{mcp.NewTextContent(string(resp.Body))}, nil
+		case workflowToolResponseString:
+			body, err := requestctx.ExecuteTemplateString(ctx, config.ReturnValue)
+			if err != nil {
+				return nil, err
+			}
+			return []mcp.Content{mcp.NewTextContent(body)}, nil
+		default:
+			return []mcp.Content{mcp.NewTextContent("")}, nil
 		}
 	}
 }

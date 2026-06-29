@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -11,6 +12,7 @@ import (
 	"text/template"
 	"time"
 
+	sfhttp "github.com/Servflow/servflow/internal/http"
 	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
@@ -184,14 +186,21 @@ func (h *APIHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 
 	ctx = plan.WithRequest(ctx, req)
 
-	resp, err := h.p.Execute(ctx, h.planStart, nil)
-	if err != nil || resp == nil {
+	result, err := h.p.Execute(ctx, h.planStart)
+	resp, ok := result.(*sfhttp.SfResponse)
+	if err != nil || !ok || resp == nil {
 		if span != nil {
 			span.SetAttributes(attribute.Int("http.status_code", http.StatusInternalServerError))
 		}
-		if err != nil {
+		switch {
+		case err != nil:
 			h.logAndWriteInternalServerError(wr, err, logger)
-		} else {
+		case result != nil && !ok:
+			// A non-nil result that isn't an HTTP response means a non-http
+			// response kind was mounted on an HTTP endpoint. Surface the type
+			// rather than the misleading "response missing".
+			h.logAndWriteInternalServerError(wr, fmt.Errorf("unexpected result type %T for HTTP endpoint", result), logger)
+		default:
 			h.logAndWriteInternalServerError(wr, errors.New("error executing api, response missing"), logger)
 		}
 		return

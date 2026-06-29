@@ -221,3 +221,15 @@ func ExecuteTemplateFromContext(ctx context.Context, tmpl *template.Template) (s
 
 	return strings.ReplaceAll(buff.String(), noValue, ""), nil
 }
+
+// ExecuteTemplateString parses config as a template against the request context
+// and renders it in one step. It is the common case of CreateTextTemplate
+// followed by ExecuteTemplateFromContext; callers needing a custom funcMap or
+// template reuse should use those directly.
+func ExecuteTemplateString(ctx context.Context, config string) (string, error) {
+	tmpl, err := CreateTextTemplate(ctx, config, nil)
+	if err != nil {
+		return "", err
+	}
+	return ExecuteTemplateFromContext(ctx, tmpl)
+}

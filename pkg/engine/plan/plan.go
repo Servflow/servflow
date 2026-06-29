@@ -11,10 +11,9 @@ import (
 	"text/template"
 	"time"
 
-	sfhttp "github.com/Servflow/servflow/internal/http"
-	"github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
+	"github.com/Servflow/servflow/pkg/engine/responses"
 	"github.com/Servflow/servflow/pkg/logging"
 	"go.uber.org/zap"
 )
@@ -42,19 +41,6 @@ type stepWrapper struct {
 	step Step
 }
 
-type EndValueType int
-
-const (
-	StringEndValue EndValueType = iota
-	FileEndValue
-)
-
-type EndValueSpec struct {
-	ValType   EndValueType
-	StringVal string
-	FileVal   apiconfig.FileInput
-}
-
 func WithRequest(ctx context.Context, r *http.Request) context.Context {
 	return context.WithValue(ctx, RequestContextKey, r)
 }
@@ -76,7 +62,7 @@ func ExecuteSingleAction(actionType string, config json.RawMessage) (any, map[st
 	return exec.Execute(context.Background(), string(config))
 }
 
-func (p *Plan) executeStep(ctx context.Context, step *stepWrapper, endValue *EndValueSpec) (*sfhttp.SfResponse, error) {
+func (p *Plan) executeStep(ctx context.Context, step *stepWrapper) (responses.Result, error) {
 	select {
 	case <-ctx.Done():
 		return nil, ErrContextCanceled
@@ -97,47 +83,18 @@ func (p *Plan) executeStep(ctx context.Context, step *stepWrapper, endValue *End
 		logger.Debug("finished execution")
 	}
 	if err != nil {
-		//if errors.Is(err, errExecutingExecutable) {
-		//	return p.generateEndValue(ctx, logger, endValue)
-		//}
 		return nil, fmt.Errorf("error executing step: %w", err)
 	}
 
 	if next != nil {
-		return p.executeStep(ctx, next, endValue)
+		return p.executeStep(ctx, next)
 	}
-	return p.generateEndValue(ctx, logger, endValue)
+	// The chain completed without a response step; callers that need output
+	// (e.g. MCP tools) render it themselves from the request context.
+	return nil, nil
 }
 
-func (p *Plan) generateEndValue(ctx context.Context, logger *zap.Logger, endValue *EndValueSpec) (*sfhttp.SfResponse, error) {
-	if endValue == nil {
-		return nil, nil
-	}
-
-	resp := &sfhttp.SfResponse{}
-	switch endValue.ValType {
-	case StringEndValue:
-		tmpl, err := requestctx.CreateTextTemplate(ctx, endValue.StringVal, nil)
-		if err != nil {
-			return nil, err
-		}
-		val, err := requestctx.ExecuteTemplateFromContext(ctx, tmpl)
-		if err != nil {
-			return nil, err
-		}
-		logger.Debug("template generated", zap.String("template", val))
-		resp.Body = []byte(val)
-	case FileEndValue:
-		fileVal, err := requestctx.GetFileFromContext(ctx, endValue.FileVal)
-		if err != nil {
-			return nil, err
-		}
-		resp.File = fileVal
-	}
-	return resp, nil
-}
-
-func (p *Plan) Execute(ctx context.Context, id string, endValue *EndValueSpec) (*sfhttp.SfResponse, error) {
+func (p *Plan) Execute(ctx context.Context, id string) (responses.Result, error) {
 	id = strings.TrimLeft(id, "$")
 	ctx = context.WithValue(ctx, ContextKey, p)
 
@@ -156,7 +113,7 @@ func (p *Plan) Execute(ctx context.Context, id string, endValue *EndValueSpec) (
 		return nil, errors.New("step not found")
 	}
 
-	return p.executeStep(ctx, &step, endValue)
+	return p.executeStep(ctx, &step)
 }
 
 // actionFunc returns a template function that looks up action outputs by name or ID.
@@ -176,13 +133,13 @@ func (p *Plan) actionFunc(reqCtx *requestctx.RequestContext) func(string) interf
 	}
 }
 
-func ExecuteFromContext(ctx context.Context, id string, endValue *EndValueSpec) (*sfhttp.SfResponse, error) {
+func ExecuteFromContext(ctx context.Context, id string) (responses.Result, error) {
 	plan, ok := ctx.Value(ContextKey).(*Plan)
 	if !ok {
 		return nil, errors.New("plan not found")
 	}
 
-	return plan.Execute(ctx, id, endValue)
+	return plan.Execute(ctx, id)
 }
 
 // BackgroundManager manages background goroutines for dispatched action chains.

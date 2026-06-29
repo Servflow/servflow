@@ -38,6 +38,7 @@ import (
 	_ "github.com/Servflow/servflow/pkg/engine/integration/integrations/qdrant"
 	_ "github.com/Servflow/servflow/pkg/engine/integration/integrations/sql"
 	"github.com/Servflow/servflow/pkg/engine/plan"
+	_ "github.com/Servflow/servflow/pkg/engine/responses/http"
 	"github.com/Servflow/servflow/pkg/engine/secrets"
 	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/Servflow/servflow/pkg/storage"

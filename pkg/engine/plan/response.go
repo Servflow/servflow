@@ -6,7 +6,7 @@ import (
 
 	"github.com/Servflow/servflow/internal/http"
 	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
-	"github.com/Servflow/servflow/pkg/engine/plan/responsebuilder"
+	"github.com/Servflow/servflow/pkg/engine/responses"
 	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/Servflow/servflow/pkg/tracing"
 	"go.opentelemetry.io/otel/attribute"
@@ -14,12 +14,10 @@ import (
 	"go.uber.org/zap"
 )
 
-// TODO improve response handling
-
 type Response struct {
 	id              string
 	name            string
-	responseBuilder ResponseBuilder
+	responseBuilder responses.ResponseBuilder
 }
 
 func (r *Response) ID() string {
@@ -33,37 +31,19 @@ func (r *Response) DisplayName() string {
 	return r.id
 }
 
-type ResponseBuilder interface {
-	BuildResponse(ctx context.Context) (*http.SfResponse, error)
-}
-
-const (
-	responseTypeTemplate = "template"
-	responseTypeObject   = "json_object"
-	responseTypeFile     = "file"
-)
-
+// newResponse builds a Response step by resolving the configured response kind
+// from the responses registry. The kind is currently always "http"; selecting
+// other kinds via config is a later step. The kind's factory owns body-format
+// selection (template/json_object) and code validation.
 func newResponse(id, name string, resp apiconfig.ResponseConfig) (*Response, error) {
-	if resp.Code < 100 || resp.Code > 999 {
-		return nil, fmt.Errorf("invalid response code: %d", resp.Code)
+	const kind = "http"
+	factory, ok := responses.Get(kind)
+	if !ok {
+		return nil, fmt.Errorf("unknown response kind: %s", kind)
 	}
-
-	var responseBuilder ResponseBuilder
-	if resp.Type == "" {
-		if resp.Object.Value != "" || len(resp.Object.Fields) > 0 {
-			resp.Type = responseTypeObject
-		} else {
-			resp.Type = responseTypeTemplate
-		}
-	}
-
-	switch resp.Type {
-	case responseTypeTemplate:
-		responseBuilder = responsebuilder.NewTemplateBuilder(resp.Code, resp.Template)
-	case responseTypeObject:
-		responseBuilder = responsebuilder.NewObjectBuilder(&resp.Object, resp.Code)
-	default:
-		return nil, fmt.Errorf("unknown builder type: %s", resp.Type)
+	responseBuilder, err := factory(resp)
+	if err != nil {
+		return nil, err
 	}
 
 	return &Response{
@@ -71,7 +51,6 @@ func newResponse(id, name string, resp apiconfig.ResponseConfig) (*Response, err
 		name:            name,
 		responseBuilder: responseBuilder,
 	}, nil
-
 }
 
 func (r *Response) execute(ctx context.Context) (*stepWrapper, error) {

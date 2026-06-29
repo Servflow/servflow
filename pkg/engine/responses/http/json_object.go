@@ -1,11 +1,11 @@
-package responsebuilder
+package http
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
 
-	"github.com/Servflow/servflow/internal/http"
+	sfhttp "github.com/Servflow/servflow/internal/http"
 	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
@@ -24,7 +24,7 @@ func NewObjectBuilder(object *apiconfig.ResponseObject, code int) *JSONObjectBui
 	}
 }
 
-func (o *JSONObjectBuilder) BuildResponse(ctx context.Context) (*http.SfResponse, error) {
+func (o *JSONObjectBuilder) BuildResponse(ctx context.Context) (*sfhttp.SfResponse, error) {
 	logger := logging.FromContext(ctx).With(zap.String("builder_type", "json_object"))
 	ctx = logging.WithLogger(ctx, logger)
 
@@ -40,14 +40,13 @@ func (o *JSONObjectBuilder) BuildResponse(ctx context.Context) (*http.SfResponse
 		return nil, err
 	}
 
-	response := &http.SfResponse{
+	response := &sfhttp.SfResponse{
 		Body: jsonResp,
 		Code: o.code,
 	}
 	response.SetHeader("Content-Type", "application/json")
 
 	return response, nil
-
 }
 
 func generateValue(ctx context.Context, object *apiconfig.ResponseObject) (any, error) {

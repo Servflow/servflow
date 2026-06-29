@@ -1,8 +1,11 @@
-package apiconfig
+// Package schemavalidate holds generic JSON-Schema validation helpers shared by
+// the engine config validator and the pro layer's WorkflowConfig validation.
+// It is deliberately free of any apiconfig/registry dependency so both layers
+// can import it one-way.
+package schemavalidate
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -17,8 +20,19 @@ import (
 // ourselves), where v6's own localized string is good enough.
 var schemaPrinter = message.NewPrinter(language.English)
 
-// compiledAPIConfigSchema is the embedded APIConfig schema, compiled once.
-var compiledAPIConfigSchema = MustCompileSchema("apiconfig.json", apiConfigSchema)
+// SchemaValidationError is a single humanized JSON-schema failure.
+type SchemaValidationError struct {
+	// Path is the instance location of the offending value (JSON-pointer style).
+	Path string
+	// Keyword is the failing schema keyword (e.g. "required", "enum", "type").
+	Keyword string
+	// Message is the humanized, domain-aware message.
+	Message string
+}
+
+func (e *SchemaValidationError) Error() string {
+	return e.Message
+}
 
 // MustCompileSchema compiles a JSON Schema document (as a JSON string) with the
 // santhosh-tekuri/jsonschema v6 compiler, panicking on failure. Schemas are
@@ -26,15 +40,15 @@ var compiledAPIConfigSchema = MustCompileSchema("apiconfig.json", apiConfigSchem
 func MustCompileSchema(name, schemaJSON string) *jsonschema.Schema {
 	doc, err := jsonschema.UnmarshalJSON(strings.NewReader(schemaJSON))
 	if err != nil {
-		panic(fmt.Sprintf("apiconfig: parse schema %s: %v", name, err))
+		panic(fmt.Sprintf("schemavalidate: parse schema %s: %v", name, err))
 	}
 	c := jsonschema.NewCompiler()
 	if err := c.AddResource(name, doc); err != nil {
-		panic(fmt.Sprintf("apiconfig: add schema %s: %v", name, err))
+		panic(fmt.Sprintf("schemavalidate: add schema %s: %v", name, err))
 	}
 	sch, err := c.Compile(name)
 	if err != nil {
-		panic(fmt.Sprintf("apiconfig: compile schema %s: %v", name, err))
+		panic(fmt.Sprintf("schemavalidate: compile schema %s: %v", name, err))
 	}
 	return sch
 }
@@ -58,27 +72,11 @@ func ValidateInstance(schema *jsonschema.Schema, jsonDoc []byte, locate func([]s
 	return nil, nil
 }
 
-func (a *APIConfig) collectSchemaErrors(validationErrors *ValidationErrors) {
-	configJSON, err := json.Marshal(a)
-	if err != nil {
-		validationErrors.Add(fmt.Errorf("failed to marshal APIConfig to JSON: %w", err))
-		return
-	}
-	schemaErrs, err := ValidateInstance(compiledAPIConfigSchema, configJSON, locate)
-	if err != nil {
-		validationErrors.Add(fmt.Errorf("schema validation failed: %w", err))
-		return
-	}
-	for _, se := range schemaErrs {
-		validationErrors.Add(se)
-	}
-}
-
 // HumanizeValidationError walks a v6 validation error tree and produces one
 // humanized SchemaValidationError per leaf. locate turns an instance location
 // (path tokens) into a domain noun, e.g. ["actions","createUser"] -> action
-// "createUser". This is exported so the pro layer can reuse the translation
-// with its own (WorkflowConfig-aware) locator.
+// "createUser". It is exported so callers can reuse the translation with their
+// own (schema-aware) locator.
 func HumanizeValidationError(verr *jsonschema.ValidationError, locate func([]string) string) []*SchemaValidationError {
 	var out []*SchemaValidationError
 	var walk func(e *jsonschema.ValidationError)
@@ -126,33 +124,6 @@ func humanizeKind(k jsonschema.ErrorKind, where string) string {
 	default:
 		return fmt.Sprintf("%s: %s", where, k.LocalizedString(schemaPrinter))
 	}
-}
-
-// locate maps an instance location (path tokens) to a domain noun for the
-// engine APIConfig schema:
-//
-//	["actions","createUser"]        -> action "createUser"
-//	["actions","createUser","type"] -> action "createUser" field "type"
-//	["responses","ok","code"]       -> response "ok" field "code"
-//	[]                              -> config
-func locate(tokens []string) string {
-	if len(tokens) == 0 {
-		return "config"
-	}
-	nouns := map[string]string{
-		"actions":      "action",
-		"conditionals": "conditional",
-		"responses":    "response",
-		"integrations": "integration",
-	}
-	if noun, ok := nouns[tokens[0]]; ok && len(tokens) >= 2 {
-		base := fmt.Sprintf("%s %q", noun, tokens[1])
-		if len(tokens) > 2 {
-			return fmt.Sprintf("%s field %q", base, strings.Join(tokens[2:], "."))
-		}
-		return base
-	}
-	return fmt.Sprintf("field %q", strings.Join(tokens, "."))
 }
 
 func quoteAll(s []string) []string {

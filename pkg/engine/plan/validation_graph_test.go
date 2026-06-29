@@ -1,15 +1,17 @@
-package apiconfig
+package plan
 
 import (
 	"errors"
 	"testing"
+
+	"github.com/Servflow/servflow/pkg/apiconfig"
 )
 
 // runGraph runs only the graph pass so these tests are isolated from schema and
 // action-registration validation.
-func runGraph(cfg APIConfig, roots ...string) *ValidationErrors {
+func runGraph(cfg apiconfig.APIConfig, roots ...string) *ValidationErrors {
 	ve := &ValidationErrors{}
-	cfg.collectGraphErrors(ve, roots)
+	collectGraphErrors(&cfg, ve, roots)
 	return ve
 }
 
@@ -25,10 +27,10 @@ func countErrs[T error](errs []error) int {
 }
 
 func TestGraph_ValidLinear(t *testing.T) {
-	cfg := APIConfig{
-		HttpConfig: HttpConfig{Next: "action.a"},
-		Actions:    map[string]Action{"a": {Name: "a", Next: "response.ok"}},
-		Responses:  map[string]ResponseConfig{"ok": {Name: "ok", Code: 200}},
+	cfg := apiconfig.APIConfig{
+		HttpConfig: apiconfig.HttpConfig{Next: "action.a"},
+		Actions:    map[string]apiconfig.Action{"a": {Name: "a", Next: "response.ok"}},
+		Responses:  map[string]apiconfig.ResponseConfig{"ok": {Name: "ok", Code: 200}},
 	}
 	ve := runGraph(cfg)
 	if ve.HasErrors() {
@@ -40,10 +42,10 @@ func TestGraph_ValidLinear(t *testing.T) {
 }
 
 func TestGraph_ValidBranch(t *testing.T) {
-	cfg := APIConfig{
-		HttpConfig:   HttpConfig{Next: "conditional.c"},
-		Conditionals: map[string]Conditional{"c": {Name: "c", OnTrue: "response.ok", OnFalse: "response.bad"}},
-		Responses:    map[string]ResponseConfig{"ok": {Name: "ok", Code: 200}, "bad": {Name: "bad", Code: 400}},
+	cfg := apiconfig.APIConfig{
+		HttpConfig:   apiconfig.HttpConfig{Next: "conditional.c"},
+		Conditionals: map[string]apiconfig.Conditional{"c": {Name: "c", OnTrue: "response.ok", OnFalse: "response.bad"}},
+		Responses:    map[string]apiconfig.ResponseConfig{"ok": {Name: "ok", Code: 200}, "bad": {Name: "bad", Code: 400}},
 	}
 	ve := runGraph(cfg)
 	if ve.HasErrors() || len(ve.Warnings()) != 0 {
@@ -52,9 +54,9 @@ func TestGraph_ValidBranch(t *testing.T) {
 }
 
 func TestGraph_SelfCycle(t *testing.T) {
-	cfg := APIConfig{
-		HttpConfig: HttpConfig{Next: "action.a"},
-		Actions:    map[string]Action{"a": {Name: "a", Next: "action.a"}},
+	cfg := apiconfig.APIConfig{
+		HttpConfig: apiconfig.HttpConfig{Next: "action.a"},
+		Actions:    map[string]apiconfig.Action{"a": {Name: "a", Next: "action.a"}},
 	}
 	ve := runGraph(cfg)
 	if countErrs[*CycleError](ve.errors) != 1 {
@@ -63,9 +65,9 @@ func TestGraph_SelfCycle(t *testing.T) {
 }
 
 func TestGraph_MultiNodeCycle(t *testing.T) {
-	cfg := APIConfig{
-		HttpConfig: HttpConfig{Next: "action.a"},
-		Actions: map[string]Action{
+	cfg := apiconfig.APIConfig{
+		HttpConfig: apiconfig.HttpConfig{Next: "action.a"},
+		Actions: map[string]apiconfig.Action{
 			"a": {Name: "a", Next: "action.b"},
 			"b": {Name: "b", Next: "action.a"},
 		},
@@ -77,9 +79,9 @@ func TestGraph_MultiNodeCycle(t *testing.T) {
 }
 
 func TestGraph_DanglingRef(t *testing.T) {
-	cfg := APIConfig{
-		HttpConfig: HttpConfig{Next: "action.a"},
-		Actions:    map[string]Action{"a": {Name: "a", Next: "action.missing"}},
+	cfg := apiconfig.APIConfig{
+		HttpConfig: apiconfig.HttpConfig{Next: "action.a"},
+		Actions:    map[string]apiconfig.Action{"a": {Name: "a", Next: "action.missing"}},
 	}
 	ve := runGraph(cfg)
 	if countErrs[*InvalidReferenceError](ve.errors) != 1 {
@@ -88,9 +90,9 @@ func TestGraph_DanglingRef(t *testing.T) {
 }
 
 func TestGraph_BadPrefix(t *testing.T) {
-	cfg := APIConfig{
-		HttpConfig: HttpConfig{Next: "action.a"},
-		Actions:    map[string]Action{"a": {Name: "a", Next: "foo"}},
+	cfg := apiconfig.APIConfig{
+		HttpConfig: apiconfig.HttpConfig{Next: "action.a"},
+		Actions:    map[string]apiconfig.Action{"a": {Name: "a", Next: "foo"}},
 	}
 	ve := runGraph(cfg)
 	if countErrs[*InvalidReferenceError](ve.errors) != 1 {
@@ -99,10 +101,10 @@ func TestGraph_BadPrefix(t *testing.T) {
 }
 
 func TestGraph_MissingEntry(t *testing.T) {
-	cfg := APIConfig{
-		HttpConfig: HttpConfig{Next: "action.missing"},
-		Actions:    map[string]Action{"a": {Name: "a", Next: "response.ok"}},
-		Responses:  map[string]ResponseConfig{"ok": {Name: "ok", Code: 200}},
+	cfg := apiconfig.APIConfig{
+		HttpConfig: apiconfig.HttpConfig{Next: "action.missing"},
+		Actions:    map[string]apiconfig.Action{"a": {Name: "a", Next: "response.ok"}},
+		Responses:  map[string]apiconfig.ResponseConfig{"ok": {Name: "ok", Code: 200}},
 	}
 	ve := runGraph(cfg)
 	if countErrs[*InvalidReferenceError](ve.errors) != 1 {
@@ -111,13 +113,13 @@ func TestGraph_MissingEntry(t *testing.T) {
 }
 
 func TestGraph_OrphanWarning(t *testing.T) {
-	cfg := APIConfig{
-		HttpConfig: HttpConfig{Next: "action.a"},
-		Actions: map[string]Action{
+	cfg := apiconfig.APIConfig{
+		HttpConfig: apiconfig.HttpConfig{Next: "action.a"},
+		Actions: map[string]apiconfig.Action{
 			"a":      {Name: "a", Next: "response.ok"},
 			"orphan": {Name: "orphan", Next: "response.ok"},
 		},
-		Responses: map[string]ResponseConfig{"ok": {Name: "ok", Code: 200}},
+		Responses: map[string]apiconfig.ResponseConfig{"ok": {Name: "ok", Code: 200}},
 	}
 	ve := runGraph(cfg)
 	if ve.HasErrors() {
@@ -129,15 +131,15 @@ func TestGraph_OrphanWarning(t *testing.T) {
 }
 
 func TestGraph_UnreachableCycleIsWarning(t *testing.T) {
-	cfg := APIConfig{
-		HttpConfig: HttpConfig{Next: "action.a"},
-		Actions: map[string]Action{
+	cfg := apiconfig.APIConfig{
+		HttpConfig: apiconfig.HttpConfig{Next: "action.a"},
+		Actions: map[string]apiconfig.Action{
 			"a": {Name: "a", Next: "response.ok"},
 			// b<->c form a cycle that no entry reaches
 			"b": {Name: "b", Next: "action.c"},
 			"c": {Name: "c", Next: "action.b"},
 		},
-		Responses: map[string]ResponseConfig{"ok": {Name: "ok", Code: 200}},
+		Responses: map[string]apiconfig.ResponseConfig{"ok": {Name: "ok", Code: 200}},
 	}
 	ve := runGraph(cfg)
 	if ve.HasErrors() {
@@ -151,13 +153,13 @@ func TestGraph_UnreachableCycleIsWarning(t *testing.T) {
 func TestGraph_DispatchIsRootNotCycle(t *testing.T) {
 	// a dispatches to b; b -> a via dispatch would NOT be a main-flow cycle.
 	// Here a's normal flow ends, and dispatch reaches b (so b is not orphaned).
-	cfg := APIConfig{
-		HttpConfig: HttpConfig{Next: "action.a"},
-		Actions: map[string]Action{
+	cfg := apiconfig.APIConfig{
+		HttpConfig: apiconfig.HttpConfig{Next: "action.a"},
+		Actions: map[string]apiconfig.Action{
 			"a": {Name: "a", Next: "response.ok", Dispatch: []string{"action.b"}},
 			"b": {Name: "b", Next: "response.ok"},
 		},
-		Responses: map[string]ResponseConfig{"ok": {Name: "ok", Code: 200}},
+		Responses: map[string]apiconfig.ResponseConfig{"ok": {Name: "ok", Code: 200}},
 	}
 	ve := runGraph(cfg)
 	if ve.HasErrors() {
@@ -169,9 +171,9 @@ func TestGraph_DispatchIsRootNotCycle(t *testing.T) {
 }
 
 func TestGraph_ExtraRootResolves(t *testing.T) {
-	cfg := APIConfig{
-		Actions:   map[string]Action{"a": {Name: "a", Next: "response.ok"}},
-		Responses: map[string]ResponseConfig{"ok": {Name: "ok", Code: 200}},
+	cfg := apiconfig.APIConfig{
+		Actions:   map[string]apiconfig.Action{"a": {Name: "a", Next: "response.ok"}},
+		Responses: map[string]apiconfig.ResponseConfig{"ok": {Name: "ok", Code: 200}},
 	}
 	// trigger.next supplied as an extra root
 	ve := runGraph(cfg, "action.a")

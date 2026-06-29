@@ -8,6 +8,7 @@ import (
 	"os/signal"
 
 	"github.com/Servflow/servflow/config"
+	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/engine/server"
 	"github.com/Servflow/servflow/pkg/storage"
 	"github.com/joho/godotenv"
@@ -77,7 +78,7 @@ func ValidateConfigs(configFolder string, verbose bool) error {
 	validCount := 0
 
 	for _, cfg := range configs {
-		if err := cfg.Validate(); err != nil {
+		if err := plan.Validate(cfg); err != nil {
 			validationErrors = append(validationErrors, ValidationError{
 				ConfigID: cfg.ID,
 				Error:    err,

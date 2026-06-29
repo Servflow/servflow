@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/Servflow/servflow/pkg/apiconfig"
-	responsebuilder2 "github.com/Servflow/servflow/pkg/engine/plan/responsebuilder"
+	httpresp "github.com/Servflow/servflow/pkg/engine/responses/http"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,12 +20,12 @@ func TestNewResponse(t *testing.T) {
 			name: "json",
 			id:   "id",
 			config: apiconfig.ResponseConfig{
-				Type:     responseTypeTemplate,
+				Type:     "template",
 				Template: "",
 				Code:     200,
 			},
 			assertBuilder: func(t *testing.T, response *Response) {
-				_, ok := response.responseBuilder.(*responsebuilder2.TemplateBuilder)
+				_, ok := response.responseBuilder.(*httpresp.TemplateBuilder)
 				if !ok {
 					t.Errorf("Response builder is not a TemplateBuilder")
 				}
@@ -47,7 +47,7 @@ func TestNewResponse(t *testing.T) {
 				},
 			},
 			assertBuilder: func(t *testing.T, response *Response) {
-				_, ok := response.responseBuilder.(*responsebuilder2.JSONObjectBuilder)
+				_, ok := response.responseBuilder.(*httpresp.JSONObjectBuilder)
 				if !ok {
 					t.Errorf("Response builder is not a JSONObjectBuilder, it is %T", response.responseBuilder)
 				}

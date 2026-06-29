@@ -1,18 +1,26 @@
-package apiconfig
+package plan
 
 import (
 	"encoding/json"
 	"errors"
 	"testing"
 
+	"github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+func registerTestAction(t *testing.T, name string, info actions.ActionRegistrationInfo) {
+	t.Helper()
+	err := actions.RegisterAction(name, info)
+	if err != nil && err.Error() != "action type "+name+" already registered" {
+		require.NoError(t, err)
+	}
+}
+
 func TestAPIConfig_Validate(t *testing.T) {
-	// Register all actions needed for the tests beforehand
-	err := actions.RegisterAction("http", actions.ActionRegistrationInfo{
+	registerTestAction(t, "http", actions.ActionRegistrationInfo{
 		Name:        "HTTP Action",
 		Description: "HTTP action for testing",
 		Fields: map[string]actions.FieldInfo{
@@ -31,9 +39,8 @@ func TestAPIConfig_Validate(t *testing.T) {
 			return nil, nil
 		},
 	})
-	require.NoError(t, err)
 
-	err = actions.RegisterAction("database", actions.ActionRegistrationInfo{
+	registerTestAction(t, "database", actions.ActionRegistrationInfo{
 		Name:        "Database Action",
 		Description: "Database action for testing",
 		Fields: map[string]actions.FieldInfo{
@@ -52,11 +59,10 @@ func TestAPIConfig_Validate(t *testing.T) {
 			return nil, nil
 		},
 	})
-	require.NoError(t, err)
 
-	validConfig := APIConfig{
+	validConfig := apiconfig.APIConfig{
 		ID: "test-api",
-		Actions: map[string]Action{
+		Actions: map[string]apiconfig.Action{
 			"action1": {
 				Name: "action1",
 				Type: "http",
@@ -67,7 +73,7 @@ func TestAPIConfig_Validate(t *testing.T) {
 				Next: "action2",
 			},
 		},
-		Conditionals: map[string]Conditional{
+		Conditionals: map[string]apiconfig.Conditional{
 			"cond1": {
 				Name:       "cond1",
 				OnTrue:     "action1",
@@ -75,26 +81,26 @@ func TestAPIConfig_Validate(t *testing.T) {
 				Expression: "request.id == 'test'",
 			},
 		},
-		Responses: map[string]ResponseConfig{
+		Responses: map[string]apiconfig.ResponseConfig{
 			"success": {
 				Name: "success",
 				Code: 200,
 				Type: "template",
-				Object: ResponseObject{
+				Object: apiconfig.ResponseObject{
 					Value: "result",
 				},
 			},
 		},
-		HttpConfig: HttpConfig{
+		HttpConfig: apiconfig.HttpConfig{
 			ListenPath: "/api/test",
 			Method:     "POST",
 			Next:       "action1",
 		},
-		McpTool: MCPToolConfig{
+		McpTool: apiconfig.MCPToolConfig{
 			Enabled:     true,
 			Name:        "test-tool",
 			Description: "A test tool",
-			Args: map[string]ArgType{
+			Args: map[string]apiconfig.ArgType{
 				"input": {
 					Name: "input",
 					Type: "string",
@@ -106,29 +112,29 @@ func TestAPIConfig_Validate(t *testing.T) {
 	}
 	tests := []struct {
 		name       string
-		config     func() APIConfig
+		config     func() apiconfig.APIConfig
 		wantError  bool
 		errMessage string
 	}{
 		{
 			name: "valid minimal config",
-			config: func() APIConfig {
-				return APIConfig{
+			config: func() apiconfig.APIConfig {
+				return apiconfig.APIConfig{
 					ID: "test-api",
 				}
 			},
 		},
 		{
 			name: "valid complete config",
-			config: func() APIConfig {
+			config: func() apiconfig.APIConfig {
 				return validConfig
 			},
 		},
 		{
 			name: "valid config with invalid action type",
-			config: func() APIConfig {
+			config: func() apiconfig.APIConfig {
 				newConfig := validConfig
-				newConfig.Actions = map[string]Action{
+				newConfig.Actions = map[string]apiconfig.Action{
 					"action1": {
 						Name: "action1",
 						Type: "invalid-action-type",
@@ -141,9 +147,9 @@ func TestAPIConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "invalid config - missing required field",
-			config: func() APIConfig {
+			config: func() apiconfig.APIConfig {
 				cfg := validConfig
-				cfg.Actions = map[string]Action{
+				cfg.Actions = map[string]apiconfig.Action{
 					"action1": {
 						Name: "action1",
 						Type: "database",
@@ -160,9 +166,9 @@ func TestAPIConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "invalid config - empty required field",
-			config: func() APIConfig {
+			config: func() apiconfig.APIConfig {
 				cfg := validConfig
-				cfg.Actions = map[string]Action{
+				cfg.Actions = map[string]apiconfig.Action{
 					"action1": {
 						Name: "action1",
 						Type: "database",
@@ -179,9 +185,9 @@ func TestAPIConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "valid config - all required fields present",
-			config: func() APIConfig {
+			config: func() apiconfig.APIConfig {
 				cfg := validConfig
-				cfg.Actions = map[string]Action{
+				cfg.Actions = map[string]apiconfig.Action{
 					"action1": {
 						Name: "action1",
 						Type: "database",
@@ -197,10 +203,10 @@ func TestAPIConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "invalid config - empty ID",
-			config: func() APIConfig {
-				return APIConfig{
+			config: func() apiconfig.APIConfig {
+				return apiconfig.APIConfig{
 					ID: "",
-					Actions: map[string]Action{
+					Actions: map[string]apiconfig.Action{
 						"action1": {
 							Name: "action1",
 							Type: "http",
@@ -215,7 +221,7 @@ func TestAPIConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "invalid config - invalid HTTP method",
-			config: func() APIConfig {
+			config: func() apiconfig.APIConfig {
 				cfg := validConfig
 				cfg.HttpConfig.Method = "test"
 				return cfg
@@ -224,9 +230,9 @@ func TestAPIConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "invalid config - invalid response code",
-			config: func() APIConfig {
+			config: func() apiconfig.APIConfig {
 				cfg := validConfig
-				cfg.Responses = map[string]ResponseConfig{
+				cfg.Responses = map[string]apiconfig.ResponseConfig{
 					"success": {
 						Name: "success",
 						Code: 900,
@@ -238,19 +244,19 @@ func TestAPIConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "valid config with structured conditional",
-			config: func() APIConfig {
-				return APIConfig{
+			config: func() apiconfig.APIConfig {
+				return apiconfig.APIConfig{
 					ID: "test-structured-conditional",
-					HttpConfig: HttpConfig{
+					HttpConfig: apiconfig.HttpConfig{
 						ListenPath: "/test",
 						Method:     "POST",
 						Next:       "cond1",
 					},
-					Conditionals: map[string]Conditional{
+					Conditionals: map[string]apiconfig.Conditional{
 						"cond1": {
 							Name: "cond1",
 							Type: "structured",
-							Structure: [][]ConditionItem{
+							Structure: [][]apiconfig.ConditionItem{
 								{
 									{Content: ".email", Function: "email", Title: "Email"},
 									{Content: ".status", Comparison: "\"active\"", Function: "eq"},
@@ -260,7 +266,7 @@ func TestAPIConfig_Validate(t *testing.T) {
 							OnFalse: "response2",
 						},
 					},
-					Responses: map[string]ResponseConfig{
+					Responses: map[string]apiconfig.ResponseConfig{
 						"response1": {Name: "response1", Code: 200, Type: "template", Template: "Success"},
 						"response2": {Name: "response2", Code: 400, Type: "template", Template: "Failed"},
 					},
@@ -269,13 +275,13 @@ func TestAPIConfig_Validate(t *testing.T) {
 		},
 		{
 			name: "valid mcp config only",
-			config: func() APIConfig {
+			config: func() apiconfig.APIConfig {
 				cfg := validConfig
-				validConfig.McpTool = MCPToolConfig{
+				validConfig.McpTool = apiconfig.MCPToolConfig{
 					Enabled:     true,
 					Name:        "data-processor",
 					Description: "Processes incoming data",
-					Args: map[string]ArgType{
+					Args: map[string]apiconfig.ArgType{
 						"input_data": {
 							Name: "input_data",
 							Type: "string",
@@ -288,7 +294,7 @@ func TestAPIConfig_Validate(t *testing.T) {
 					Result: "processed_data",
 					Start:  "process-action",
 				}
-				validConfig.HttpConfig = HttpConfig{}
+				validConfig.HttpConfig = apiconfig.HttpConfig{}
 				return cfg
 			},
 		},
@@ -297,7 +303,7 @@ func TestAPIConfig_Validate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := tt.config()
-			err := cfg.Validate()
+			err := Validate(&cfg)
 			if tt.errMessage != "" {
 				assert.ErrorContains(t, err, tt.errMessage)
 			}
@@ -306,7 +312,7 @@ func TestAPIConfig_Validate(t *testing.T) {
 }
 
 func TestActionConfigError_Extraction(t *testing.T) {
-	err := actions.RegisterAction("test-action", actions.ActionRegistrationInfo{
+	registerTestAction(t, "test-action", actions.ActionRegistrationInfo{
 		Name:        "Test Action",
 		Description: "Test action for error extraction",
 		Fields: map[string]actions.FieldInfo{
@@ -320,21 +326,18 @@ func TestActionConfigError_Extraction(t *testing.T) {
 			return nil, nil
 		},
 	})
-	if err != nil && err.Error() != "action type test-action already registered" {
-		require.NoError(t, err)
-	}
 
 	tests := []struct {
 		name             string
-		config           APIConfig
+		config           apiconfig.APIConfig
 		expectedActionID string
 		expectedMessage  string
 	}{
 		{
 			name: "invalid action type returns ActionConfigError with action ID",
-			config: APIConfig{
+			config: apiconfig.APIConfig{
 				ID: "test-api",
-				Actions: map[string]Action{
+				Actions: map[string]apiconfig.Action{
 					"my-action": {
 						Name: "my-action",
 						Type: "nonexistent-type",
@@ -347,9 +350,9 @@ func TestActionConfigError_Extraction(t *testing.T) {
 		},
 		{
 			name: "missing required field returns ActionConfigError with action ID",
-			config: APIConfig{
+			config: apiconfig.APIConfig{
 				ID: "test-api",
-				Actions: map[string]Action{
+				Actions: map[string]apiconfig.Action{
 					"failing-action": {
 						Name:   "failing-action",
 						Type:   "test-action",
@@ -365,7 +368,7 @@ func TestActionConfigError_Extraction(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.config.Validate()
+			err := Validate(&tt.config)
 			require.Error(t, err)
 
 			var validationErrs *ValidationErrors
@@ -389,13 +392,13 @@ func TestActionConfigError_Extraction(t *testing.T) {
 func TestSchemaValidationError_Extraction(t *testing.T) {
 	tests := []struct {
 		name            string
-		config          APIConfig
+		config          apiconfig.APIConfig
 		expectedPath    string
 		expectedMessage string
 	}{
 		{
 			name: "empty ID returns SchemaValidationError with path",
-			config: APIConfig{
+			config: apiconfig.APIConfig{
 				ID: "",
 			},
 			expectedPath:    "/id",
@@ -403,9 +406,9 @@ func TestSchemaValidationError_Extraction(t *testing.T) {
 		},
 		{
 			name: "invalid HTTP method returns SchemaValidationError with path",
-			config: APIConfig{
+			config: apiconfig.APIConfig{
 				ID: "test-api",
-				HttpConfig: HttpConfig{
+				HttpConfig: apiconfig.HttpConfig{
 					Method: "INVALID",
 				},
 			},
@@ -414,9 +417,9 @@ func TestSchemaValidationError_Extraction(t *testing.T) {
 		},
 		{
 			name: "invalid response code returns SchemaValidationError with path",
-			config: APIConfig{
+			config: apiconfig.APIConfig{
 				ID: "test-api",
-				Responses: map[string]ResponseConfig{
+				Responses: map[string]apiconfig.ResponseConfig{
 					"error": {
 						Name: "error",
 						Code: 999,
@@ -430,7 +433,7 @@ func TestSchemaValidationError_Extraction(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.config.Validate()
+			err := Validate(&tt.config)
 			require.Error(t, err)
 
 			var validationErrs *ValidationErrors
@@ -452,7 +455,7 @@ func TestSchemaValidationError_Extraction(t *testing.T) {
 }
 
 func TestValidationErrors_CollectsBothSchemaAndActionErrors(t *testing.T) {
-	err := actions.RegisterAction("combined-test-action", actions.ActionRegistrationInfo{
+	registerTestAction(t, "combined-test-action", actions.ActionRegistrationInfo{
 		Name:        "Combined Test Action",
 		Description: "Test action for combined error collection",
 		Fields: map[string]actions.FieldInfo{
@@ -466,13 +469,10 @@ func TestValidationErrors_CollectsBothSchemaAndActionErrors(t *testing.T) {
 			return nil, nil
 		},
 	})
-	if err != nil && err.Error() != "action type combined-test-action already registered" {
-		require.NoError(t, err)
-	}
 
-	config := APIConfig{
+	config := apiconfig.APIConfig{
 		ID: "",
-		Actions: map[string]Action{
+		Actions: map[string]apiconfig.Action{
 			"my-action": {
 				Name:   "my-action",
 				Type:   "combined-test-action",
@@ -482,7 +482,7 @@ func TestValidationErrors_CollectsBothSchemaAndActionErrors(t *testing.T) {
 		},
 	}
 
-	err = config.Validate()
+	err := Validate(&config)
 	require.Error(t, err)
 
 	var validationErrs *ValidationErrors

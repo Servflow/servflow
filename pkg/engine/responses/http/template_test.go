@@ -1,4 +1,4 @@
-package responsebuilder
+package http
 
 import (
 	"testing"

@@ -32,11 +32,13 @@ func (r *Response) DisplayName() string {
 }
 
 // newResponse builds a Response step by resolving the configured response kind
-// from the responses registry. The kind is currently always "http"; selecting
-// other kinds via config is a later step. The kind's factory owns body-format
-// selection (template/json_object) and code validation.
+// from the responses registry. An empty kind defaults to "http". The kind's
+// factory owns body-format selection (template/json_object) and code validation.
 func newResponse(id, name string, resp apiconfig.ResponseConfig) (*Response, error) {
-	const kind = "http"
+	kind := resp.Kind
+	if kind == "" {
+		kind = "http"
+	}
 	factory, ok := responses.Get(kind)
 	if !ok {
 		return nil, fmt.Errorf("unknown response kind: %s", kind)

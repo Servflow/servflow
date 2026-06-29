@@ -53,6 +53,31 @@ func TestNewResponse(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "explicit http kind",
+			id:   "id",
+			config: apiconfig.ResponseConfig{
+				Kind:     "http",
+				Type:     "template",
+				Code:     200,
+				Template: "",
+			},
+			assertBuilder: func(t *testing.T, response *Response) {
+				_, ok := response.responseBuilder.(*httpresp.TemplateBuilder)
+				if !ok {
+					t.Errorf("Response builder is not a TemplateBuilder")
+				}
+			},
+		},
+		{
+			name: "unknown kind errors",
+			id:   "id",
+			config: apiconfig.ResponseConfig{
+				Kind: "not-a-real-kind",
+				Code: 200,
+			},
+			expectedErr: true,
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {

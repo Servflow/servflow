@@ -98,7 +98,12 @@ type ConditionItem struct {
 }
 
 type ResponseConfig struct {
-	Name     string         `json:"name,omitempty" yaml:"name,omitempty" jsonschema:"required"`
+	// Name and Kind are shared by every response kind. Kind selects the response
+	// type from the responses registry; an empty Kind defaults to "http". The
+	// fields below it are specific to the built-in "http" kind.
+	Name string `json:"name,omitempty" yaml:"name,omitempty" jsonschema:"required"`
+	Kind string `json:"kind,omitempty" yaml:"kind,omitempty"`
+
 	Code     int            `json:"code" yaml:"code"`
 	Template string         `json:"template" yaml:"template"`
 	Type     string         `json:"type" yaml:"type"`

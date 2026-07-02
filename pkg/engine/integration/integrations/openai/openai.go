@@ -276,5 +276,14 @@ func convertSDKResponseToAgentResponse(resp *responses.Response, logger *zap.Log
 		}
 	}
 
+	r.Usage = agent.Usage{
+		InputTokens:  resp.Usage.InputTokens,
+		OutputTokens: resp.Usage.OutputTokens,
+		TotalTokens:  resp.Usage.TotalTokens,
+	}
+	if r.Usage.TotalTokens == 0 {
+		r.Usage.TotalTokens = r.Usage.InputTokens + r.Usage.OutputTokens
+	}
+
 	return r
 }

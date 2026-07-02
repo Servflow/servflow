@@ -120,6 +120,23 @@ type ToolInfo struct {
 type LLMResponse struct {
 	Content []ContentResponse    `json:"content"`
 	Tools   []ToolResponseObject `json:"tools"`
+	Usage   Usage                `json:"usage"`
+}
+
+// Usage holds the token counts reported by an LLM provider for a single call.
+type Usage struct {
+	InputTokens  int64 `json:"inputTokens"`
+	OutputTokens int64 `json:"outputTokens"`
+	TotalTokens  int64 `json:"totalTokens"`
+}
+
+// Add returns the element-wise sum of two Usage values.
+func (u Usage) Add(o Usage) Usage {
+	return Usage{
+		InputTokens:  u.InputTokens + o.InputTokens,
+		OutputTokens: u.OutputTokens + o.OutputTokens,
+		TotalTokens:  u.TotalTokens + o.TotalTokens,
+	}
 }
 
 type ToolResponseObject struct {
@@ -135,4 +152,5 @@ type ContentResponse struct {
 // SessionMetadata contains metadata collected during an agent session
 type SessionMetadata struct {
 	LLMResponses []LLMResponse `json:"llmResponses"`
+	TotalUsage   Usage         `json:"totalUsage"`
 }

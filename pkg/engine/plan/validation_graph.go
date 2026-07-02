@@ -1,9 +1,11 @@
-package apiconfig
+package plan
 
 import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/Servflow/servflow/pkg/apiconfig"
 )
 
 // InvalidReferenceError is a step reference that does not resolve to an existing
@@ -45,24 +47,24 @@ func (e *UnreachableStepError) Error() string {
 // Severity: invalid references and cycles reachable from an entry are fatal;
 // unreachable steps and cycles confined to an unreachable subgraph are warnings
 // (they cannot execute, so they do not block the config).
-func (a *APIConfig) collectGraphErrors(ve *ValidationErrors, extraRoots []string) {
+func collectGraphErrors(a *apiconfig.APIConfig, ve *ValidationErrors, extraRoots []string) {
 	// node set: canonical (prefixed) id -> kind
-	nodes := make(map[string]StepKind)
+	nodes := make(map[string]apiconfig.StepKind)
 	for id := range a.Actions {
-		nodes[ActionConfigPrefix+id] = StepKindAction
+		nodes[apiconfig.ActionConfigPrefix+id] = apiconfig.StepKindAction
 	}
 	for id := range a.Conditionals {
-		nodes[ConditionalConfigPrefix+id] = StepKindConditional
+		nodes[apiconfig.ConditionalConfigPrefix+id] = apiconfig.StepKindConditional
 	}
 	for id := range a.Responses {
-		nodes[ResponsesConfigPrefix+id] = StepKindResponse
+		nodes[apiconfig.ResponsesConfigPrefix+id] = apiconfig.StepKindResponse
 	}
 
 	// resolve a reference to a canonical node id. Records an InvalidReferenceError
 	// and returns ok=false when the reference is malformed or dangling. Terminal
 	// (empty) references return ok=false with no error.
 	resolve := func(from, ref string) (string, bool) {
-		kind, bare, terminal, err := ParseStepRef(ref)
+		kind, bare, terminal, err := apiconfig.ParseStepRef(ref)
 		if terminal {
 			return "", false
 		}
@@ -70,7 +72,7 @@ func (a *APIConfig) collectGraphErrors(ve *ValidationErrors, extraRoots []string
 			ve.Add(&InvalidReferenceError{From: from, To: ref, Reason: err.Error()})
 			return "", false
 		}
-		canonical := CanonicalStepID(ref)
+		canonical := apiconfig.CanonicalStepID(ref)
 		if _, ok := nodes[canonical]; !ok {
 			ve.Add(&InvalidReferenceError{From: from, To: ref, Reason: fmt.Sprintf("no %s named %q", kind, bare)})
 			return "", false
@@ -109,7 +111,7 @@ func (a *APIConfig) collectGraphErrors(ve *ValidationErrors, extraRoots []string
 	// action edges + dispatch (dispatch is reference-checked and treated as an
 	// independent root, but excluded from main-flow cycle detection)
 	for id, act := range a.Actions {
-		from := ActionConfigPrefix + id
+		from := apiconfig.ActionConfigPrefix + id
 		addEdge(from, act.Next)
 		addEdge(from, act.Fail)
 		for _, d := range act.Dispatch {
@@ -118,7 +120,7 @@ func (a *APIConfig) collectGraphErrors(ve *ValidationErrors, extraRoots []string
 	}
 	// conditional edges
 	for id, cond := range a.Conditionals {
-		from := ConditionalConfigPrefix + id
+		from := apiconfig.ConditionalConfigPrefix + id
 		addEdge(from, cond.OnTrue)
 		addEdge(from, cond.OnFalse)
 	}

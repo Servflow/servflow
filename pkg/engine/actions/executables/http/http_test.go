@@ -13,6 +13,8 @@ import (
 	"github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
+	// register the built-in "http" response kind for plan-execute tests below
+	_ "github.com/Servflow/servflow/pkg/engine/responses/http"
 	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/stretchr/testify/assert"
 
@@ -417,7 +419,7 @@ func TestHTTPActionWithEscapeTemplateViaPlanExecute(t *testing.T) {
 	require.NoError(t, err)
 
 	// Execute the plan
-	_, err = p.Execute(ctx, requestctx.ActionConfigPrefix+"test_http", nil)
+	_, err = p.Execute(ctx, requestctx.ActionConfigPrefix+"test_http")
 	require.NoError(t, err)
 
 	// Verify the server was called

@@ -82,11 +82,16 @@ func (e *Engine) createMCPHandler(config *apiconfig.APIConfig) error {
 			},
 		}, true)
 
-		resp, err := p.Execute(ctx, config.McpTool.Start, &plan.EndValueSpec{
-			StringVal: config.McpTool.Result,
-		})
-		if err != nil {
+		if _, err := p.Execute(ctx, config.McpTool.Start); err != nil {
 			logger.Error("error executing planner", zap.Error(err))
+			return nil, errors.New("error executing request")
+		}
+
+		// The MCP tool renders its own result from the request context once the
+		// workflow has run, rather than terminating in a response step.
+		body, err := requestctx.ExecuteTemplateString(ctx, config.McpTool.Result)
+		if err != nil {
+			logger.Error("error rendering result", zap.Error(err))
 			return nil, errors.New("error executing request")
 		}
 
@@ -94,7 +99,7 @@ func (e *Engine) createMCPHandler(config *apiconfig.APIConfig) error {
 		response := mcp.CallToolResult{
 			Content: []mcp.Content{
 				mcp.TextContent{
-					Text: string(resp.Body),
+					Text: body,
 					Type: "text",
 				},
 			},

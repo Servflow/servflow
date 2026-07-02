@@ -39,11 +39,7 @@ func (e *EndStep) execute(ctx context.Context) (*stepWrapper, error) {
 		}
 	}
 	if e.endTemplate != "" {
-		tmpl, err := requestctx2.CreateTextTemplate(ctx, e.endTemplate, nil)
-		if err != nil {
-			return nil, err
-		}
-		val, err := requestctx2.ExecuteTemplateFromContext(ctx, tmpl)
+		val, err := requestctx2.ExecuteTemplateString(ctx, e.endTemplate)
 		if err != nil {
 			return nil, err
 		}

@@ -1,8 +1,9 @@
-package responsebuilder
+package http
 
 import (
 	"testing"
 
+	sfhttp "github.com/Servflow/servflow/internal/http"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 
 	"github.com/stretchr/testify/assert"
@@ -63,8 +64,10 @@ func TestJSONResponseBuilder_BuildResponse(t *testing.T) {
 			err := requestctx.AddRequestVariables(ctx, tc.variables, "")
 			require.NoError(t, err)
 
-			response, err := builder.BuildResponse(ctx)
+			result, err := builder.BuildResponse(ctx)
 			assert.NoError(t, err)
+			response, ok := result.(*sfhttp.SfResponse)
+			require.True(t, ok)
 			assert.Equal(t, tc.code, response.Code)
 			assert.Equal(t, "application/json", response.Headers.Get("Content-Type"))
 			assert.JSONEq(t, tc.expected, string(response.Body))

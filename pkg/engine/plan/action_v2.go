@@ -163,7 +163,7 @@ func (a *ActionV2) dispatchBackgroundChains(ctx context.Context, logger *zap.Log
 			bgCtx = logging.WithLogger(bgCtx, logger.With(zap.String("dispatch_id", dispatchID)))
 			bgCtx = context.WithValue(bgCtx, ContextKey, p)
 
-			_, err := ExecuteFromContext(bgCtx, dispatchID, nil)
+			_, err := ExecuteFromContext(bgCtx, dispatchID)
 			if err != nil {
 				logging.FromContext(bgCtx).Error("dispatch chain failed", zap.Error(err))
 			}

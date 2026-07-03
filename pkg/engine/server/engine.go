@@ -49,8 +49,7 @@ import (
 )
 
 type EngineConfig struct {
-	Integrations map[string]apiconfig.IntegrationConfig `yaml:"integrations"`
-	Cors         CorsConfig                             `yaml:"cors"`
+	Cors CorsConfig `yaml:"cors"`
 }
 
 type CorsConfig struct {
@@ -92,7 +91,7 @@ func WithFileConfig(configFolder, engineConfigFile string) Option {
 			e.logger.Error("failed to load API configs from YAML", zap.Error(err))
 			return
 		}
-		engineConfig, err := LoadEngineConfigFromYAML(engineConfigFile, e.logger)
+		engineConfig, integrations, err := LoadEngineConfigFromYAML(engineConfigFile, e.logger)
 		if err != nil {
 			e.logger.Error("failed to load engine config from YAML", zap.Error(err))
 			return
@@ -100,6 +99,11 @@ func WithFileConfig(configFolder, engineConfigFile string) Option {
 		e.directConfigs = &DirectConfigs{
 			APIConfigs:   apiConfigs,
 			EngineConfig: engineConfig,
+		}
+		// Register the file-loaded integrations up front so they are available
+		// before any plan is compiled from these configs.
+		if err := e.RegisterIntegrations(integrations); err != nil {
+			e.initErr = fmt.Errorf("failed to register integrations from file config: %w", err)
 		}
 	}
 }
@@ -192,6 +196,7 @@ type Engine struct {
 	handler           http.HandlerFunc
 	backgroundManager *plan.BackgroundManager
 	workspaceProvider WorkspaceProvider
+	initErr           error
 }
 
 func New(port, env string, opts ...Option) (*Engine, error) {
@@ -212,6 +217,10 @@ func New(port, env string, opts ...Option) (*Engine, error) {
 		opt(e)
 	}
 
+	if e.initErr != nil {
+		return nil, e.initErr
+	}
+
 	if e.directConfigs == nil {
 		e.directConfigs = &DirectConfigs{
 			APIConfigs:   []*apiconfig.APIConfig{},
@@ -230,20 +239,20 @@ func (e *Engine) DoneChan() <-chan struct{} {
 	return e.ctx.Done()
 }
 
+// RegisterIntegrations registers (or replaces) the given integrations in the
+// integration manager. It is decoupled from Start so callers can control when
+// integrations become available - notably before compiling any plans that
+// resolve integrations eagerly (e.g. a trigger scheduler). Safe to call more
+// than once; each call re-initializes the supplied integrations by id.
+func (e *Engine) RegisterIntegrations(configs []apiconfig.IntegrationConfig) error {
+	logging.DebugContext(e.ctx, "Registering integrations...")
+	return integration.RegisterIntegrationsFromConfig(configs)
+}
+
 func (e *Engine) Start() error {
 	e.ctx = logging.WithLogger(e.ctx, e.logger)
 
 	e.backgroundManager = plan.NewBackgroundManager(e.ctx)
-
-	var integrationConfigs []apiconfig.IntegrationConfig
-	if e.directConfigs.EngineConfig != nil {
-		integrationConfigs = e.directConfigs.EngineConfig.GetIntegrationConfigs()
-	}
-
-	logging.DebugContext(e.ctx, "Starting integrations...")
-	if err := integration.RegisterIntegrationsFromConfig(integrationConfigs); err != nil {
-		return err
-	}
 
 	e.handler = e.createHandler()
 
@@ -301,18 +310,9 @@ func (e *Engine) ReloadConfigs(newDirectConfigs *DirectConfigs) error {
 
 	logging.DebugContext(e.ctx, "Reloading API configurations...")
 
-	// Register integrations before rebuilding the handler: planning resolves each
-	// action's integration eagerly, so a newly added integration must be in the
-	// manager before its config is planned. Without this, reloads that add an
-	// agent + integration log "integration <id> not registered" until restart.
-	var integrationConfigs []apiconfig.IntegrationConfig
-	if newDirectConfigs.EngineConfig != nil {
-		integrationConfigs = newDirectConfigs.EngineConfig.GetIntegrationConfigs()
-	}
-	if err := integration.RegisterIntegrationsFromConfig(integrationConfigs); err != nil {
-		return fmt.Errorf("failed to register integrations on reload: %w", err)
-	}
-
+	// Integrations must already be registered (via RegisterIntegrations) before
+	// this call: planning resolves each action's integration eagerly, so a newly
+	// added integration must be in the manager before its config is planned.
 	newHandler := e.createMuxHandler(newDirectConfigs.APIConfigs)
 
 	e.handler = newHandler.ServeHTTP

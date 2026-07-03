@@ -10,6 +10,7 @@ import (
 	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
+	"github.com/Servflow/servflow/pkg/tracing"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"go.uber.org/zap"
@@ -81,6 +82,9 @@ func (e *Engine) createMCPHandler(config *apiconfig.APIConfig) error {
 				return r
 			},
 		}, true)
+
+		ctx, span := tracing.StartMCPTool(ctx, config.McpTool.Name)
+		defer span.End()
 
 		if _, err := p.Execute(ctx, config.McpTool.Start); err != nil {
 			logger.Error("error executing planner", zap.Error(err))

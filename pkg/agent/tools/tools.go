@@ -13,6 +13,7 @@ import (
 	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
+	"github.com/Servflow/servflow/pkg/tracing"
 	"github.com/mark3labs/mcp-go/client"
 	"github.com/mark3labs/mcp-go/client/transport"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -150,6 +151,9 @@ func generateWorkflowToolExec(config *WorkflowToolConfig) functionExec {
 				return p
 			},
 		}, true)
+
+		ctx, span := tracing.StartAgentTool(ctx, config.Name)
+		defer span.End()
 
 		if _, err := plan.ExecuteFromContext(ctx, config.Start); err != nil {
 			return nil, err

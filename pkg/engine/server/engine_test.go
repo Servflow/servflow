@@ -66,11 +66,6 @@ func TestDirectConfigs_APIConfigsIntegrity(t *testing.T) {
 	}
 
 	engineConfig := &EngineConfig{
-		Integrations: map[string]apiconfig.IntegrationConfig{
-			"test-integration": {
-				Type: "test-type",
-			},
-		},
 		Cors: CorsConfig{
 			AllowedOrigins: []string{"http://example.com"},
 		},
@@ -84,7 +79,6 @@ func TestDirectConfigs_APIConfigsIntegrity(t *testing.T) {
 	assert.Len(t, directConfigs.APIConfigs, 1)
 	assert.Equal(t, "test-api", directConfigs.APIConfigs[0].ID)
 	assert.NotNil(t, directConfigs.EngineConfig)
-	assert.Len(t, directConfigs.EngineConfig.Integrations, 1)
 	assert.Equal(t, "http://example.com", directConfigs.EngineConfig.Cors.AllowedOrigins[0])
 }
 

@@ -50,38 +50,48 @@ func LoadAPIConfigsFromYAML(apisFolder string, shouldFail bool, logger *zap.Logg
 	return configs, nil
 }
 
-// LoadEngineConfigFromYAML loads engine configuration from YAML file
-func LoadEngineConfigFromYAML(engineConfigFile string, logger *zap.Logger) (*EngineConfig, error) {
+// engineConfigYAML is the on-disk shape of the engine config file. Integrations
+// are parsed here but returned separately from EngineConfig so that registering
+// them stays an explicit, caller-controlled step (see Engine.RegisterIntegrations).
+type engineConfigYAML struct {
+	Integrations map[string]apiconfig.IntegrationConfig `yaml:"integrations"`
+	Cors         CorsConfig                             `yaml:"cors"`
+}
+
+// LoadEngineConfigFromYAML loads engine configuration from a YAML file, returning
+// the EngineConfig (cors, etc.) and the declared integrations as a separate slice.
+func LoadEngineConfigFromYAML(engineConfigFile string, logger *zap.Logger) (*EngineConfig, []apiconfig.IntegrationConfig, error) {
 	logger.Debug("Loading engine config from YAML file", zap.String("file", engineConfigFile))
 
 	if engineConfigFile == "" {
 		logger.Debug("No engine config file specified, returning empty config")
-		return &EngineConfig{}, nil
+		return &EngineConfig{}, nil, nil
 	}
 
 	contents, err := os.ReadFile(engineConfigFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read engine config file: %w", err)
+		return nil, nil, fmt.Errorf("failed to read engine config file: %w", err)
 	}
 
-	var engineConfig EngineConfig
-	if err := yaml.Unmarshal(contents, &engineConfig); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal engine config: %w", err)
+	var raw engineConfigYAML
+	if err := yaml.Unmarshal(contents, &raw); err != nil {
+		return nil, nil, fmt.Errorf("failed to unmarshal engine config: %w", err)
 	}
 
-	integrationCount := len(engineConfig.Integrations)
-	logger.Debug("Successfully loaded engine config", zap.Int("integrations_count", integrationCount))
-	return &engineConfig, nil
+	integrations := IntegrationConfigsFromMap(raw.Integrations)
+	logger.Debug("Successfully loaded engine config", zap.Int("integrations_count", len(integrations)))
+	return &EngineConfig{Cors: raw.Cors}, integrations, nil
 }
 
-// GetIntegrationConfigs extracts integration configs from EngineConfig as a slice
-func (ec *EngineConfig) GetIntegrationConfigs() []apiconfig.IntegrationConfig {
-	if ec == nil || ec.Integrations == nil {
+// IntegrationConfigsFromMap converts an id-keyed integration map into a slice,
+// stamping each entry's ID from its key.
+func IntegrationConfigsFromMap(m map[string]apiconfig.IntegrationConfig) []apiconfig.IntegrationConfig {
+	if len(m) == 0 {
 		return nil
 	}
 
-	configs := make([]apiconfig.IntegrationConfig, 0, len(ec.Integrations))
-	for id, conf := range ec.Integrations {
+	configs := make([]apiconfig.IntegrationConfig, 0, len(m))
+	for id, conf := range m {
 		conf.ID = id
 		configs = append(configs, conf)
 	}

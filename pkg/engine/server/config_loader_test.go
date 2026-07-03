@@ -108,16 +108,17 @@ func TestLoadEngineConfigFromYAML(t *testing.T) {
 	logger := zap.NewNop()
 
 	t.Run("empty file path returns empty config", func(t *testing.T) {
-		engineConfig, err := LoadEngineConfigFromYAML("", logger)
+		engineConfig, integrations, err := LoadEngineConfigFromYAML("", logger)
 		require.NoError(t, err)
 		assert.NotNil(t, engineConfig)
-		assert.Nil(t, engineConfig.Integrations)
+		assert.Nil(t, integrations)
 	})
 
 	t.Run("non-existent file returns error", func(t *testing.T) {
-		engineConfig, err := LoadEngineConfigFromYAML("/non/existent/file.yaml", logger)
+		engineConfig, integrations, err := LoadEngineConfigFromYAML("/non/existent/file.yaml", logger)
 		assert.Error(t, err)
 		assert.Nil(t, engineConfig)
+		assert.Nil(t, integrations)
 	})
 
 	t.Run("valid engine config file with integrations", func(t *testing.T) {
@@ -139,12 +140,9 @@ integrations:
 		err := os.WriteFile(tempFile, []byte(engineYAML), 0644)
 		require.NoError(t, err)
 
-		engineConfig, err := LoadEngineConfigFromYAML(tempFile, logger)
+		engineConfig, configs, err := LoadEngineConfigFromYAML(tempFile, logger)
 		require.NoError(t, err)
 		require.NotNil(t, engineConfig)
-		require.Len(t, engineConfig.Integrations, 2)
-
-		configs := engineConfig.GetIntegrationConfigs()
 		require.Len(t, configs, 2)
 
 		// Find configs by ID
@@ -175,22 +173,19 @@ integrations: [unclosed array
 		err := os.WriteFile(tempFile, []byte(invalidYAML), 0644)
 		require.NoError(t, err)
 
-		engineConfig, err := LoadEngineConfigFromYAML(tempFile, logger)
+		engineConfig, integrations, err := LoadEngineConfigFromYAML(tempFile, logger)
 		assert.Error(t, err)
 		assert.Nil(t, engineConfig)
+		assert.Nil(t, integrations)
 		assert.Contains(t, err.Error(), "failed to unmarshal engine config")
 	})
 
-	t.Run("GetIntegrationConfigs with nil engine config", func(t *testing.T) {
-		var engineConfig *EngineConfig
-		configs := engineConfig.GetIntegrationConfigs()
-		assert.Nil(t, configs)
+	t.Run("IntegrationConfigsFromMap with nil map", func(t *testing.T) {
+		assert.Nil(t, IntegrationConfigsFromMap(nil))
 	})
 
-	t.Run("GetIntegrationConfigs with empty integrations", func(t *testing.T) {
-		engineConfig := &EngineConfig{}
-		configs := engineConfig.GetIntegrationConfigs()
-		assert.Nil(t, configs)
+	t.Run("IntegrationConfigsFromMap with empty map", func(t *testing.T) {
+		assert.Nil(t, IntegrationConfigsFromMap(map[string]apiconfig.IntegrationConfig{}))
 	})
 }
 

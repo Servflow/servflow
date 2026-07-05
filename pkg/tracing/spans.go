@@ -16,7 +16,8 @@ const (
 	AttrActionType = "sf.action_type" // concrete action type (http, callworkflow, parallel, ...)
 	AttrID         = "sf.id"          // bare node id (no prefix)
 	AttrToolName   = "sf.tool_name"
-	AttrToolType   = "sf.tool_type" // mcp | workflow
+	AttrToolType   = "sf.tool_type"   // mcp | workflow
+	AttrToolParams = "sf.tool_params" // JSON of model-supplied tool-call arguments (sensitive keys redacted, size-capped)
 )
 
 // start creates a span with a low-cardinality name and always attaches the

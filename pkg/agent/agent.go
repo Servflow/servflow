@@ -178,6 +178,12 @@ func (a *Session) GetMetadata() SessionMetadata {
 	}
 }
 
+// maxAgentIterations bounds the agent's tool-calling loop so a model that keeps
+// calling tools (e.g. repeatedly requesting non-existent files) cannot run
+// unbounded. On the final permitted iteration the tools are withheld so the
+// model must produce a text answer from what it already has.
+const maxAgentIterations = 40
+
 func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 	logger := logging.FromContext(ctx).With(zap.String("module", "agent"))
 	out := make(chan agentOutput)
@@ -185,13 +191,24 @@ func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 	toolList := a.toolManager.ToolList()
 	go func() {
 		endTurn := false
+		iterations := 0
 		for !endTurn {
+			iterations++
 			systemMessage := string(instructions)
 			if a.customInstructions != "" {
 				systemMessage = a.customInstructions
 			}
+			// On the final permitted iteration, withhold tools so the model has to
+			// answer from what it already gathered rather than calling more tools.
+			reqTools := toolList
+			forceFinish := iterations >= maxAgentIterations
+			if forceFinish {
+				reqTools = nil
+				logger.Warn("agent reached max iterations; forcing a final response without tools",
+					zap.Int("max_iterations", maxAgentIterations))
+			}
 			r, err := a.llm.ProvideResponse(ctx, LLMRequest{
-				Tools:         toolList,
+				Tools:         reqTools,
 				Messages:      a.messages,
 				SystemMessage: systemMessage,
 			})
@@ -213,8 +230,9 @@ func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 				}, out)
 			}
 
-			if len(r.Tools) == 0 {
+			if forceFinish || len(r.Tools) == 0 {
 				endTurn = true
+				continue
 			}
 
 			for _, tool := range r.Tools {

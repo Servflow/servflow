@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/Servflow/servflow/pkg/agent"
 	"github.com/Servflow/servflow/pkg/agent/tools"
@@ -95,7 +96,14 @@ func (a *Agent) Execute(ctx context.Context, modifiedConfig string) (interface{}
 		if err == nil {
 			fields[fmt.Sprintf("agent.llm_response.%d", i)] = string(respBytes)
 		}
+		fields[fmt.Sprintf("agent.llm.iteration.%d.input_tokens", i)] = strconv.FormatInt(llmResp.Usage.InputTokens, 10)
+		fields[fmt.Sprintf("agent.llm.iteration.%d.output_tokens", i)] = strconv.FormatInt(llmResp.Usage.OutputTokens, 10)
+		fields[fmt.Sprintf("agent.llm.iteration.%d.total_tokens", i)] = strconv.FormatInt(llmResp.Usage.TotalTokens, 10)
 	}
+	fields["agent.llm.iterations"] = strconv.Itoa(len(metadata.LLMResponses))
+	fields["agent.llm.total.input_tokens"] = strconv.FormatInt(metadata.TotalUsage.InputTokens, 10)
+	fields["agent.llm.total.output_tokens"] = strconv.FormatInt(metadata.TotalUsage.OutputTokens, 10)
+	fields["agent.llm.total.total_tokens"] = strconv.FormatInt(metadata.TotalUsage.TotalTokens, 10)
 
 	return resp, fields, nil
 }

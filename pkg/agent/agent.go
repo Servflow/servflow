@@ -173,8 +173,13 @@ func (a *Session) Query(ctx context.Context, query string, file *requestctx.File
 
 // GetMetadata returns the metadata collected during the session
 func (a *Session) GetMetadata() SessionMetadata {
+	var total Usage
+	for _, r := range a.llmResponses {
+		total = total.Add(r.Usage)
+	}
 	return SessionMetadata{
 		LLMResponses: a.llmResponses,
+		TotalUsage:   total,
 	}
 }
 

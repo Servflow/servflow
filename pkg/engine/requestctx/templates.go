@@ -106,6 +106,8 @@ func (rc *RequestContext) getFuncMap(funcMap template.FuncMap) template.FuncMap 
 		"notempty":     rc.tmplFuncNotEmpty,
 		"bcrypt":       rc.tmplFuncBcrypt,
 		"file":         rc.tmplFuncFile,
+		"loop_item":    rc.tmplFuncLoopItem,
+		"loop_index":   rc.tmplFuncLoopIndex,
 	}
 	// Add request-scoped functions (param, header, body, urlparam, etc.)
 	for k, v := range rc.requestFuncs {
@@ -359,4 +361,36 @@ func (rc *RequestContext) tmplFuncFile(path string) (string, error) {
 		return "", err
 	}
 	return string(data), nil
+}
+
+// tmplFuncLoopItem returns the current loop element. With no argument it returns
+// the whole element ({{ loop_item }}); with a field name it returns that field
+// of the element when the element is a JSON object ({{ loop_item "id" }}).
+// Outside any loop it returns an empty string so the function is safe to
+// reference anywhere.
+func (rc *RequestContext) tmplFuncLoopItem(field ...string) interface{} {
+	rc.Lock()
+	defer rc.Unlock()
+	if len(rc.loopStack) == 0 {
+		return ""
+	}
+	item := rc.loopStack[len(rc.loopStack)-1].item
+	if len(field) == 0 || field[0] == "" {
+		return item
+	}
+	if obj, ok := item.(map[string]interface{}); ok {
+		return obj[field[0]]
+	}
+	return ""
+}
+
+// tmplFuncLoopIndex returns the current loop's 0-based iteration index, or 0
+// outside any loop.
+func (rc *RequestContext) tmplFuncLoopIndex() int {
+	rc.Lock()
+	defer rc.Unlock()
+	if len(rc.loopStack) == 0 {
+		return 0
+	}
+	return rc.loopStack[len(rc.loopStack)-1].index
 }

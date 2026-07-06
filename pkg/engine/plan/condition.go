@@ -62,14 +62,10 @@ func (c *ConditionStep) DisplayName() string {
 func (c *ConditionStep) execute(ctx context.Context) (*stepWrapper, error) {
 	// set up tracer
 	var span trace.Span
-	ctx, span = tracing.SpanCtxFromContext(ctx, "conditional."+c.DisplayName())
+	ctx, span = tracing.StartCondition(ctx, c.id, c.DisplayName())
 	defer span.End()
 
-	span.SetAttributes(
-		attribute.String("conditional_id", c.id),
-		attribute.String("conditional_name", c.name),
-		attribute.String("config", c.exprString),
-	)
+	span.SetAttributes(attribute.String("sf.config", c.exprString))
 
 	logger := logging.FromContext(ctx).With(
 		zap.String("conditional_id", c.id),
@@ -77,7 +73,7 @@ func (c *ConditionStep) execute(ctx context.Context) (*stepWrapper, error) {
 	)
 	ctx = logging.WithLogger(ctx, logger)
 	if c.exprString == "" {
-		span.SetAttributes(attribute.Bool("result", true))
+		span.SetAttributes(attribute.Bool("sf.result", true))
 		return c.OnValid, nil
 	}
 
@@ -109,10 +105,10 @@ func (c *ConditionStep) execute(ctx context.Context) (*stepWrapper, error) {
 
 	logger.Debug("condition evaluated to "+resp, zap.String("condition", c.exprString))
 	if strings.TrimSpace(resp) == "true" {
-		span.SetAttributes(attribute.Bool("result", true))
+		span.SetAttributes(attribute.Bool("sf.result", true))
 		return c.OnValid, nil
 	}
-	span.SetAttributes(attribute.Bool("result", false))
+	span.SetAttributes(attribute.Bool("sf.result", false))
 	return c.OnInvalid, nil
 }
 

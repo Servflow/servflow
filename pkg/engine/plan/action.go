@@ -53,7 +53,7 @@ func (a *Action) DisplayName() string {
 
 func (a *Action) execute(ctx context.Context) (*stepWrapper, error) {
 	var span trace.Span
-	ctx, span = tracing.SpanCtxFromContext(ctx, "action."+a.DisplayName())
+	ctx, span = tracing.StartAction(ctx, a.id, a.DisplayName(), a.exec.Type())
 	defer span.End()
 
 	logger := logging.FromContext(ctx).With(zap.String("action_id", a.id), zap.String("action_name", a.DisplayName()))
@@ -88,7 +88,7 @@ func (a *Action) execute(ctx context.Context) (*stepWrapper, error) {
 		logger.Debug("template evaluated successfully")
 	}
 
-	span.SetAttributes(attribute.String("config", cfg))
+	span.SetAttributes(attribute.String("sf.config", cfg))
 
 	var (
 		resp   interface{}
@@ -129,7 +129,7 @@ func (a *Action) execute(ctx context.Context) (*stepWrapper, error) {
 	if err != nil {
 		logger.Error("error marshalling action response", zap.Error(err))
 	}
-	span.SetAttributes(attribute.String("result", string(b)))
+	span.SetAttributes(attribute.String("sf.result", string(b)))
 	logger.Debug("action executed successfully. Response: " + string(b))
 
 	// Check if response is an io.Reader and store as action file

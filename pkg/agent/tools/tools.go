@@ -6,16 +6,21 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"text/template"
+	"unicode/utf8"
 
 	"github.com/Servflow/servflow/pkg/agent"
 	"github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
+	"github.com/Servflow/servflow/pkg/tracing"
 	"github.com/mark3labs/mcp-go/client"
 	"github.com/mark3labs/mcp-go/client/transport"
 	"github.com/mark3labs/mcp-go/mcp"
+	"go.opentelemetry.io/otel/attribute"
 	"go.uber.org/zap"
 )
 
@@ -128,6 +133,69 @@ func WithWorkflowToolConfig(config WorkflowToolConfig) ClientOption {
 	}
 }
 
+// toolParamString coerces a model-supplied tool argument to the string form the
+// workflow templates expect. The model may send a value typed per its own JSON
+// (a number, bool, etc.) even though tool params are declared as strings, so a
+// plain string type-assertion would drop non-string args (e.g. an installation
+// id sent as a number) and yield "". Numbers are formatted without scientific
+// notation so large integer-valued ids render as "144147277", not "1.44e+08".
+func toolParamString(v any) string {
+	switch p := v.(type) {
+	case nil:
+		return ""
+	case string:
+		return p
+	case float64:
+		return strconv.FormatFloat(p, 'f', -1, 64)
+	case json.Number:
+		return p.String()
+	case bool:
+		return strconv.FormatBool(p)
+	default:
+		return fmt.Sprintf("%v", p)
+	}
+}
+
+// sensitiveToolParamKey reports whether a tool-call argument name looks like it
+// carries a secret and so should be redacted before being placed on a trace span.
+func sensitiveToolParamKey(key string) bool {
+	k := strings.ToLower(key)
+	for _, s := range []string{"token", "secret", "password", "pem", "apikey", "api_key", "authorization", "credential"} {
+		if strings.Contains(k, s) {
+			return true
+		}
+	}
+	return false
+}
+
+// marshalToolParams renders the model-supplied tool arguments for a trace span,
+// redacting values whose key looks sensitive and capping the total size (on a
+// UTF-8 boundary) so a large argument such as a comment body cannot bloat the
+// span. It never returns an error; tracing must not break tool execution.
+func marshalToolParams(params map[string]any) string {
+	const maxLen = 2048
+	safe := make(map[string]any, len(params))
+	for k, v := range params {
+		if sensitiveToolParamKey(k) {
+			safe[k] = "[redacted]"
+			continue
+		}
+		safe[k] = v
+	}
+	b, err := json.Marshal(safe)
+	if err != nil {
+		return fmt.Sprintf("<unmarshalable tool params: %v>", err)
+	}
+	if len(b) <= maxLen {
+		return string(b)
+	}
+	cut := maxLen
+	for cut > 0 && !utf8.RuneStart(b[cut]) {
+		cut--
+	}
+	return string(b[:cut]) + "…(truncated)"
+}
+
 func generateWorkflowToolExec(config *WorkflowToolConfig) functionExec {
 	return func(ctx context.Context, params map[string]any) ([]mcp.Content, error) {
 		logging.DebugContext(ctx,
@@ -143,13 +211,16 @@ func generateWorkflowToolExec(config *WorkflowToolConfig) functionExec {
 		}
 		reqCtx.AddRequestTemplateFunctions(template.FuncMap{
 			"tool_param": func(key string) string {
-				p, ok := params[key].(string)
-				if !ok {
-					return ""
-				}
-				return p
+				return toolParamString(params[key])
 			},
 		}, true)
+
+		ctx, span := tracing.StartAgentTool(ctx, config.Name)
+		defer span.End()
+		// Record the model-supplied arguments on the tool-call span so a missing
+		// or empty argument (e.g. an omitted installation_id) is visible directly
+		// in the trace rather than inferred from a downstream action.
+		span.SetAttributes(attribute.String(tracing.AttrToolParams, marshalToolParams(params)))
 
 		if _, err := plan.ExecuteFromContext(ctx, config.Start); err != nil {
 			return nil, err

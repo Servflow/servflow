@@ -116,30 +116,30 @@ func (h *APIHandler) initTracing(req *http.Request) (context.Context, trace.Span
 		return req.Context(), nil
 	}
 
-	ctx, span := tracing.SpanCtxFromContext(req.Context(), "request")
+	ctx, span := tracing.StartHTTPEntry(req.Context())
 
 	span.SetAttributes(
-		attribute.String("http.method", req.Method),
-		attribute.String("http.path", req.URL.Path),
+		attribute.String("sf.http.method", req.Method),
+		attribute.String("sf.http.path", req.URL.Path),
 	)
 
 	// Add query parameters to trace
 	queryParams := req.URL.Query()
 	for key, values := range queryParams {
-		span.SetAttributes(attribute.StringSlice("http.query."+key, values))
+		span.SetAttributes(attribute.StringSlice("sf.http.query."+key, values))
 	}
 
 	// Add form values to trace
 	if err := req.ParseForm(); err == nil {
 		for key, values := range req.Form {
-			span.SetAttributes(attribute.StringSlice("http.form."+key, values))
+			span.SetAttributes(attribute.StringSlice("sf.http.form."+key, values))
 		}
 	}
 
 	if req.Body != nil {
 		bodyBytes, err := io.ReadAll(req.Body)
 		if err == nil {
-			span.SetAttributes(attribute.String("body", string(bodyBytes)))
+			span.SetAttributes(attribute.String("sf.body", string(bodyBytes)))
 			req.Body = io.NopCloser(strings.NewReader(string(bodyBytes)))
 		}
 	}
@@ -163,14 +163,14 @@ func (h *APIHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	if !ok {
 		logger.Error("Could not get request context")
 		if span != nil {
-			span.SetAttributes(attribute.Int("http.status_code", http.StatusInternalServerError))
+			span.SetAttributes(attribute.Int("sf.http.status_code", http.StatusInternalServerError))
 		}
 		http.Error(wr, "Error processing request", http.StatusInternalServerError)
 		return
 	}
 
 	if span != nil {
-		span.SetAttributes(attribute.String("request_id", rectx.ID()))
+		span.SetAttributes(attribute.String("sf.request_id", rectx.ID()))
 	}
 	rectx.AddRequestTemplateFunctions(requestTemplateFunctions(req), false)
 
@@ -178,7 +178,7 @@ func (h *APIHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		logger.Error("Error storing HTTP request", zap.Error(err))
 		if span != nil {
-			span.SetAttributes(attribute.Int("http.status_code", http.StatusInternalServerError))
+			span.SetAttributes(attribute.Int("sf.http.status_code", http.StatusInternalServerError))
 		}
 		http.Error(wr, "Error processing request", http.StatusInternalServerError)
 		return
@@ -190,7 +190,7 @@ func (h *APIHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	resp, ok := result.(*sfhttp.SfResponse)
 	if err != nil || !ok || resp == nil {
 		if span != nil {
-			span.SetAttributes(attribute.Int("http.status_code", http.StatusInternalServerError))
+			span.SetAttributes(attribute.Int("sf.http.status_code", http.StatusInternalServerError))
 		}
 		switch {
 		case err != nil:
@@ -207,7 +207,7 @@ func (h *APIHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	}
 
 	if span != nil {
-		span.SetAttributes(attribute.Int("http.status_code", resp.Code))
+		span.SetAttributes(attribute.Int("sf.http.status_code", resp.Code))
 	}
 	for key := range resp.Headers {
 		wr.Header().Set(key, resp.Headers.Get(key))

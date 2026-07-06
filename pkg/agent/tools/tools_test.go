@@ -8,6 +8,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"net/http"
 	"net/http/httptest"
@@ -267,6 +268,7 @@ func TestNewClient(t *testing.T) {
 		// Setup mocks
 		mockExec.EXPECT().Config().Return("").AnyTimes()
 		mockExec.EXPECT().SupportsReplica().Return(false).AnyTimes()
+		mockExec.EXPECT().Type().Return("mock").AnyTimes()
 		mockExec.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(map[string]interface{}{"result": "workflow result:"}, nil, nil)
 
 		// Create planner and plan
@@ -359,6 +361,7 @@ func TestNewClient(t *testing.T) {
 
 		mockExec.EXPECT().Config().Return("").AnyTimes()
 		mockExec.EXPECT().SupportsReplica().Return(false).AnyTimes()
+		mockExec.EXPECT().Type().Return("mock").AnyTimes()
 		mockExec.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(fileReader, nil, nil)
 
 		planner := plan2.NewPlannerV2(plan2.PlannerConfig{
@@ -409,4 +412,60 @@ func TestNewClient(t *testing.T) {
 		}))
 		assert.ErrorContains(t, err, "invalid workflow tool type: invalid")
 	})
+}
+
+func TestMarshalToolParams(t *testing.T) {
+	// normal params round-trip as JSON
+	out := marshalToolParams(map[string]any{"repo": "a/b", "installation_id": ""})
+	var got map[string]any
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("output not valid JSON: %v (%q)", err, out)
+	}
+	if got["repo"] != "a/b" {
+		t.Errorf("repo = %v, want a/b", got["repo"])
+	}
+	if v, ok := got["installation_id"]; !ok || v != "" {
+		t.Errorf("empty installation_id should be present and empty, got %v ok=%v", v, ok)
+	}
+
+	// sensitive keys are redacted
+	red := marshalToolParams(map[string]any{"token": "supersecret", "api_key": "k", "body": "hi"})
+	if strings.Contains(red, "supersecret") || strings.Contains(red, "\"k\"") {
+		t.Errorf("sensitive values leaked: %q", red)
+	}
+	if !strings.Contains(red, "[redacted]") || !strings.Contains(red, "hi") {
+		t.Errorf("expected redaction marker and non-sensitive value kept: %q", red)
+	}
+
+	// oversized values are capped and remain valid UTF-8
+	big := marshalToolParams(map[string]any{"content": strings.Repeat("x", 5000)})
+	if len(big) > 2048+len("…(truncated)") {
+		t.Errorf("output not capped: len=%d", len(big))
+	}
+	if !utf8.ValidString(big) {
+		t.Errorf("truncated output is not valid UTF-8")
+	}
+}
+
+func TestToolParamString(t *testing.T) {
+	cases := []struct {
+		name string
+		in   any
+		want string
+	}{
+		{"nil", nil, ""},
+		{"string", "abc", "abc"},
+		{"large id float64", float64(144147277), "144147277"},
+		{"small int float64", float64(57), "57"},
+		{"non-integral float64", float64(1.5), "1.5"},
+		{"json.Number", json.Number("144147277"), "144147277"},
+		{"bool", true, "true"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := toolParamString(c.in); got != c.want {
+				t.Errorf("toolParamString(%v) = %q, want %q", c.in, got, c.want)
+			}
+		})
+	}
 }

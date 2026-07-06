@@ -44,6 +44,7 @@ func TestAction_Execute(t *testing.T) {
 
 			mockExec := NewMockActionExecutable(ctrl)
 			mockExec.EXPECT().Config().Return(conf)
+			mockExec.EXPECT().Type().Return("mock").AnyTimes()
 			mockExec.EXPECT().Execute(gomock.Any(), "test actual name").Return("response string", nil, nil)
 			mockExec.EXPECT().SupportsReplica().Return(false)
 
@@ -76,6 +77,7 @@ func TestAction_Execute(t *testing.T) {
 			mockExec := NewMockActionExecutable(ctrl)
 			config := fmt.Sprintf("test {{ .%sname.actualname }}", requestctx.BareVariablesPrefixStripped)
 			mockExec.EXPECT().Config().Return(config)
+			mockExec.EXPECT().Type().Return("mock").AnyTimes()
 			mockExec.EXPECT().Execute(gomock.Any(), "test actual name").Return("response string", nil, nil)
 			mockExec.EXPECT().SupportsReplica().Return(false)
 
@@ -111,6 +113,7 @@ func TestAction_Execute(t *testing.T) {
 
 			mockExec := NewMockActionExecutable(ctrl)
 			mockExec.EXPECT().Config().Return("")
+			mockExec.EXPECT().Type().Return("mock").AnyTimes()
 			mockExec.EXPECT().Execute(gomock.Any(), "").Return("custom response", nil, nil)
 			mockExec.EXPECT().SupportsReplica().Return(false)
 
@@ -142,6 +145,7 @@ func TestAction_Execute(t *testing.T) {
 			fileContent := "test file content"
 			reader := io.NopCloser(strings.NewReader(fileContent))
 			mockExec.EXPECT().Config().Return("")
+			mockExec.EXPECT().Type().Return("mock").AnyTimes()
 			mockExec.EXPECT().Execute(gomock.Any(), "").Return(reader, nil, nil)
 			mockExec.EXPECT().SupportsReplica().Return(false)
 
@@ -212,6 +216,7 @@ func TestAction_Execute(t *testing.T) {
 
 			mockExec := NewMockActionExecutable(ctrl)
 			mockExec.EXPECT().Config().Return("").AnyTimes()
+			mockExec.EXPECT().Type().Return("mock").AnyTimes()
 			mockExec.EXPECT().Execute(gomock.Any(), "").Return("response string", nil, fmt.Errorf("%w: dummy error", ErrFailure)).AnyTimes()
 			mockExec.EXPECT().SupportsReplica().Return(false).AnyTimes()
 
@@ -269,7 +274,7 @@ func TestAction_ExecuteWithReplica(t *testing.T) {
 		mockExec := NewMockActionExecutable(ctrl)
 		mockExec.EXPECT().Config().Return("")
 		mockExec.EXPECT().SupportsReplica().Return(true).AnyTimes()
-		mockExec.EXPECT().Type().Return("mock")
+		mockExec.EXPECT().Type().Return("mock").AnyTimes()
 
 		mockReplica := NewMockReplica(ctrl)
 		mockReplica.EXPECT().ExecuteAction("mock", "").Return("replica response", nil, nil)
@@ -302,6 +307,7 @@ func TestAction_ExecuteWithReplica(t *testing.T) {
 
 		mockExec := NewMockActionExecutable(ctrl)
 		mockExec.EXPECT().Config().Return("")
+		mockExec.EXPECT().Type().Return("mock").AnyTimes()
 		mockExec.EXPECT().SupportsReplica().Return(false).AnyTimes()
 		mockExec.EXPECT().Execute(gomock.Any(), "").Return("direct response", nil, nil)
 
@@ -336,7 +342,7 @@ func TestAction_ExecuteWithReplica(t *testing.T) {
 		mockExec := NewMockActionExecutable(ctrl)
 		mockExec.EXPECT().Config().Return("")
 		mockExec.EXPECT().SupportsReplica().Return(true).AnyTimes()
-		mockExec.EXPECT().Type().Return("mock")
+		mockExec.EXPECT().Type().Return("mock").AnyTimes()
 		mockExec.EXPECT().Execute(gomock.Any(), "").Return("fallback response", nil, nil)
 
 		mockReplica := NewMockReplica(ctrl)
@@ -407,6 +413,7 @@ func TestAction_ExecuteWithDispatch(t *testing.T) {
 
 		mockExec := NewMockActionExecutable(ctrl)
 		mockExec.EXPECT().Config().Return("")
+		mockExec.EXPECT().Type().Return("mock").AnyTimes()
 		mockExec.EXPECT().Execute(gomock.Any(), "").Return("response", nil, nil)
 		mockExec.EXPECT().SupportsReplica().Return(false)
 
@@ -468,6 +475,7 @@ func TestAction_ExecuteWithDispatch(t *testing.T) {
 
 		mockExec := NewMockActionExecutable(ctrl)
 		mockExec.EXPECT().Config().Return("")
+		mockExec.EXPECT().Type().Return("mock").AnyTimes()
 		mockExec.EXPECT().Execute(gomock.Any(), "").Return("response", nil, nil)
 		mockExec.EXPECT().SupportsReplica().Return(false)
 
@@ -523,6 +531,7 @@ func TestAction_ExecuteWithDispatch(t *testing.T) {
 
 		mockExec := NewMockActionExecutable(ctrl)
 		mockExec.EXPECT().Config().Return("")
+		mockExec.EXPECT().Type().Return("mock").AnyTimes()
 		mockExec.EXPECT().Execute(gomock.Any(), "").Return("response", nil, nil)
 		mockExec.EXPECT().SupportsReplica().Return(false)
 
@@ -584,6 +593,7 @@ func TestAction_ExecuteWithDispatch(t *testing.T) {
 
 		mockExec := NewMockActionExecutable(ctrl)
 		mockExec.EXPECT().Config().Return("")
+		mockExec.EXPECT().Type().Return("mock").AnyTimes()
 		mockExec.EXPECT().Execute(gomock.Any(), "").Return("response", nil, nil)
 		mockExec.EXPECT().SupportsReplica().Return(false)
 

@@ -56,7 +56,7 @@ func (r *Response) execute(ctx context.Context) (*stepWrapper, error) {
 }
 
 func (r *Response) WriteResponse(ctx context.Context) (responses.Result, error) {
-	ctx, span := tracing.SpanCtxFromContext(ctx, "response."+r.DisplayName())
+	ctx, span := tracing.StartResponse(ctx, r.id, r.DisplayName())
 	defer span.End()
 
 	logger := logging.FromContext(ctx).With(zap.String("response_id", r.id), zap.String("response_name", r.DisplayName()))
@@ -69,7 +69,7 @@ func (r *Response) WriteResponse(ctx context.Context) (responses.Result, error) 
 		return nil, err
 	}
 
-	span.SetAttributes(attribute.String("result.kind", resp.Kind()))
+	span.SetAttributes(attribute.String("sf.response_kind", resp.Kind()))
 
 	return resp, nil
 }

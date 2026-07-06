@@ -96,3 +96,70 @@ func (mr *MockActionExecutableMockRecorder) Type() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Type", reflect.TypeOf((*MockActionExecutable)(nil).Type))
 }
+
+// MockActionExecutableV2 is a mock of ActionExecutableV2 interface.
+type MockActionExecutableV2 struct {
+	ctrl     *gomock.Controller
+	recorder *MockActionExecutableV2MockRecorder
+}
+
+// MockActionExecutableV2MockRecorder is the mock recorder for MockActionExecutableV2.
+type MockActionExecutableV2MockRecorder struct {
+	mock *MockActionExecutableV2
+}
+
+// NewMockActionExecutableV2 creates a new mock instance.
+func NewMockActionExecutableV2(ctrl *gomock.Controller) *MockActionExecutableV2 {
+	mock := &MockActionExecutableV2{ctrl: ctrl}
+	mock.recorder = &MockActionExecutableV2MockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockActionExecutableV2) EXPECT() *MockActionExecutableV2MockRecorder {
+	return m.recorder
+}
+
+// Execute mocks base method.
+func (m *MockActionExecutableV2) Execute(ctx context.Context) (any, map[string]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Execute", ctx)
+	ret0, _ := ret[0].(any)
+	ret1, _ := ret[1].(map[string]string)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// Execute indicates an expected call of Execute.
+func (mr *MockActionExecutableV2MockRecorder) Execute(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockActionExecutableV2)(nil).Execute), ctx)
+}
+
+// SupportsReplica mocks base method.
+func (m *MockActionExecutableV2) SupportsReplica() bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SupportsReplica")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// SupportsReplica indicates an expected call of SupportsReplica.
+func (mr *MockActionExecutableV2MockRecorder) SupportsReplica() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SupportsReplica", reflect.TypeOf((*MockActionExecutableV2)(nil).SupportsReplica))
+}
+
+// Type mocks base method.
+func (m *MockActionExecutableV2) Type() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Type")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// Type indicates an expected call of Type.
+func (mr *MockActionExecutableV2MockRecorder) Type() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Type", reflect.TypeOf((*MockActionExecutableV2)(nil).Type))
+}

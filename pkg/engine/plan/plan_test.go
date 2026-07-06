@@ -149,6 +149,9 @@ func TestPlan_Execute(t *testing.T) {
 			mockExec1.EXPECT().Config().Return("").AnyTimes()
 			mockExec2.EXPECT().Config().Return("").AnyTimes()
 			mockExec3.EXPECT().Config().Return("").AnyTimes()
+			mockExec1.EXPECT().Type().Return("mock").AnyTimes()
+			mockExec2.EXPECT().Type().Return("mock").AnyTimes()
+			mockExec3.EXPECT().Type().Return("mock").AnyTimes()
 
 			tc.mockAssertions(mockExec1, mockExec2, mockExec3)
 
@@ -319,6 +322,7 @@ func TestPlan_WorkspacePassedToActions(t *testing.T) {
 
 			mockExec := NewMockActionExecutable(ctrl)
 			mockExec.EXPECT().Config().Return("").AnyTimes()
+			mockExec.EXPECT().Type().Return("mock").AnyTimes()
 			mockExec.EXPECT().SupportsReplica().Return(false).AnyTimes()
 			mockExec.EXPECT().Execute(gomock.Any(), gomock.Any()).
 				DoAndReturn(func(ctx context.Context, _ string) (interface{}, map[string]string, error) {
@@ -385,6 +389,7 @@ func TestPlan_WorkspaceTemplateFunction(t *testing.T) {
 
 	mockExec := NewMockActionExecutable(ctrl)
 	mockExec.EXPECT().Config().Return(`{"content": "{{ file \"hello.txt\" }}"}`).AnyTimes()
+	mockExec.EXPECT().Type().Return("mock").AnyTimes()
 	mockExec.EXPECT().SupportsReplica().Return(false).AnyTimes()
 	mockExec.EXPECT().Execute(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(ctx context.Context, config string) (interface{}, map[string]string, error) {

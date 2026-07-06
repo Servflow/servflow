@@ -641,6 +641,68 @@ func TestAction_ExecuteWithDispatch(t *testing.T) {
 			t.Fatal("test timed out waiting for dispatch")
 		}
 	})
+
+	t.Run("survives request context cancellation", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		bgMgr := NewBackgroundManager(context.Background())
+		require.NotNil(t, bgMgr)
+
+		mockExec := NewMockActionExecutable(ctrl)
+		mockExec.EXPECT().Config().Return("")
+		mockExec.EXPECT().Type().Return("mock").AnyTimes()
+		mockExec.EXPECT().Execute(gomock.Any(), "").Return("response", nil, nil)
+		mockExec.EXPECT().SupportsReplica().Return(false)
+
+		dispatchStarted := make(chan struct{})
+		dispatchCtxErr := make(chan error, 1)
+
+		ctx := requestctx.NewTestContext()
+		ctx = WithBackgroundManager(ctx, bgMgr)
+		ctx, cancelReq := context.WithCancel(ctx)
+
+		p := &Plan{
+			dispatchTimeout: time.Second,
+			steps: map[string]stepWrapper{
+				"action.dispatch_action": {
+					id: "action.dispatch_action",
+					step: &executableStep{
+						fn: func(dctx context.Context) (*stepWrapper, error) {
+							close(dispatchStarted)
+							// Give a request cancellation time to propagate, if it were going to.
+							time.Sleep(50 * time.Millisecond)
+							dispatchCtxErr <- dctx.Err()
+							return nil, nil
+						},
+					},
+				},
+			},
+		}
+
+		ctx = context.WithValue(ctx, ContextKey, p)
+
+		act := Action{
+			exec:     mockExec,
+			id:       "test",
+			out:      "test",
+			dispatch: []string{"action.dispatch_action"},
+		}
+
+		_, err := act.execute(ctx)
+		assert.NoError(t, err)
+
+		// Simulate the HTTP request completing and cancelling its context.
+		<-dispatchStarted
+		cancelReq()
+
+		select {
+		case dErr := <-dispatchCtxErr:
+			assert.NoError(t, dErr, "dispatch context must not be cancelled when the request context is")
+		case <-time.After(2 * time.Second):
+			t.Fatal("test timed out waiting for dispatch")
+		}
+	})
 }
 
 // executableStep is a test helper that wraps a function as a Step

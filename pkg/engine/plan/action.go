@@ -175,35 +175,40 @@ func (a *Action) dispatchBackgroundChains(ctx context.Context, logger *zap.Logge
 
 	p, _ := ctx.Value(ContextKey).(*Plan)
 
-	// Capture the span context from the original request to propagate trace ID
-	// to background goroutines without establishing a parent-child relationship
-	spanCtx := trace.SpanContextFromContext(ctx)
-
 	for _, dispatchID := range a.dispatch {
 		dispatchID := dispatchID // capture for goroutine
 
 		logger.Debug("dispatching background chain", zap.String("dispatch_id", dispatchID))
 
 		bgMgr.Dispatch(func(bgCtx context.Context) {
-			// Apply dispatch timeout if configured
+			// Detach the request context's cancellation so the chain survives the
+			// HTTP request completing, while retaining its values — crucially the
+			// live, recording OTEL span. Re-injecting only a remote span context
+			// (the previous approach) left dispatched spans parented to a
+			// non-recording reference that never exported, orphaning them as
+			// separate trace roots. WithoutCancel keeps the real parent span so
+			// dispatched spans nest under the original trace.
+			chainCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
+			defer cancel()
+
+			// Still cancel the chain when the server shuts down (bgCtx is the
+			// background manager's server-level context).
+			defer context.AfterFunc(bgCtx, cancel)()
+
+			// Bound the chain by the dispatch timeout.
 			if p != nil && p.dispatchTimeout > 0 {
-				var cancel context.CancelFunc
-				bgCtx, cancel = context.WithTimeout(bgCtx, p.dispatchTimeout)
-				defer cancel()
+				var timeoutCancel context.CancelFunc
+				chainCtx, timeoutCancel = context.WithTimeout(chainCtx, p.dispatchTimeout)
+				defer timeoutCancel()
 			}
 
-			// Embed the original span context so new spans continue the same trace
-			if spanCtx.IsValid() {
-				bgCtx = trace.ContextWithRemoteSpanContext(bgCtx, spanCtx)
-			}
+			chainCtx = requestctx.WithAggregationContext(chainCtx, reqCtx)
+			chainCtx = logging.WithLogger(chainCtx, logger.With(zap.String("dispatch_id", dispatchID)))
+			chainCtx = context.WithValue(chainCtx, ContextKey, p)
 
-			bgCtx = requestctx.WithAggregationContext(bgCtx, reqCtx)
-			bgCtx = logging.WithLogger(bgCtx, logger.With(zap.String("dispatch_id", dispatchID)))
-			bgCtx = context.WithValue(bgCtx, ContextKey, p)
-
-			_, err := ExecuteFromContext(bgCtx, dispatchID)
+			_, err := ExecuteFromContext(chainCtx, dispatchID)
 			if err != nil {
-				logging.FromContext(bgCtx).Error("dispatch chain failed", zap.Error(err))
+				logging.FromContext(chainCtx).Error("dispatch chain failed", zap.Error(err))
 			}
 		})
 	}

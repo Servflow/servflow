@@ -1,0 +1,47 @@
+#!/bin/sh
+
+# Git pre-push hook for ServFlow
+# Runs the same linting checks as the Drone CI code-quality step
+
+set -e
+
+echo "Running pre-push linting checks..."
+
+# Check if gofmt is available
+if ! command -v gofmt >/dev/null 2>&1; then
+    echo "Error: gofmt not found. Please install Go."
+    exit 1
+fi
+
+# Check if staticcheck is available
+if ! command -v staticcheck >/dev/null 2>&1; then
+    echo "Error: staticcheck not found."
+    echo "Install it with: go install honnef.co/go/tools/cmd/staticcheck@2025.1.1"
+    exit 1
+fi
+
+echo "Checking code formatting with gofmt..."
+UNFORMATTED=$(gofmt -l .)
+if [ -n "$UNFORMATTED" ]; then
+    echo "Error: Code not formatted properly. Please run 'gofmt -w .' on the following files:"
+    echo "$UNFORMATTED"
+    exit 1
+fi
+echo "✓ Code formatting check passed"
+
+echo "Running staticcheck..."
+if ! staticcheck ./...; then
+    echo "Error: staticcheck found issues. Please fix them before pushing."
+    exit 1
+fi
+echo "✓ staticcheck passed"
+
+echo "Running tests..."
+if ! go test ./...; then
+    echo "Error: tests failed. Please fix them before pushing."
+    exit 1
+fi
+echo "✓ All tests passed"
+
+echo "All checks passed!"
+exit 0

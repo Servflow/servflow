@@ -21,6 +21,7 @@ import (
 	"github.com/mark3labs/mcp-go/client/transport"
 	"github.com/mark3labs/mcp-go/mcp"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.uber.org/zap"
 )
 
@@ -223,6 +224,8 @@ func generateWorkflowToolExec(config *WorkflowToolConfig) functionExec {
 		span.SetAttributes(attribute.String(tracing.AttrToolParams, marshalToolParams(params)))
 
 		if _, err := plan.ExecuteFromContext(ctx, config.Start); err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			return nil, err
 		}
 
@@ -358,13 +361,16 @@ func createMCPExecute(toolName string, mcpClient *client.Client) functionExec {
 			},
 		})
 		if err != nil {
+			err = fmt.Errorf("call tool %s failed: %v", toolName, err)
 			span.RecordError(err)
-			return nil, fmt.Errorf("call tool %s failed: %v", toolName, err)
+			span.SetStatus(codes.Error, err.Error())
+			return nil, err
 		}
 
 		if resp.IsError {
 			err := fmt.Errorf("error calling tool %s", toolName)
 			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
 			return nil, err
 		}
 

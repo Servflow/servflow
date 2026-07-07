@@ -162,9 +162,7 @@ func (h *APIHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	rectx, ok := requestctx.FromContext(ctx)
 	if !ok {
 		logger.Error("Could not get request context")
-		if span != nil {
-			span.SetAttributes(attribute.Int("sf.http.status_code", http.StatusInternalServerError))
-		}
+		tracing.SetHTTPStatus(span, http.StatusInternalServerError, errors.New("could not get request context"))
 		http.Error(wr, "Error processing request", http.StatusInternalServerError)
 		return
 	}
@@ -177,9 +175,7 @@ func (h *APIHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	err := rectx.LoadRequestFiles(req)
 	if err != nil {
 		logger.Error("Error storing HTTP request", zap.Error(err))
-		if span != nil {
-			span.SetAttributes(attribute.Int("sf.http.status_code", http.StatusInternalServerError))
-		}
+		tracing.SetHTTPStatus(span, http.StatusInternalServerError, err)
 		http.Error(wr, "Error processing request", http.StatusInternalServerError)
 		return
 	}
@@ -189,9 +185,7 @@ func (h *APIHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	result, err := h.p.Execute(ctx, h.planStart)
 	resp, ok := result.(*sfhttp.SfResponse)
 	if err != nil || !ok || resp == nil {
-		if span != nil {
-			span.SetAttributes(attribute.Int("sf.http.status_code", http.StatusInternalServerError))
-		}
+		tracing.SetHTTPStatus(span, http.StatusInternalServerError, err)
 		switch {
 		case err != nil:
 			h.logAndWriteInternalServerError(wr, err, logger)
@@ -206,9 +200,7 @@ func (h *APIHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if span != nil {
-		span.SetAttributes(attribute.Int("sf.http.status_code", resp.Code))
-	}
+	tracing.SetHTTPStatus(span, resp.Code, nil)
 	for key := range resp.Headers {
 		wr.Header().Set(key, resp.Headers.Get(key))
 	}

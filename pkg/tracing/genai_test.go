@@ -14,9 +14,9 @@ import (
 )
 
 func TestInferenceRecordsSpanAndMetrics(t *testing.T) {
-	// Wire an in-memory MeterProvider + span recorder before first instrument use.
+	// Bind instruments to an in-memory MeterProvider + wire a span recorder.
 	reader := metric.NewManualReader()
-	otel.SetMeterProvider(metric.NewMeterProvider(metric.WithReader(reader)))
+	initGenAIInstruments(metric.NewMeterProvider(metric.WithReader(reader)))
 
 	sr := tracetest.NewSpanRecorder()
 	otel.SetTracerProvider(sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(sr)))

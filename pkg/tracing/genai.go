@@ -2,10 +2,8 @@ package tracing
 
 import (
 	"context"
-	"sync"
 	"time"
 
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
@@ -17,10 +15,10 @@ import (
 // agent-action subtree (invoke_agent -> chat -> execute_tool). Structural
 // workflow spans keep the sf.* keys defined in spans.go.
 const (
-	AttrGenAIOperation     = "gen_ai.operation.name"    // chat | invoke_agent | execute_tool
-	AttrGenAIProvider      = "gen_ai.provider.name"     // anthropic | openai
-	AttrGenAIRequestModel  = "gen_ai.request.model"     // model requested
-	AttrGenAIResponseModel = "gen_ai.response.model"    // model that served the response
+	AttrGenAIOperation     = "gen_ai.operation.name" // chat | invoke_agent | execute_tool
+	AttrGenAIProvider      = "gen_ai.provider.name"  // anthropic | openai
+	AttrGenAIRequestModel  = "gen_ai.request.model"  // model requested
+	AttrGenAIResponseModel = "gen_ai.response.model" // model that served the response
 	AttrGenAIUsageInput    = "gen_ai.usage.input_tokens"
 	AttrGenAIUsageOutput   = "gen_ai.usage.output_tokens"
 	AttrGenAITokenType     = "gen_ai.token.type" // input | output (metric dimension)
@@ -35,30 +33,28 @@ const (
 	opExecuteTool = "execute_tool"
 )
 
-// GenAI "floor" metrics per the OTel spec.
+// GenAI "floor" metrics per the OTel spec. Bound to the concrete MeterProvider
+// by initGenAIInstruments during InitTracer; nil (and inert) until then.
 var (
-	genaiInstrumentsOnce sync.Once
-	tokenUsageHist       metric.Int64Histogram
-	opDurationHist       metric.Float64Histogram
+	tokenUsageHist metric.Int64Histogram
+	opDurationHist metric.Float64Histogram
 )
 
-// initGenAIInstruments lazily creates the metric instruments. It runs on first
-// use so that the real MeterProvider installed by InitTracer is already in
-// place; before that otel.Meter returns a no-op and the instruments are inert.
-func initGenAIInstruments() {
-	genaiInstrumentsOnce.Do(func() {
-		m := otel.Meter("servflow")
-		tokenUsageHist, _ = m.Int64Histogram(
-			"gen_ai.client.token.usage",
-			metric.WithUnit("{token}"),
-			metric.WithDescription("Number of tokens used per GenAI request, split by token type."),
-		)
-		opDurationHist, _ = m.Float64Histogram(
-			"gen_ai.client.operation.duration",
-			metric.WithUnit("s"),
-			metric.WithDescription("Duration of a GenAI client operation."),
-		)
-	})
+// initGenAIInstruments creates the GenAI metric instruments from the given
+// provider. InitTracer calls this with the concrete MeterProvider so the
+// instruments bind directly to it, rather than relying on global delegation.
+func initGenAIInstruments(mp metric.MeterProvider) {
+	m := mp.Meter("servflow")
+	tokenUsageHist, _ = m.Int64Histogram(
+		"gen_ai.client.token.usage",
+		metric.WithUnit("{token}"),
+		metric.WithDescription("Number of tokens used per GenAI request, split by token type."),
+	)
+	opDurationHist, _ = m.Float64Histogram(
+		"gen_ai.client.operation.duration",
+		metric.WithUnit("s"),
+		metric.WithDescription("Duration of a GenAI client operation."),
+	)
 }
 
 // Inference brackets a single LLM model call: it owns the "chat" span and the
@@ -76,7 +72,6 @@ type Inference struct {
 // duration clock. provider is the semconv gen_ai.provider.name value
 // ("anthropic", "openai"); model is the requested model id.
 func StartInference(ctx context.Context, provider, model string) (context.Context, *Inference) {
-	initGenAIInstruments()
 	ctx, span := start(ctx, "chat", provider+" "+model,
 		attribute.String(AttrGenAIOperation, opChat),
 		attribute.String(AttrGenAIProvider, provider),

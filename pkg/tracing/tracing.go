@@ -92,6 +92,7 @@ func InitTracer(ctx context.Context, serviceName, orgID, collectorEndpoint strin
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
 
 	tracer = otel.Tracer(serviceName)
+	initGenAIInstruments(mp)
 	initialized = true
 
 	return func(ctx context.Context) error {

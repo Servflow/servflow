@@ -11,6 +11,7 @@ import (
 	"github.com/Servflow/servflow/pkg/agent"
 	"github.com/Servflow/servflow/pkg/engine/integration"
 	"github.com/Servflow/servflow/pkg/logging"
+	"github.com/Servflow/servflow/pkg/tracing"
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
 	"go.uber.org/zap"
@@ -63,11 +64,17 @@ func (c *Client) ProvideResponse(ctx context.Context, agentReq agent.LLMRequest)
 	logger := logging.WithContextEnriched(ctx)
 	params := convertAgentRequestToSDKParams(logger, &agentReq, c.model, c.maxTokens)
 
+	ctx, inf := tracing.StartInference(ctx, "anthropic", c.model)
+	defer func() { inf.End(ctx, err) }()
+
 	response, err := c.client.Messages.New(ctx, params)
 	if err != nil {
 		logger.Error("error from claude", zap.Error(err))
 		return resp, err
 	}
+
+	inf.SetResponseModel(string(response.Model))
+	inf.RecordUsage(ctx, response.Usage.InputTokens, response.Usage.OutputTokens)
 
 	return convertSDKResponseToAgentResponse(response, logger), nil
 }
@@ -280,6 +287,13 @@ func convertSDKResponseToAgentResponse(resp *anthropic.Message, logger *zap.Logg
 				Input:  unmarshalArguments(logger, string(val.Input)),
 			})
 		}
+	}
+
+	// Anthropic reports input/output token counts but no total; derive it.
+	r.Usage = agent.Usage{
+		InputTokens:  resp.Usage.InputTokens,
+		OutputTokens: resp.Usage.OutputTokens,
+		TotalTokens:  resp.Usage.InputTokens + resp.Usage.OutputTokens,
 	}
 
 	return r

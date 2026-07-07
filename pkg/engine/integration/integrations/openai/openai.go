@@ -8,6 +8,7 @@ import (
 	"github.com/Servflow/servflow/pkg/agent"
 	"github.com/Servflow/servflow/pkg/engine/integration"
 	"github.com/Servflow/servflow/pkg/logging"
+	"github.com/Servflow/servflow/pkg/tracing"
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
 	"github.com/openai/openai-go/v3/responses"
@@ -54,11 +55,17 @@ func (c *Client) ProvideResponse(ctx context.Context, agentReq agent.LLMRequest)
 
 	params := convertAgentRequestToSDKParams(logger, &agentReq, c.model)
 
+	ctx, inf := tracing.StartInference(ctx, "openai", c.model)
+	defer func() { inf.End(ctx, err) }()
+
 	response, err := c.client.Responses.New(ctx, params)
 	if err != nil {
 		logger.Error("error from openai", zap.Error(err))
 		return
 	}
+
+	inf.SetResponseModel(string(response.Model))
+	inf.RecordUsage(ctx, response.Usage.InputTokens, response.Usage.OutputTokens)
 
 	resp = convertSDKResponseToAgentResponse(response, logger)
 	return resp, nil

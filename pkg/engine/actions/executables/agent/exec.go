@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 
 	"github.com/Servflow/servflow/pkg/agent"
 	"github.com/Servflow/servflow/pkg/agent/tools"
@@ -13,6 +12,9 @@ import (
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/integration"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
+	"github.com/Servflow/servflow/pkg/tracing"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 type Config struct {
@@ -79,33 +81,29 @@ func (a *Agent) Execute(ctx context.Context, modifiedConfig string) (interface{}
 		return nil, nil, err
 	}
 
+	ctx, span := tracing.StartAgentInvoke(ctx, newConfig.IntegrationID)
+	defer span.End()
+
 	fileInput, err := requestctx.GetFileFromContext(ctx, newConfig.FileUpload)
 	if err != nil && !errors.Is(err, requestctx.ErrFileNotFound) {
 		return nil, nil, fmt.Errorf("%w: %v", actions.ErrorFatal, err)
 	}
 	resp, err := session.Query(ctx, newConfig.UserPrompt, fileInput)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return nil, nil, err
 	}
 
-	// collect metadata for OTel logging
+	// Per-call token detail lives on the child chat spans created at the
+	// integration boundary; aggregate the totals onto the invoke_agent span.
 	metadata := session.GetMetadata()
-	fields := make(map[string]string)
-	for i, llmResp := range metadata.LLMResponses {
-		respBytes, err := json.Marshal(llmResp)
-		if err == nil {
-			fields[fmt.Sprintf("agent.llm_response.%d", i)] = string(respBytes)
-		}
-		fields[fmt.Sprintf("agent.llm.iteration.%d.input_tokens", i)] = strconv.FormatInt(llmResp.Usage.InputTokens, 10)
-		fields[fmt.Sprintf("agent.llm.iteration.%d.output_tokens", i)] = strconv.FormatInt(llmResp.Usage.OutputTokens, 10)
-		fields[fmt.Sprintf("agent.llm.iteration.%d.total_tokens", i)] = strconv.FormatInt(llmResp.Usage.TotalTokens, 10)
-	}
-	fields["agent.llm.iterations"] = strconv.Itoa(len(metadata.LLMResponses))
-	fields["agent.llm.total.input_tokens"] = strconv.FormatInt(metadata.TotalUsage.InputTokens, 10)
-	fields["agent.llm.total.output_tokens"] = strconv.FormatInt(metadata.TotalUsage.OutputTokens, 10)
-	fields["agent.llm.total.total_tokens"] = strconv.FormatInt(metadata.TotalUsage.TotalTokens, 10)
+	span.SetAttributes(
+		attribute.Int64(tracing.AttrGenAIUsageInput, metadata.TotalUsage.InputTokens),
+		attribute.Int64(tracing.AttrGenAIUsageOutput, metadata.TotalUsage.OutputTokens),
+	)
 
-	return resp, fields, nil
+	return resp, nil, nil
 }
 
 func (a *Agent) Type() string {

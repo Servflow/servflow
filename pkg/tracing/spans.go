@@ -75,16 +75,38 @@ func StartDashboardRun(ctx context.Context, name string) (context.Context, trace
 		attribute.String(AttrStepType, "request"))
 }
 
-// StartMCPTool spans the invocation of an MCP tool.
+// StartAgentInvoke spans a whole agent-action run (the GenAI invoke_agent
+// operation). Its child chat spans are created at the integration boundary.
+func StartAgentInvoke(ctx context.Context, name string) (context.Context, trace.Span) {
+	display := name
+	if display == "" {
+		display = opInvokeAgent
+	}
+	attrs := []attribute.KeyValue{attribute.String(AttrGenAIOperation, opInvokeAgent)}
+	if name != "" {
+		attrs = append(attrs, attribute.String(AttrGenAIAgentName, name))
+	}
+	return start(ctx, "invoke_agent", display, attrs...)
+}
+
+// StartMCPTool spans the invocation of an MCP tool. Carries both the sf.* tool
+// keys and the GenAI execute_tool attributes.
 func StartMCPTool(ctx context.Context, name string) (context.Context, trace.Span) {
 	return start(ctx, "MCP Tool", name,
 		attribute.String(AttrToolName, name),
-		attribute.String(AttrToolType, "mcp"))
+		attribute.String(AttrToolType, "mcp"),
+		attribute.String(AttrGenAIOperation, opExecuteTool),
+		attribute.String(AttrGenAIToolName, name),
+		attribute.String(AttrGenAIToolType, "mcp"))
 }
 
-// StartAgentTool spans the invocation of an agent workflow tool.
+// StartAgentTool spans the invocation of an agent workflow tool. Carries both
+// the sf.* tool keys and the GenAI execute_tool attributes.
 func StartAgentTool(ctx context.Context, identifier string) (context.Context, trace.Span) {
 	return start(ctx, "Tool Call", identifier,
 		attribute.String(AttrToolName, identifier),
-		attribute.String(AttrToolType, "workflow"))
+		attribute.String(AttrToolType, "workflow"),
+		attribute.String(AttrGenAIOperation, opExecuteTool),
+		attribute.String(AttrGenAIToolName, identifier),
+		attribute.String(AttrGenAIToolType, "workflow"))
 }

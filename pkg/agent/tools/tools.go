@@ -347,6 +347,10 @@ func (m *Manager) addServerConfig(config ServerConfig) error {
 // createMCPExecute creates an execute function that executes and calls an mcp server with the specified tool.
 func createMCPExecute(toolName string, mcpClient *client.Client) functionExec {
 	return func(ctx context.Context, params map[string]any) ([]mcp.Content, error) {
+		ctx, span := tracing.StartMCPTool(ctx, toolName)
+		defer span.End()
+		span.SetAttributes(attribute.String(tracing.AttrToolParams, marshalToolParams(params)))
+
 		resp, err := mcpClient.CallTool(ctx, mcp.CallToolRequest{
 			Params: mcp.CallToolParams{
 				Name:      toolName,
@@ -354,11 +358,14 @@ func createMCPExecute(toolName string, mcpClient *client.Client) functionExec {
 			},
 		})
 		if err != nil {
+			span.RecordError(err)
 			return nil, fmt.Errorf("call tool %s failed: %v", toolName, err)
 		}
 
 		if resp.IsError {
-			return nil, fmt.Errorf("error calling tool %s", toolName)
+			err := fmt.Errorf("error calling tool %s", toolName)
+			span.RecordError(err)
+			return nil, err
 		}
 
 		return resp.Content, nil

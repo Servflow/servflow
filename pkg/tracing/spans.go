@@ -2,8 +2,10 @@ package tracing
 
 import (
 	"context"
+	"net/http"
 
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -33,6 +35,27 @@ func start(ctx context.Context, spanName, display string, attrs ...attribute.Key
 func StartHTTPEntry(ctx context.Context) (context.Context, trace.Span) {
 	return start(ctx, "HTTP Entry", "HTTP Entry",
 		attribute.String(AttrStepType, "request"))
+}
+
+// SetHTTPStatus records the final HTTP status code on the entry span and, per
+// the OpenTelemetry HTTP server conventions, marks the span status as Error
+// only for 5xx responses — a 4xx is a client error and leaves the status Unset.
+// A non-nil err is attached as a span event. Safe to call with a nil span.
+func SetHTTPStatus(span trace.Span, code int, err error) {
+	if span == nil {
+		return
+	}
+	span.SetAttributes(attribute.Int("sf.http.status_code", code))
+	if err != nil {
+		span.RecordError(err)
+	}
+	if code >= 500 {
+		msg := http.StatusText(code)
+		if err != nil {
+			msg = err.Error()
+		}
+		span.SetStatus(codes.Error, msg)
+	}
 }
 
 // StartAction spans a plan action step. actionType is the concrete action type.
@@ -75,16 +98,38 @@ func StartDashboardRun(ctx context.Context, name string) (context.Context, trace
 		attribute.String(AttrStepType, "request"))
 }
 
-// StartMCPTool spans the invocation of an MCP tool.
+// StartAgentInvoke spans a whole agent-action run (the GenAI invoke_agent
+// operation). Its child chat spans are created at the integration boundary.
+func StartAgentInvoke(ctx context.Context, name string) (context.Context, trace.Span) {
+	display := name
+	if display == "" {
+		display = opInvokeAgent
+	}
+	attrs := []attribute.KeyValue{attribute.String(AttrGenAIOperation, opInvokeAgent)}
+	if name != "" {
+		attrs = append(attrs, attribute.String(AttrGenAIAgentName, name))
+	}
+	return start(ctx, "invoke_agent", display, attrs...)
+}
+
+// StartMCPTool spans the invocation of an MCP tool. Carries both the sf.* tool
+// keys and the GenAI execute_tool attributes.
 func StartMCPTool(ctx context.Context, name string) (context.Context, trace.Span) {
 	return start(ctx, "MCP Tool", name,
 		attribute.String(AttrToolName, name),
-		attribute.String(AttrToolType, "mcp"))
+		attribute.String(AttrToolType, "mcp"),
+		attribute.String(AttrGenAIOperation, opExecuteTool),
+		attribute.String(AttrGenAIToolName, name),
+		attribute.String(AttrGenAIToolType, "mcp"))
 }
 
-// StartAgentTool spans the invocation of an agent workflow tool.
+// StartAgentTool spans the invocation of an agent workflow tool. Carries both
+// the sf.* tool keys and the GenAI execute_tool attributes.
 func StartAgentTool(ctx context.Context, identifier string) (context.Context, trace.Span) {
 	return start(ctx, "Tool Call", identifier,
 		attribute.String(AttrToolName, identifier),
-		attribute.String(AttrToolType, "workflow"))
+		attribute.String(AttrToolType, "workflow"),
+		attribute.String(AttrGenAIOperation, opExecuteTool),
+		attribute.String(AttrGenAIToolName, identifier),
+		attribute.String(AttrGenAIToolType, "workflow"))
 }

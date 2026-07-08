@@ -473,3 +473,38 @@ func TestHTTPActionObjectBodyViaPlanExecute(t *testing.T) {
 	assert.Equal(t, "line one\nline two \"quoted\"", receivedBody["message"], "escaped multi-line/quoted content should round-trip")
 	assert.Equal(t, "RIGHT", receivedBody["side"])
 }
+
+// TestHeaderPairing guards the batched resolution: many templated headers whose
+// resolved key encodes which value it must pair with, so any positional
+// mis-alignment between keys and values surfaces regardless of map order.
+func TestHeaderPairing(t *testing.T) {
+	names := []string{"one", "two", "three", "four", "five", "six"}
+
+	var got http.Header
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = r.Header.Clone()
+		io.WriteString(w, `{"ok":true}`)
+	}))
+	defer srv.Close()
+
+	headers := map[string]string{}
+	vars := map[string]interface{}{}
+	want := map[string]string{}
+	for _, n := range names {
+		headers[`X-{{ .`+requestctx.BareVariablesPrefixStripped+`k_`+n+` }}`] = `{{ .` + requestctx.BareVariablesPrefixStripped + `v_` + n + ` }}`
+		vars[requestctx.BareVariablesPrefixStripped+"k_"+n] = n
+		vars[requestctx.BareVariablesPrefixStripped+"v_"+n] = n
+		want["X-"+n] = n
+	}
+
+	h := New(Config{URL: srv.URL, Method: "GET", Headers: headers})
+	ctx := requestctx.NewTestContext()
+	require.NoError(t, requestctx.AddRequestVariables(ctx, vars, ""))
+
+	_, _, err := h.Execute(ctx)
+	require.NoError(t, err)
+
+	for k, v := range want {
+		assert.Equal(t, v, got.Get(k), "header %s mispaired", k)
+	}
+}

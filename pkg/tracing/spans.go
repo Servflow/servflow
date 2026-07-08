@@ -13,13 +13,14 @@ import (
 // to stay clear of OpenTelemetry semantic conventions. Span names are kept
 // low-cardinality (the step class); the per-instance label lives in AttrName.
 const (
-	AttrName       = "sf.name"        // friendly per-instance label rendered by dashboards
-	AttrStepType   = "sf.step.type"   // request | action | condition | response | trigger | scheduled
-	AttrActionType = "sf.action_type" // concrete action type (http, callworkflow, parallel, ...)
-	AttrID         = "sf.id"          // bare node id (no prefix)
-	AttrToolName   = "sf.tool_name"
-	AttrToolType   = "sf.tool_type"   // mcp | workflow
-	AttrToolParams = "sf.tool_params" // JSON of model-supplied tool-call arguments (sensitive keys redacted, size-capped)
+	AttrName         = "sf.name"        // friendly per-instance label rendered by dashboards
+	AttrStepType     = "sf.step.type"   // request | action | condition | response | trigger | scheduled
+	AttrActionType   = "sf.action_type" // concrete action type (http, callworkflow, parallel, ...)
+	AttrActionConfig = "sf.config"      // resolved action config (V1 wrapper sets it; V2 actions self-report via fields)
+	AttrID           = "sf.id"          // bare node id (no prefix)
+	AttrToolName     = "sf.tool_name"
+	AttrToolType     = "sf.tool_type"   // mcp | workflow
+	AttrToolParams   = "sf.tool_params" // JSON of model-supplied tool-call arguments (sensitive keys redacted, size-capped)
 )
 
 // start creates a span with a low-cardinality name and always attaches the

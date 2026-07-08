@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/metric"
@@ -103,6 +104,80 @@ func TestInferenceEndRecordsError(t *testing.T) {
 	}
 	if spans[0].Status().Code.String() != "Error" {
 		t.Errorf("status = %v, want Error", spans[0].Status().Code)
+	}
+}
+
+func TestRequestTokensAggregateOntoRoot(t *testing.T) {
+	sr := tracetest.NewSpanRecorder()
+	otel.SetTracerProvider(sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(sr)))
+	tracer = otel.Tracer("servflow-test")
+
+	// The request context holds the running total; two model calls beneath the
+	// root accumulate into it, and SetRequestTokens attaches it to the root span.
+	ctx, root := StartHTTPEntry(requestctx.NewTestContext())
+
+	_, inf1 := StartInference(ctx, "anthropic", "m1")
+	inf1.RecordUsage(ctx, 100, 20)
+	inf1.End(ctx, nil)
+
+	_, inf2 := StartInference(ctx, "openai", "m2")
+	inf2.RecordUsage(ctx, 30, 5)
+	inf2.End(ctx, nil)
+
+	SetRequestTokens(ctx, root)
+	root.End()
+
+	var got map[string]interface{}
+	for _, s := range sr.Ended() {
+		if s.Name() == "HTTP Entry" {
+			got = attrMap(s.Attributes())
+		}
+	}
+	if got[AttrUsageInput] != int64(130) {
+		t.Errorf("total input = %v, want 130", got[AttrUsageInput])
+	}
+	if got[AttrUsageOutput] != int64(25) {
+		t.Errorf("total output = %v, want 25", got[AttrUsageOutput])
+	}
+	if got[AttrUsageTotal] != int64(155) {
+		t.Errorf("total = %v, want 155", got[AttrUsageTotal])
+	}
+}
+
+func TestContentCaptureGate(t *testing.T) {
+	sr := tracetest.NewSpanRecorder()
+	otel.SetTracerProvider(sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(sr)))
+	tracer = otel.Tracer("servflow-test")
+
+	// Default: capture disabled -> no content attributes.
+	captureContent = false
+	_, inf := StartInference(context.Background(), "anthropic", "m")
+	inf.SetInput("you are helpful", `[{"role":"user","content":"hi"}]`)
+	inf.SetCompletion("hello there")
+	inf.End(context.Background(), nil)
+
+	// Enabled -> content recorded.
+	captureContent = true
+	defer func() { captureContent = false }()
+	_, inf2 := StartInference(context.Background(), "anthropic", "m")
+	inf2.SetInput("you are helpful", `[{"role":"user","content":"hi"}]`)
+	inf2.SetCompletion("hello there")
+	inf2.End(context.Background(), nil)
+
+	ended := sr.Ended()
+	off := attrMap(ended[0].Attributes())
+	if _, ok := off[AttrGenAIInputMessages]; ok {
+		t.Error("input messages recorded while capture disabled")
+	}
+	if _, ok := off[AttrGenAIOutputMessages]; ok {
+		t.Error("output recorded while capture disabled")
+	}
+	on := attrMap(ended[1].Attributes())
+	if on[AttrGenAISystemInstr] != "you are helpful" {
+		t.Errorf("system_instructions = %v", on[AttrGenAISystemInstr])
+	}
+	if on[AttrGenAIOutputMessages] != "hello there" {
+		t.Errorf("output = %v", on[AttrGenAIOutputMessages])
 	}
 }
 

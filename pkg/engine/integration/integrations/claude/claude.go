@@ -66,6 +66,7 @@ func (c *Client) ProvideResponse(ctx context.Context, agentReq agent.LLMRequest)
 
 	ctx, inf := tracing.StartInference(ctx, "anthropic", c.model)
 	defer func() { inf.End(ctx, err) }()
+	inf.SetInput(buildSystemPrompt(agentReq.SystemMessage, agentReq.Instruction), agent.TraceMessages(agentReq.Messages))
 
 	response, err := c.client.Messages.New(ctx, params)
 	if err != nil {
@@ -76,7 +77,9 @@ func (c *Client) ProvideResponse(ctx context.Context, agentReq agent.LLMRequest)
 	inf.SetResponseModel(string(response.Model))
 	inf.RecordUsage(ctx, response.Usage.InputTokens, response.Usage.OutputTokens)
 
-	return convertSDKResponseToAgentResponse(response, logger), nil
+	resp = convertSDKResponseToAgentResponse(response, logger)
+	inf.SetCompletion(resp.Text())
+	return resp, nil
 }
 
 func convertAgentRequestToSDKParams(logger *zap.Logger, req *agent.LLMRequest, model string, maxTokens int64) anthropic.MessageNewParams {

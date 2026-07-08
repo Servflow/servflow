@@ -95,12 +95,15 @@ func (a *Agent) Execute(ctx context.Context, modifiedConfig string) (interface{}
 		return nil, nil, err
 	}
 
-	// Per-call token detail lives on the child chat spans created at the
-	// integration boundary; aggregate the totals onto the invoke_agent span.
+	// Per-call token detail lives on the child chat spans as gen_ai.usage.*.
+	// This span is an aggregate, so use the sf.usage.* keys — gen_ai.usage.* is
+	// scoped to a single model call, and reusing it here would double-count in
+	// backends that sum gen_ai.usage.* across a trace.
 	metadata := session.GetMetadata()
 	span.SetAttributes(
-		attribute.Int64(tracing.AttrGenAIUsageInput, metadata.TotalUsage.InputTokens),
-		attribute.Int64(tracing.AttrGenAIUsageOutput, metadata.TotalUsage.OutputTokens),
+		attribute.Int64(tracing.AttrUsageInput, metadata.TotalUsage.InputTokens),
+		attribute.Int64(tracing.AttrUsageOutput, metadata.TotalUsage.OutputTokens),
+		attribute.Int64(tracing.AttrUsageTotal, metadata.TotalUsage.InputTokens+metadata.TotalUsage.OutputTokens),
 	)
 
 	return resp, nil, nil

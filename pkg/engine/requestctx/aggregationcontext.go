@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"text/template"
 )
 
@@ -22,6 +23,24 @@ type RequestContext struct {
 	validationErrors []error
 	availableFiles   map[string]*FileValue
 	workspace        Workspace
+
+	// tokenInput/tokenOutput accumulate LLM token usage across every model call
+	// in this request. Observability-only — not exposed to workflow templates.
+	// Atomic so parallel model calls can add without the RequestContext mutex.
+	tokenInput  atomic.Int64
+	tokenOutput atomic.Int64
+}
+
+// AddTokenUsage adds LLM token usage to this request's running total. Safe for
+// concurrent callers (e.g. parallel model calls).
+func (rc *RequestContext) AddTokenUsage(input, output int64) {
+	rc.tokenInput.Add(input)
+	rc.tokenOutput.Add(output)
+}
+
+// TokenUsage returns the accumulated request-level token totals.
+func (rc *RequestContext) TokenUsage() (input, output int64) {
+	return rc.tokenInput.Load(), rc.tokenOutput.Load()
 }
 
 // TODO move this and dpl together

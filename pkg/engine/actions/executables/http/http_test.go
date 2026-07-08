@@ -1,7 +1,6 @@
 package http
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -294,18 +293,16 @@ func TestHttp_Execute(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
-			//
-			h := New(c.Config)
-			//configBytes, err := json.Marshal(c.Config)
-			//require.NoError(t, err)
 			url := c.serverSetup(t)
 			config := c.Config
 			config.URL = url
 
-			conf, err := json.Marshal(config)
-			require.NoError(t, err)
+			// V2: the action reads its parsed config and resolves fields against
+			// the request context, so no config string is passed to Execute.
+			h := New(config)
+			ctx := requestctx.NewTestContext()
 
-			resp, _, err := h.Execute(context.Background(), string(conf))
+			resp, _, err := h.Execute(ctx)
 			if c.ShouldError {
 				require.Error(t, err)
 				if c.Name == "Expected Response Code Failure" || c.Name == "Empty Response Failure" || c.Name == "invalid response path" {
@@ -316,33 +313,6 @@ func TestHttp_Execute(t *testing.T) {
 			require.NoError(t, err)
 
 			assert.Equal(t, c.Expected, resp)
-		})
-	}
-}
-
-func TestHttp_Config(t *testing.T) {
-	cases := []struct {
-		Name     string
-		Config   Config
-		Expected string
-	}{
-		{
-			Name: "Basic Config",
-			Config: Config{
-				URL:     "https://test.com",
-				Method:  http.MethodGet,
-				Headers: map[string]string{"Content-Type": "application/json"},
-				Body:    json.RawMessage(`{"test": "value"}`),
-			},
-			Expected: `{"url":"https://test.com","method":"GET","headers":{"Content-Type":"application/json"},"body":{"test":"value"}, "responsePath": "", "expectedResponseCode": "", "failIfResponseEmpty": false}`,
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.Name, func(t *testing.T) {
-			h := New(c.Config)
-			result := h.Config()
-			require.JSONEq(t, c.Expected, result)
 		})
 	}
 }
@@ -365,9 +335,11 @@ func TestHTTPActionWithEscapeTemplateViaPlanExecute(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	// Build the config body template with escape function
+	// Build a RAW-STRING body template (body is a JSON string containing JSON
+	// text). Under V2 there is no outer config-serialization layer, so a single
+	// {{ escape }} is the correct amount of escaping for the inner JSON string.
 	configBody := fmt.Sprintf(`{
-  "message": "{{ escape .%scontent | js }}",
+  "message": "{{ escape .%scontent }}",
   "path": "{{ .%sfilepath }}",
 	"array": [
 ]
@@ -428,4 +400,76 @@ func TestHTTPActionWithEscapeTemplateViaPlanExecute(t *testing.T) {
 	// Verify the escaped content was received correctly
 	assert.Equal(t, `This has "quoted" text`, receivedBody["message"], "Message should have properly escaped quotes")
 	assert.Equal(t, "some/path", receivedBody["path"], "Path should be set correctly")
+}
+
+// TestHTTPActionObjectBodyViaPlanExecute exercises the OBJECT body form end-to-end.
+// The body is resolved as a single template string, so the author escapes any
+// dynamic value they place inside a JSON string with one {{ escape }} — and that
+// single level is now correct because there is no outer config-serialization layer.
+func TestHTTPActionObjectBodyViaPlanExecute(t *testing.T) {
+	var receivedBody map[string]interface{}
+	serverCalled := false
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		serverCalled = true
+		bod, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		err = json.Unmarshal(bod, &receivedBody)
+		require.NoError(t, err, "Server should receive valid JSON, got: %s", string(bod))
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status": "ok"}`))
+	}))
+	defer srv.Close()
+
+	apiCfg := apiconfig.APIConfig{
+		Actions: map[string]apiconfig.Action{
+			"test_http": {
+				Name: "test_http",
+				Type: "http",
+				Config: map[string]interface{}{
+					"url":     srv.URL,
+					"method":  "POST",
+					"headers": map[string]string{"Content-Type": "application/json"},
+					// OBJECT body form: author escapes the dynamic value once.
+					"body": map[string]interface{}{
+						"message": fmt.Sprintf("{{ escape .%scontent }}", requestctx.BareVariablesPrefixStripped),
+						"side":    "RIGHT",
+					},
+				},
+				Next: "response.success",
+			},
+		},
+		Responses: map[string]apiconfig.ResponseConfig{
+			"success": {
+				Name: "success",
+				Code: 200,
+				Object: apiconfig.ResponseObject{
+					Fields: map[string]apiconfig.ResponseObject{
+						"status": {Value: "ok"},
+					},
+				},
+			},
+		},
+	}
+
+	planner := plan.NewPlannerV2(plan.PlannerConfig{
+		Actions:   apiCfg.Actions,
+		Responses: apiCfg.Responses,
+	}, logging.GetNewLogger())
+	p, err := planner.Plan()
+	require.NoError(t, err)
+
+	ctx := requestctx.NewTestContext()
+	err = requestctx.AddRequestVariables(ctx, map[string]interface{}{
+		// multi-line value with embedded quotes — the classic escaping trap
+		fmt.Sprintf("%scontent", requestctx.BareVariablesPrefixStripped): "line one\nline two \"quoted\"",
+	}, "")
+	require.NoError(t, err)
+
+	_, err = p.Execute(ctx, requestctx.ActionConfigPrefix+"test_http")
+	require.NoError(t, err)
+
+	require.True(t, serverCalled, "Test server should have been called")
+	assert.Equal(t, "line one\nline two \"quoted\"", receivedBody["message"], "escaped multi-line/quoted content should round-trip")
+	assert.Equal(t, "RIGHT", receivedBody["side"])
 }

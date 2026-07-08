@@ -11,6 +11,7 @@ import (
 
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/plan"
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
 	"go.uber.org/zap"
 
@@ -30,6 +31,20 @@ func (h *Http) SupportsReplica() bool {
 	return true
 }
 
+// unwrapBody returns the body template to resolve. The raw-string body form
+// stores the body as a JSON string wrapping the real text, so it is unwrapped
+// once; every other shape (object/array, or a non-JSON body) is used as-is. The
+// author owns escaping of any dynamic value they place inside JSON — a single
+// {{ escape }} is correct because the body is resolved on its own, with no outer
+// config-serialization layer.
+func unwrapBody(raw json.RawMessage) string {
+	var unwrapped string
+	if err := json.Unmarshal(raw, &unwrapped); err == nil {
+		return unwrapped
+	}
+	return string(raw)
+}
+
 type Config struct {
 	URL                  string            `json:"url" yaml:"url"`
 	Method               string            `json:"method" yaml:"method"`
@@ -40,34 +55,6 @@ type Config struct {
 	FailIfResponseEmpty  bool              `json:"failIfResponseEmpty" yaml:"failIfResponseEmpty"`
 }
 
-// transformBody converts a json.RawMessage body into the appropriate byte slice for HTTP requests.
-// It handles bodies from YAML which can be:
-// 1. Actual key-value object - use as-is
-// 2. Plain string representation of an object - unwrap quotes, parse as JSON
-// 3. Plain string - unwrap quotes, use as-is
-//
-// With json.RawMessage, strings are surrounded by quotes, so we need to unwrap them.
-func transformBody(body json.RawMessage) []byte {
-	if body == nil {
-		return nil
-	}
-
-	// Check if it's already a JSON object/array (not a string)
-	var obj map[string]interface{}
-	if json.Unmarshal(body, &obj) == nil {
-		return body
-	}
-
-	// It's a string, unwrap the surrounding quotes
-	var strBody string
-	if err := json.Unmarshal(body, &strBody); err == nil {
-		return []byte(strBody)
-	}
-
-	// Fallback: use as-is
-	return body
-}
-
 func New(cfg Config) *Http {
 	return &Http{
 		client: &http.Client{},
@@ -75,27 +62,58 @@ func New(cfg Config) *Http {
 	}
 }
 
-func (h *Http) Config() string {
-	configBytes, err := json.Marshal(h.cfg)
-	if err != nil {
-		return ""
-	}
-	return string(configBytes)
-}
-
-func (h *Http) Execute(ctx context.Context, filledInConfig string) (interface{}, map[string]string, error) {
+func (h *Http) Execute(ctx context.Context) (interface{}, map[string]string, error) {
 	logger := logging.FromContext(ctx).With(zap.String("execution_type", h.Type()))
 	ctx = logging.WithLogger(ctx, logger)
 
-	var cfg Config
+	rc, err := requestctx.FromContextOrError(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get request context: %w", err)
+	}
 
-	if err := json.Unmarshal([]byte(filledInConfig), &cfg); err != nil {
-		return nil, nil, err
+	// V2: every templated field — the scalars, each header key/value, and the
+	// body — resolves against the request context in a SINGLE batched pass.
+	// ResolveBatch returns results in the same order as the inputs, so we just
+	// append in a known order and read back in that same order.
+	cfg := *h.cfg
+
+	var batch []string
+	batch = append(batch, cfg.URL, cfg.Method, cfg.ResponsePath, cfg.ExpectedResponseCode)
+
+	for k, v := range cfg.Headers {
+		batch = append(batch, k, v)
+	}
+
+	hasBody := len(cfg.Body) > 0
+	if hasBody {
+		batch = append(batch, unwrapBody(cfg.Body))
+	}
+
+	resolved, err := rc.ResolveBatch(ctx, batch...)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to resolve http config: %w", err)
+	}
+
+	i := 0
+	next := func() string { v := resolved[i]; i++; return v }
+
+	cfg.URL = next()
+	cfg.Method = next()
+	cfg.ResponsePath = next()
+	cfg.ExpectedResponseCode = next()
+
+	if len(cfg.Headers) > 0 {
+		headers := make(map[string]string, len(cfg.Headers))
+		for range cfg.Headers {
+			key := next()
+			headers[key] = next()
+		}
+		cfg.Headers = headers
 	}
 
 	var body io.Reader
-	if transformed := transformBody(cfg.Body); transformed != nil {
-		body = bytes.NewBuffer(transformed)
+	if hasBody {
+		body = bytes.NewBufferString(next())
 	}
 
 	req, err := http.NewRequestWithContext(ctx, cfg.Method, cfg.URL, body)
@@ -215,7 +233,8 @@ func init() {
 		Name:        "HTTP Request",
 		Description: "Makes HTTP requests to external APIs and returns the response",
 		Fields:      fields,
-		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
+		UseV2:       true,
+		ConstructorV2: func(config json.RawMessage) (actions.ActionExecutableV2, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {
 				return nil, fmt.Errorf("error creating http action: %v", err)

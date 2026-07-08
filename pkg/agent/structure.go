@@ -3,6 +3,7 @@ package agent
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -18,6 +19,21 @@ const (
 	RoleTypeDeveloper
 )
 
+func (r RoleType) String() string {
+	switch r {
+	case RoleTypeSystem:
+		return "system"
+	case RoleTypeUser:
+		return "user"
+	case RoleTypeAssistant:
+		return "assistant"
+	case RoleTypeDeveloper:
+		return "developer"
+	default:
+		return "unknown"
+	}
+}
+
 type MessageType int
 
 const (
@@ -31,6 +47,34 @@ type LLMRequest struct {
 	Instruction   string
 	Messages      []any
 	Tools         []ToolInfo `json:"tools"`
+}
+
+// TraceMessages renders the request messages as a compact JSON array for
+// tracing (role + textual content only; no image bytes). Best-effort — returns
+// "" if it cannot marshal.
+func TraceMessages(messages []any) string {
+	type traced struct {
+		Role    string `json:"role,omitempty"`
+		Content string `json:"content,omitempty"`
+		Tool    string `json:"tool,omitempty"`
+	}
+	out := make([]traced, 0, len(messages))
+	for _, msg := range messages {
+		switch v := msg.(type) {
+		case MessageTypeContent:
+			out = append(out, traced{Role: v.Role.String(), Content: v.Content})
+		case MessageToolCall:
+			args, _ := json.Marshal(v.Arguments)
+			out = append(out, traced{Role: "assistant", Tool: v.Name, Content: string(args)})
+		case MessageToolCallResponse:
+			out = append(out, traced{Role: "tool", Tool: v.ID, Content: v.Text})
+		}
+	}
+	b, err := json.Marshal(out)
+	if err != nil {
+		return ""
+	}
+	return string(b)
 }
 
 type MessageTypeContent struct {
@@ -122,6 +166,17 @@ type LLMResponse struct {
 	Content []ContentResponse    `json:"content"`
 	Tools   []ToolResponseObject `json:"tools"`
 	Usage   Usage                `json:"usage"`
+}
+
+// Text joins the textual content blocks of a response, for tracing/logging.
+func (r LLMResponse) Text() string {
+	parts := make([]string, 0, len(r.Content))
+	for _, c := range r.Content {
+		if c.Text != "" {
+			parts = append(parts, c.Text)
+		}
+	}
+	return strings.Join(parts, "\n")
 }
 
 // Usage holds the token counts reported by an LLM provider for a single call.

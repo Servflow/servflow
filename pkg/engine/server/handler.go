@@ -157,6 +157,9 @@ func (h *APIHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	ctx, span := h.initTracing(req)
 	if span != nil {
 		defer span.End()
+		// Registered after span.End so it runs first (LIFO): attach the
+		// request-level token total before the root span closes.
+		defer tracing.SetRequestTokens(ctx, span)
 	}
 
 	rectx, ok := requestctx.FromContext(ctx)

@@ -2,6 +2,7 @@ package tracing
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -25,7 +26,28 @@ const (
 	AttrGenAIToolName      = "gen_ai.tool.name"
 	AttrGenAIToolType      = "gen_ai.tool.type" // mcp | workflow
 	AttrGenAIAgentName     = "gen_ai.agent.name"
+
+	// Message-content keys, recorded only when content capture is enabled.
+	AttrGenAISystemInstr    = "gen_ai.system_instructions"
+	AttrGenAIInputMessages  = "gen_ai.input.messages"
+	AttrGenAIOutputMessages = "gen_ai.output.messages"
 )
+
+// captureContent gates recording of prompt/response CONTENT onto chat spans.
+// Off by default (content may hold PII/secrets and is large); enable per the
+// OTel-standard env var. Read once at init; tests may set it directly.
+var captureContent = os.Getenv("OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT") == "true"
+
+// maxContentBytes caps each captured content attribute so a large context
+// window cannot bloat every span.
+const maxContentBytes = 8 * 1024
+
+func truncateContent(s string) string {
+	if len(s) <= maxContentBytes {
+		return s
+	}
+	return s[:maxContentBytes] + "…[truncated]"
+}
 
 const (
 	opChat        = "chat"
@@ -87,6 +109,33 @@ func (i *Inference) SetResponseModel(model string) {
 	}
 }
 
+// SetInput records the system instructions and input messages on the chat span.
+// No-op unless content capture is enabled; each field is size-capped.
+func (i *Inference) SetInput(system, messages string) {
+	if !captureContent {
+		return
+	}
+	attrs := make([]attribute.KeyValue, 0, 2)
+	if system != "" {
+		attrs = append(attrs, attribute.String(AttrGenAISystemInstr, truncateContent(system)))
+	}
+	if messages != "" {
+		attrs = append(attrs, attribute.String(AttrGenAIInputMessages, truncateContent(messages)))
+	}
+	if len(attrs) > 0 {
+		i.span.SetAttributes(attrs...)
+	}
+}
+
+// SetCompletion records the model's response content on the chat span. No-op
+// unless content capture is enabled; size-capped.
+func (i *Inference) SetCompletion(output string) {
+	if !captureContent || output == "" {
+		return
+	}
+	i.span.SetAttributes(attribute.String(AttrGenAIOutputMessages, truncateContent(output)))
+}
+
 // RecordUsage sets the token-usage span attributes and emits the token-usage
 // metric once per token type.
 func (i *Inference) RecordUsage(ctx context.Context, input, output int64) {
@@ -94,6 +143,7 @@ func (i *Inference) RecordUsage(ctx context.Context, input, output int64) {
 		attribute.Int64(AttrGenAIUsageInput, input),
 		attribute.Int64(AttrGenAIUsageOutput, output),
 	)
+	addTokens(ctx, input, output)
 	if tokenUsageHist == nil {
 		return
 	}

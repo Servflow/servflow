@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 
 	"github.com/Servflow/servflow/pkg/agent"
 	"github.com/Servflow/servflow/pkg/engine/integration"
@@ -57,6 +58,7 @@ func (c *Client) ProvideResponse(ctx context.Context, agentReq agent.LLMRequest)
 
 	ctx, inf := tracing.StartInference(ctx, "openai", c.model)
 	defer func() { inf.End(ctx, err) }()
+	inf.SetInput(buildSystemInstructions(agentReq.SystemMessage, agentReq.Instruction), agent.TraceMessages(agentReq.Messages))
 
 	response, err := c.client.Responses.New(ctx, params)
 	if err != nil {
@@ -68,7 +70,20 @@ func (c *Client) ProvideResponse(ctx context.Context, agentReq agent.LLMRequest)
 	inf.RecordUsage(ctx, response.Usage.InputTokens, response.Usage.OutputTokens)
 
 	resp = convertSDKResponseToAgentResponse(response, logger)
+	inf.SetCompletion(resp.Text())
 	return resp, nil
+}
+
+// buildSystemInstructions joins the system message and instruction for tracing.
+func buildSystemInstructions(systemMessage, instruction string) string {
+	parts := make([]string, 0, 2)
+	if s := strings.TrimSpace(systemMessage); s != "" {
+		parts = append(parts, s)
+	}
+	if s := strings.TrimSpace(instruction); s != "" {
+		parts = append(parts, s)
+	}
+	return strings.Join(parts, "\n\n")
 }
 
 func init() {

@@ -82,6 +82,12 @@
           "items": {
             "type": "string"
           }
+        },
+        "handler": {
+          "type": "string"
+        },
+        "handlerConfig": {
+          "type": ["object", "null"]
         }
       },
       "additionalProperties": false

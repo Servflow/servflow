@@ -14,6 +14,7 @@ import (
 
 	sfhttp "github.com/Servflow/servflow/internal/http"
 	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
+	"github.com/Servflow/servflow/pkg/engine/entryhandlers"
 	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
@@ -54,10 +55,12 @@ func (e *Engine) createBasicHandler(config *apiconfig.APIConfig) (http.Handler, 
 	logger.Debug("Starting plan generation from", zap.String("start", config.HttpConfig.Next))
 
 	a := &APIHandler{
-		apiPath:   config.HttpConfig.ListenPath,
-		apiName:   config.ID,
-		planStart: config.HttpConfig.Next,
-		p:         p,
+		apiPath:       config.HttpConfig.ListenPath,
+		apiName:       config.ID,
+		planStart:     config.HttpConfig.Next,
+		p:             p,
+		handlerType:   config.HttpConfig.Handler,
+		handlerConfig: config.HttpConfig.HandlerConfig,
 	}
 
 	return a.CreateChain(config, e.getCorsConfig()), nil
@@ -68,6 +71,12 @@ type APIHandler struct {
 	apiName   string
 	p         *plan.Plan
 	planStart string
+	// handlerType names a registered entry handler (entryhandlers) whose
+	// middleware wraps the request before the plan runs. Empty means none.
+	handlerType string
+	// handlerConfig is the raw config for the entry handler, made available to
+	// the middleware via entryhandlers.WithConfig.
+	handlerConfig map[string]interface{}
 }
 
 const mcpServerVersion = "0.1.0"
@@ -184,33 +193,85 @@ func (h *APIHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	}
 
 	ctx = plan.WithRequest(ctx, req)
+	req = req.WithContext(ctx)
 
-	result, err := h.p.Execute(ctx, h.planStart)
-	resp, ok := result.(*sfhttp.SfResponse)
-	if err != nil || !ok || resp == nil {
-		tracing.SetHTTPStatus(span, http.StatusInternalServerError, err)
-		switch {
-		case err != nil:
-			h.logAndWriteInternalServerError(wr, err, logger)
-		case result != nil && !ok:
-			// A non-nil result that isn't an HTTP response means a non-http
-			// response kind was mounted on an HTTP endpoint. Surface the type
-			// rather than the misleading "response missing".
-			h.logAndWriteInternalServerError(wr, fmt.Errorf("unexpected result type %T for HTTP endpoint", result), logger)
-		default:
-			h.logAndWriteInternalServerError(wr, errors.New("error executing api, response missing"), logger)
+	// planRunner executes the workflow plan and writes the HTTP response. It is
+	// the terminal handler that any entry-handler middleware wraps.
+	planRunner := http.HandlerFunc(func(wr http.ResponseWriter, req *http.Request) {
+		ctx := req.Context()
+		result, err := h.p.Execute(ctx, h.planStart)
+		resp, ok := result.(*sfhttp.SfResponse)
+		if err != nil || !ok || resp == nil {
+			tracing.SetHTTPStatus(span, http.StatusInternalServerError, err)
+			switch {
+			case err != nil:
+				h.logAndWriteInternalServerError(wr, err, logger)
+			case result != nil && !ok:
+				// A non-nil result that isn't an HTTP response means a non-http
+				// response kind was mounted on an HTTP endpoint. Surface the type
+				// rather than the misleading "response missing".
+				h.logAndWriteInternalServerError(wr, fmt.Errorf("unexpected result type %T for HTTP endpoint", result), logger)
+			default:
+				h.logAndWriteInternalServerError(wr, errors.New("error executing api, response missing"), logger)
+			}
+			return
 		}
-		return
-	}
 
-	tracing.SetHTTPStatus(span, resp.Code, nil)
-	for key := range resp.Headers {
-		wr.Header().Set(key, resp.Headers.Get(key))
+		tracing.SetHTTPStatus(span, resp.Code, nil)
+		for key := range resp.Headers {
+			wr.Header().Set(key, resp.Headers.Get(key))
+		}
+		wr.WriteHeader(resp.Code)
+		wr.Write(resp.Body)
+		timeTaken := time.Since(start)
+		logger.Debug("Finished handling request", zap.String("timeTaken", timeTaken.String()))
+	})
+
+	// When an entry handler is configured, its middleware runs here — after the
+	// request prerequisites above and before the plan. It may reject or
+	// short-circuit the request (returning without calling planRunner) or inject
+	// values into the request context.
+	var entry http.Handler = planRunner
+	if h.handlerType != "" {
+		mw, ok := entryhandlers.Get(h.handlerType)
+		if !ok {
+			h.logAndWriteInternalServerError(wr, fmt.Errorf("unknown entry handler %q", h.handlerType), logger)
+			return
+		}
+		// Resolve config templates (e.g. {{ secret "..." }}, {{ file "..." }})
+		// once here so handlers receive plain values and never touch templating.
+		resolvedConfig, rerr := resolveHandlerConfig(ctx, h.handlerConfig)
+		if rerr != nil {
+			h.logAndWriteInternalServerError(wr, fmt.Errorf("resolving entry handler %q config: %w", h.handlerType, rerr), logger)
+			return
+		}
+		entry = mw(resolvedConfig, planRunner)
 	}
-	wr.WriteHeader(resp.Code)
-	wr.Write(resp.Body)
-	timeTaken := time.Since(start)
-	logger.Debug("Finished handling request", zap.String("timeTaken", timeTaken.String()))
+	entry.ServeHTTP(wr, req)
+}
+
+// resolveHandlerConfig renders each string value of an entry handler's config as
+// a template against the request context, so references like {{ secret "..." }}
+// and {{ file "..." }} are resolved before the handler runs. Non-string values
+// are passed through unchanged.
+func resolveHandlerConfig(ctx context.Context, raw map[string]interface{}) (map[string]interface{}, error) {
+	if len(raw) == 0 {
+		return raw, nil
+	}
+	resolved := make(map[string]interface{}, len(raw))
+	for k, v := range raw {
+		s, ok := v.(string)
+		if !ok {
+			resolved[k] = v
+			continue
+		}
+		out, err := requestctx.ExecuteTemplateString(ctx, s)
+		if err != nil {
+			return nil, fmt.Errorf("field %q: %w", k, err)
+		}
+		resolved[k] = out
+	}
+	return resolved, nil
 }
 
 func (h *APIHandler) logAndWriteInternalServerError(w http.ResponseWriter, err error, logger *zap.Logger) {

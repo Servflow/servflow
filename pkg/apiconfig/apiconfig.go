@@ -42,6 +42,14 @@ type HttpConfig struct {
 	Method             string   `json:"method" yaml:"method"`
 	Next               string   `json:"next" yaml:"next"`
 	CORSAllowedOrigins []string `json:"corsAllowedOrigins,omitempty" yaml:"corsAllowedOrigins,omitempty"`
+	// Handler names a registered HTTP entry handler (see pkg/engine/entryhandlers).
+	// When set, its middleware wraps the request after the standard request
+	// prerequisites and before the workflow plan runs. Empty means no handler.
+	Handler string `json:"handler,omitempty" yaml:"handler,omitempty"`
+	// HandlerConfig carries the entry handler's configuration. Values may contain
+	// templates (e.g. {"secret": "{{ secret \"github\" }}"}) which the handler
+	// resolves at request time.
+	HandlerConfig map[string]interface{} `json:"handlerConfig,omitempty" yaml:"handlerConfig,omitempty"`
 }
 
 type McpConfig struct {

@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.24 AS builder
+FROM golang:1.26 AS builder
 
 ARG TARGETOS
 ARG TARGETARCH

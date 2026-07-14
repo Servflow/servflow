@@ -119,16 +119,19 @@ type TracingConfig struct {
 	ServiceName       string
 	OrgID             string
 	CollectorEndpoint string
+	Headers           map[string]string
+	SpanAttributes    func() map[string]string
 }
 
 func WithOTELTracing(cfg TracingConfig) Option {
 	return func(e *Engine) {
-		shutdown, err := tracing.InitTracer(
-			e.ctx,
-			cfg.ServiceName,
-			cfg.OrgID,
-			cfg.CollectorEndpoint,
-		)
+		shutdown, err := tracing.InitTracer(e.ctx, tracing.Config{
+			ServiceName:       cfg.ServiceName,
+			OrgID:             cfg.OrgID,
+			CollectorEndpoint: cfg.CollectorEndpoint,
+			Headers:           cfg.Headers,
+			SpanAttributes:    cfg.SpanAttributes,
+		})
 		if err != nil {
 			logging.ErrorContext(e.ctx, "failed to initialize tracer", err)
 		} else {

@@ -6,9 +6,7 @@ import (
 	"fmt"
 
 	"cloud.google.com/go/firestore"
-	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	"github.com/Servflow/servflow/pkg/engine/actions"
-	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
 )
 
@@ -40,12 +38,7 @@ func NewFirestoreExecutable(cfg Config) (*Firestore, error) {
 		return nil, fmt.Errorf("please make sure service account, projectID and collection id are valid")
 	}
 
-	credentialsFromJSON, err := google.CredentialsFromJSON(context.Background(), []byte(cfg.ServiceAccount), secretmanager.DefaultAuthScopes()...)
-	if err != nil {
-		return nil, fmt.Errorf("error creating credentials from JSON from service account key: %w", err)
-	}
-
-	fsClient, err := firestore.NewClient(context.Background(), cfg.ProjectID, option.WithCredentials(credentialsFromJSON))
+	fsClient, err := firestore.NewClient(context.Background(), cfg.ProjectID, option.WithCredentialsJSON([]byte(cfg.ServiceAccount)))
 	if err != nil {
 		return nil, fmt.Errorf("error creating secret client: %w", err)
 	}

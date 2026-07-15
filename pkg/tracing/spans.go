@@ -2,18 +2,63 @@ package tracing
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
+
+// scrubber is the subset of *requestctx.RequestContext spans need to mask
+// secret values resolved during the owning request.
+type scrubber interface {
+	HasSecrets() bool
+	Scrub(string) string
+}
+
+// scrubSpan wraps a span so every string that lands on it — attributes,
+// recorded errors, status descriptions — is scrubbed of the request's tracked
+// secret values. All spans created through this package's constructors are
+// wrapped when a RequestContext is present, which is why span creation must go
+// through these constructors and never through a raw tracer.
+type scrubSpan struct {
+	trace.Span
+	s scrubber
+}
+
+func (sp scrubSpan) SetAttributes(kv ...attribute.KeyValue) {
+	if sp.s.HasSecrets() {
+		for i, a := range kv {
+			if a.Value.Type() == attribute.STRING {
+				kv[i] = attribute.String(string(a.Key), sp.s.Scrub(a.Value.AsString()))
+			}
+		}
+	}
+	sp.Span.SetAttributes(kv...)
+}
+
+func (sp scrubSpan) RecordError(err error, opts ...trace.EventOption) {
+	if err != nil && sp.s.HasSecrets() {
+		err = errors.New(sp.s.Scrub(err.Error()))
+	}
+	sp.Span.RecordError(err, opts...)
+}
+
+func (sp scrubSpan) SetStatus(code codes.Code, description string) {
+	if sp.s.HasSecrets() {
+		description = sp.s.Scrub(description)
+	}
+	sp.Span.SetStatus(code, description)
+}
 
 // Standard servflow span attribute keys. Everything is namespaced under "sf."
 // to stay clear of OpenTelemetry semantic conventions. Span names are kept
 // low-cardinality (the step class); the per-instance label lives in AttrName.
 const (
 	AttrName         = "sf.name"        // friendly per-instance label rendered by dashboards
+	AttrWorkflow     = "sf.workflow"    // stable workflow config id, carried on root entry spans for grouping/search
 	AttrStepType     = "sf.step.type"   // request | action | condition | response | trigger | scheduled
 	AttrActionType   = "sf.action_type" // concrete action type (http, callworkflow, parallel, ...)
 	AttrActionConfig = "sf.config"      // resolved action config (V1 wrapper sets it; V2 actions self-report via fields)
@@ -25,17 +70,36 @@ const (
 
 // start creates a span with a low-cardinality name and always attaches the
 // friendly display label as the AttrName attribute. All typed constructors
-// below funnel through here so no span can be created without a label.
+// below funnel through here so no span can be created without a label — and,
+// when the context carries a RequestContext, without secret scrubbing.
 func start(ctx context.Context, spanName, display string, attrs ...attribute.KeyValue) (context.Context, trace.Span) {
 	ctx, span := tracer.Start(ctx, spanName)
+	if rc, ok := requestctx.FromContext(ctx); ok {
+		span = scrubSpan{Span: span, s: rc}
+		// Re-store the wrapped span so trace.SpanFromContext(ctx) callers also
+		// get the scrubbing wrapper, not the raw span.
+		ctx = trace.ContextWithSpan(ctx, span)
+	}
 	span.SetAttributes(append(attrs, attribute.String(AttrName, display))...)
 	return ctx, span
 }
 
-// StartHTTPEntry spans the HTTP request entry point.
-func StartHTTPEntry(ctx context.Context) (context.Context, trace.Span) {
-	return start(ctx, "HTTP Entry", "HTTP Entry",
-		attribute.String(AttrStepType, "request"))
+// rootDisplay picks the friendly label for a workflow root span: the
+// human-readable name when set, otherwise the stable config id.
+func rootDisplay(name, id string) string {
+	if name != "" {
+		return name
+	}
+	return id
+}
+
+// StartHTTPEntry spans the HTTP request entry point. name is the workflow's
+// friendly display name and id its stable config id; both identify which
+// workflow the trace belongs to.
+func StartHTTPEntry(ctx context.Context, name, id string) (context.Context, trace.Span) {
+	return start(ctx, "HTTP Entry", rootDisplay(name, id),
+		attribute.String(AttrStepType, "request"),
+		attribute.String(AttrWorkflow, id))
 }
 
 // SetHTTPStatus records the final HTTP status code on the entry span and, per
@@ -82,21 +146,27 @@ func StartResponse(ctx context.Context, id, name string) (context.Context, trace
 }
 
 // StartWorkflowExecute spans a workflow invoked through a trigger (e.g. callworkflow).
-func StartWorkflowExecute(ctx context.Context, name string) (context.Context, trace.Span) {
-	return start(ctx, "Workflow Execute", name,
-		attribute.String(AttrStepType, "trigger"))
+// name is the workflow's friendly display name and id its stable config id.
+func StartWorkflowExecute(ctx context.Context, name, id string) (context.Context, trace.Span) {
+	return start(ctx, "Workflow Execute", rootDisplay(name, id),
+		attribute.String(AttrStepType, "trigger"),
+		attribute.String(AttrWorkflow, id))
 }
 
 // StartScheduledExecution spans a scheduled (cron) workflow run.
-func StartScheduledExecution(ctx context.Context, name string) (context.Context, trace.Span) {
-	return start(ctx, "Scheduled Execution", name,
-		attribute.String(AttrStepType, "scheduled"))
+// name is the workflow's friendly display name and id its stable config id.
+func StartScheduledExecution(ctx context.Context, name, id string) (context.Context, trace.Span) {
+	return start(ctx, "Scheduled Execution", rootDisplay(name, id),
+		attribute.String(AttrStepType, "scheduled"),
+		attribute.String(AttrWorkflow, id))
 }
 
 // StartDashboardRun spans a manual workflow run triggered from the builder dashboard.
-func StartDashboardRun(ctx context.Context, name string) (context.Context, trace.Span) {
-	return start(ctx, "Dashboard Run", name,
-		attribute.String(AttrStepType, "request"))
+// name is the workflow's friendly display name and id its stable config id.
+func StartDashboardRun(ctx context.Context, name, id string) (context.Context, trace.Span) {
+	return start(ctx, "Dashboard Run", rootDisplay(name, id),
+		attribute.String(AttrStepType, "request"),
+		attribute.String(AttrWorkflow, id))
 }
 
 // StartAgentInvoke spans a whole agent-action run (the GenAI invoke_agent

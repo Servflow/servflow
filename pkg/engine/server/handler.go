@@ -56,7 +56,8 @@ func (e *Engine) createBasicHandler(config *apiconfig.APIConfig) (http.Handler, 
 
 	a := &APIHandler{
 		apiPath:       config.HttpConfig.ListenPath,
-		apiName:       config.ID,
+		apiName:       config.Name,
+		apiID:         config.ID,
 		planStart:     config.HttpConfig.Next,
 		p:             p,
 		handlerType:   config.HttpConfig.Handler,
@@ -69,6 +70,7 @@ func (e *Engine) createBasicHandler(config *apiconfig.APIConfig) (http.Handler, 
 type APIHandler struct {
 	apiPath   string
 	apiName   string
+	apiID     string
 	p         *plan.Plan
 	planStart string
 	// handlerType names a registered entry handler (entryhandlers) whose
@@ -125,7 +127,7 @@ func (h *APIHandler) initTracing(req *http.Request) (context.Context, trace.Span
 		return req.Context(), nil
 	}
 
-	ctx, span := tracing.StartHTTPEntry(req.Context())
+	ctx, span := tracing.StartHTTPEntry(req.Context(), h.apiName, h.apiID)
 
 	span.SetAttributes(
 		attribute.String("sf.http.method", req.Method),

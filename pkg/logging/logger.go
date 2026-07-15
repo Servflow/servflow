@@ -35,11 +35,16 @@ func WithLogger(ctx context.Context, logger *zap.Logger) context.Context {
 }
 
 // FromContext retrieves a logger from the context.
-// If no logger is found, it falls back to the singleton logger
+// If no logger is found, it falls back to a fresh logger — but never an
+// unscrubbed one when the context carries a RequestContext: a request that
+// resolved secrets must not be able to log them through the fallback path.
 func FromContext(ctx context.Context) *zap.Logger {
 	if ctx != nil {
 		if logger, ok := ctx.Value(loggerKey{}).(*zap.Logger); ok {
 			return logger
+		}
+		if rc, ok := requestctx.FromContext(ctx); ok {
+			return WrapWithScrubber(GetNewLogger(), rc)
 		}
 	}
 	// Fallback to singleton during migration

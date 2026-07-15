@@ -29,6 +29,11 @@ type RequestContext struct {
 	// Atomic so parallel model calls can add without the RequestContext mutex.
 	tokenInput  atomic.Int64
 	tokenOutput atomic.Int64
+
+	// secrets is the placeholder→value table for this request's call tree.
+	// Shared by pointer with child workflow contexts via ShareSecretsWith.
+	// Own mutex; never nil (see NewRequestContext).
+	secrets *secretTable
 }
 
 // AddTokenUsage adds LLM token usage to this request's running total. Safe for
@@ -105,6 +110,7 @@ func NewRequestContext(id string) *RequestContext {
 		requestFuncs:     make(template.FuncMap),
 		validationErrors: make([]error, 0),
 		availableFiles:   make(map[string]*FileValue),
+		secrets:          newSecretTable(),
 	}
 }
 

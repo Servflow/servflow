@@ -88,7 +88,10 @@ func (a *Action) execute(ctx context.Context) (*stepWrapper, error) {
 		logger.Debug("template evaluated successfully")
 	}
 
-	span.SetAttributes(attribute.String("sf.config", cfg))
+	// The resolved config may contain real secret values — scrub before it
+	// touches the span. (Context-derived loggers scrub on write themselves.)
+	reqCtx, _ := requestctx.FromContext(ctx)
+	span.SetAttributes(attribute.String("sf.config", reqCtx.Scrub(cfg)))
 
 	var (
 		resp   interface{}
@@ -107,16 +110,19 @@ func (a *Action) execute(ctx context.Context) (*stepWrapper, error) {
 	}
 
 	for k, v := range fields {
-		span.SetAttributes(attribute.String(k, v))
+		span.SetAttributes(attribute.String(k, reqCtx.Scrub(v)))
 	}
 
 	if err != nil {
-		span.RecordError(err)
+		// Executable errors may embed resolved config (URLs, connection
+		// strings with secrets) — scrub before anything records or stores them.
+		errMsg := reqCtx.Scrub(err.Error())
+		span.RecordError(errors.New(errMsg))
 		if errors.Is(err, ErrFailure) {
-			if err := requestctx.AddRequestVariables(ctx, map[string]interface{}{requestctx.ErrorTagStripped: err.Error()}, ""); err != nil {
+			if err := requestctx.AddRequestVariables(ctx, map[string]interface{}{requestctx.ErrorTagStripped: errMsg}, ""); err != nil {
 				return nil, err
 			}
-			if err := requestctx.AddRequestVariables(ctx, map[string]interface{}{a.out: fmt.Sprintf("error: %v", err)}, ""); err != nil {
+			if err := requestctx.AddRequestVariables(ctx, map[string]interface{}{a.out: fmt.Sprintf("error: %v", errMsg)}, ""); err != nil {
 				return nil, err
 			}
 			return a.fail, nil
@@ -125,19 +131,22 @@ func (a *Action) execute(ctx context.Context) (*stepWrapper, error) {
 		return nil, fmt.Errorf("error executing action: %w", err)
 	}
 
+	// Scrub tracked secret values out of the output before it reaches the
+	// span, logs or the variable store (e.g. an API echoing a token back).
+	resp = reqCtx.ScrubValue(resp)
+
 	b, err := json.MarshalIndent(resp, "", "  ")
 	if err != nil {
 		logger.Error("error marshalling action response", zap.Error(err))
 	}
-	span.SetAttributes(attribute.String("sf.result", string(b)))
+	span.SetAttributes(attribute.String("sf.result", reqCtx.Scrub(string(b))))
 	logger.Debug("action executed successfully. Response: " + string(b))
 
 	// Check if response is an io.Reader and store as action file
 	if f, ok := resp.(io.ReadCloser); ok {
 		fileValue := requestctx.NewFileValue(f, a.out)
-		reqCtx, err := requestctx.FromContextOrError(ctx)
-		if err != nil {
-			return nil, err
+		if reqCtx == nil {
+			return nil, requestctx.ErrNoContext
 		}
 		reqCtx.AddActionFile(a.out, fileValue)
 		logger.Debug("stored action output as file", zap.String("action_output", a.out))

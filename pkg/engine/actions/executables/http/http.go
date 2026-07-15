@@ -143,7 +143,9 @@ func (h *Http) Execute(ctx context.Context) (interface{}, map[string]string, err
 	fields["status_code"] = strconv.Itoa(resp.StatusCode)
 	fields["response_body"] = string(bodyBytes)
 
-	logger.Debug("finished request", zap.String("url", req.URL.String()), zap.Int("status", resp.StatusCode), zap.ByteString("body", bodyBytes))
+	// Scrub the URL explicitly (a secret can ride in a query param); the
+	// context logger's scrub core also covers the body if it echoes a secret.
+	logger.Debug("finished request", zap.String("url", rc.Scrub(cfg.URL)), zap.Int("status", resp.StatusCode), zap.ByteString("body", bodyBytes))
 
 	if cfg.ExpectedResponseCode != "" && cfg.ExpectedResponseCode != "0" {
 		expectedCode := cfg.ExpectedResponseCode

@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
+	"github.com/Servflow/servflow/pkg/engine/secrets"
 	// register the built-in "http" response kind for plan-execute tests below
 	_ "github.com/Servflow/servflow/pkg/engine/responses/http"
 	"github.com/Servflow/servflow/pkg/logging"
@@ -507,4 +509,53 @@ func TestHeaderPairing(t *testing.T) {
 	for k, v := range want {
 		assert.Equal(t, v, got.Get(k), "header %s mispaired", k)
 	}
+}
+
+// TestHTTPActionSecretsOnWireTrackedForScrubbing is the end-to-end check for
+// the scrub-gateway secret model: the outbound request (URL query, header,
+// body) carries the REAL secret value, and from the moment of resolution the
+// request context tracks it so every context-derived logger/span scrubs it.
+func TestHTTPActionSecretsOnWireTrackedForScrubbing(t *testing.T) {
+	secrets.Reset()
+	t.Cleanup(secrets.Reset)
+	t.Setenv("HTTP_TEST_TOKEN", "realsecrettoken")
+
+	var gotAuth, gotBody, gotQuery string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		gotQuery = r.URL.Query().Get("token")
+		bod, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		gotBody = string(bod)
+		w.Write([]byte(`{"echo": "realsecrettoken"}`))
+	}))
+	defer srv.Close()
+
+	cfg := Config{
+		Method:  http.MethodPost,
+		URL:     srv.URL + `?token={{ secret "HTTP_TEST_TOKEN" }}`,
+		Headers: map[string]string{"Authorization": `Bearer {{ secret "HTTP_TEST_TOKEN" }}`},
+		Body:    json.RawMessage(`"body:{{ secret \"HTTP_TEST_TOKEN\" }}"`),
+	}
+
+	rc := requestctx.NewRequestContext("secret-egress-test")
+	ctx := requestctx.WithAggregationContext(context.Background(), rc)
+
+	resp, _, err := New(cfg).Execute(ctx)
+	require.NoError(t, err)
+
+	// The wire got the real value everywhere.
+	assert.Equal(t, "Bearer realsecrettoken", gotAuth)
+	assert.Equal(t, "realsecrettoken", gotQuery)
+	assert.Equal(t, "body:realsecrettoken", gotBody)
+
+	// The value was tracked at resolution time: scrubbers mask it wherever it
+	// surfaces (logs, spans, stored outputs — the plan runner scrubs resp).
+	assert.True(t, rc.HasSecrets())
+	scrubbed := rc.Scrub("log line with realsecrettoken inside")
+	assert.NotContains(t, scrubbed, "realsecrettoken")
+
+	// The response echoing the token comes back to the caller un-scrubbed here
+	// (the PLAN runner scrubs before storing); sanity-check shape only.
+	require.IsType(t, map[string]interface{}{}, resp)
 }

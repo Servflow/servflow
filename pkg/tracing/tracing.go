@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
@@ -45,7 +46,12 @@ func GetTracer() trace.Tracer {
 }
 
 func SpanCtxFromContext(ctx context.Context, name string) (context.Context, trace.Span) {
-	return tracer.Start(ctx, name)
+	ctx, span := tracer.Start(ctx, name)
+	if rc, ok := requestctx.FromContext(ctx); ok {
+		span = scrubSpan{Span: span, s: rc}
+		ctx = trace.ContextWithSpan(ctx, span)
+	}
+	return ctx, span
 }
 
 func OTELEnabled() bool {

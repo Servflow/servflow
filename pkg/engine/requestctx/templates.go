@@ -99,7 +99,7 @@ func (rc *RequestContext) getFuncMap(funcMap template.FuncMap) template.FuncMap 
 		"join":         tmplJoin,
 		"hash":         tmplHash,
 		"now":          now,
-		"secret":       secret,
+		"secret":       rc.tmplFuncSecret,
 		"tostring":     tostring,
 		"email":        rc.tmplFuncEmail,
 		"empty":        rc.tmplFuncEmpty,
@@ -134,8 +134,24 @@ func now() string {
 	return time.Now().Format("2006-01-02 15:04:05")
 }
 
+// secret is the base (host-side, no RequestContext) template func used by
+// paths with no request in flight (config load, CLI). Request-scoped templates
+// use tmplFuncSecret, which additionally tracks the value for scrubbing.
 func secret(key string) string {
 	return secrets.FetchSecret(key)
+}
+
+// tmplFuncSecret is the request-scoped `secret` template function. It returns
+// the secret's real value — transforms like escape/eq/hash work normally — and
+// records the value in the request's secret table so every context-derived
+// logger, span and stored output scrubs it. A missing secret resolves to "".
+func (rc *RequestContext) tmplFuncSecret(key string) string {
+	v := secrets.FetchSecret(key)
+	if v == "" {
+		return ""
+	}
+	rc.secrets.track(key, v)
+	return v
 }
 
 func jsonRaw(val interface{}) string {

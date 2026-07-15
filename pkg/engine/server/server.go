@@ -97,6 +97,9 @@ func (e *Engine) wrapMiddlewareWithReqIDLogger(logger *zap.Logger, handler http.
 		aggCtx := requestctx.NewRequestContext(requestID)
 		ctx := requestctx.WithAggregationContext(r.Context(), aggCtx)
 		logger := logger.With(zap.String("request_id", requestID), zap.String("method", r.Method), zap.String("path", r.URL.Path))
+		// Scrub any secret values revealed during this request from every log
+		// line derived from this logger (no-op until a reveal happens).
+		logger = logging.WrapWithScrubber(logger, aggCtx)
 		ctx = logging.WithLogger(ctx, logger)
 		if e.backgroundManager != nil {
 			ctx = plan.WithBackgroundManager(ctx, e.backgroundManager)

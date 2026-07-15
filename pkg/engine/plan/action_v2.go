@@ -69,18 +69,23 @@ func (a *ActionV2) execute(ctx context.Context) (*stepWrapper, error) {
 		resp, fields, err = a.exec.Execute(ctx)
 	}
 
+	// V2 actions resolve secrets to real values internally; scrub anything
+	// they hand back before it reaches spans, logs or variables.
+	reqCtx, _ := requestctx.FromContext(ctx)
+
 	for k, v := range fields {
-		span.SetAttributes(attribute.String(k, v))
+		span.SetAttributes(attribute.String(k, reqCtx.Scrub(v)))
 	}
 
 	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, err.Error())
+		errMsg := reqCtx.Scrub(err.Error())
+		span.RecordError(errors.New(errMsg))
+		span.SetStatus(codes.Error, errMsg)
 		if errors.Is(err, ErrFailure) {
-			if err := requestctx.AddRequestVariables(ctx, map[string]interface{}{requestctx.ErrorTagStripped: err.Error()}, ""); err != nil {
+			if err := requestctx.AddRequestVariables(ctx, map[string]interface{}{requestctx.ErrorTagStripped: errMsg}, ""); err != nil {
 				return nil, err
 			}
-			if err := requestctx.AddRequestVariables(ctx, map[string]interface{}{a.id: fmt.Sprintf("error: %v", err)}, ""); err != nil {
+			if err := requestctx.AddRequestVariables(ctx, map[string]interface{}{a.id: fmt.Sprintf("error: %v", errMsg)}, ""); err != nil {
 				return nil, err
 			}
 			return a.fail, nil
@@ -89,19 +94,20 @@ func (a *ActionV2) execute(ctx context.Context) (*stepWrapper, error) {
 		return nil, fmt.Errorf("error executing action: %w", err)
 	}
 
+	resp = reqCtx.ScrubValue(resp)
+
 	b, err := json.MarshalIndent(resp, "", "  ")
 	if err != nil {
 		logger.Error("error marshalling action response", zap.Error(err))
 	}
-	span.SetAttributes(attribute.String("sf.result", string(b)))
+	span.SetAttributes(attribute.String("sf.result", reqCtx.Scrub(string(b))))
 	logger.Debug("action executed successfully. Response: " + string(b))
 
 	// Check if response is an io.Reader and store as action file
 	if f, ok := resp.(io.ReadCloser); ok {
 		fileValue := requestctx.NewFileValue(f, a.id)
-		reqCtx, err := requestctx.FromContextOrError(ctx)
-		if err != nil {
-			return nil, err
+		if reqCtx == nil {
+			return nil, requestctx.ErrNoContext
 		}
 		reqCtx.AddActionFile(a.id, fileValue)
 		logger.Debug("stored action output as file", zap.String("action_output", a.id))

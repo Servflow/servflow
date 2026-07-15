@@ -114,7 +114,7 @@ func TestRequestTokensAggregateOntoRoot(t *testing.T) {
 
 	// The request context holds the running total; two model calls beneath the
 	// root accumulate into it, and SetRequestTokens attaches it to the root span.
-	ctx, root := StartHTTPEntry(requestctx.NewTestContext())
+	ctx, root := StartHTTPEntry(requestctx.NewTestContext(), "Test Workflow", "test-workflow")
 
 	_, inf1 := StartInference(ctx, "anthropic", "m1")
 	inf1.RecordUsage(ctx, 100, 20)

@@ -13,6 +13,14 @@ lint:
 	@if [ -n "$$(gofmt -l .)" ]; then echo "Code not formatted properly"; gofmt -d .; exit 1; fi
 	@echo "==> Running staticcheck..."
 	staticcheck ./...
+	@echo "==> Checking observability exits (secret scrubbing)..."
+	@# Loggers/tracers must be derived from the request context so secret
+	@# values resolved by {{ secret }} are scrubbed on the way out. Global
+	@# loggers and raw tracers bypass the scrubbing layer.
+	@bad=$$(grep -rn 'zap\.L()\|zap\.S()' --include='*.go' pkg internal 2>/dev/null | grep -v '_test.go'); \
+	if [ -n "$$bad" ]; then echo "forbidden global logger (use logging.FromContext):"; echo "$$bad"; exit 1; fi
+	@bad=$$(grep -rn 'otel\.Tracer(\|\.Tracer(".*").Start(' --include='*.go' pkg internal 2>/dev/null | grep -v '_test.go' | grep -v 'pkg/tracing/'); \
+	if [ -n "$$bad" ]; then echo "forbidden raw tracer (use pkg/tracing constructors):"; echo "$$bad"; exit 1; fi
 
 docker-build:
 	docker buildx build --platform linux/amd64,linux/arm64 -t $(DOCKER_IMAGE) \

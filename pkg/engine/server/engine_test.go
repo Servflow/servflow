@@ -25,10 +25,9 @@ func TestNew_WithDirectConfigs(t *testing.T) {
 		EngineConfig: &EngineConfig{},
 	}
 
-	engine, err := New("8080", "test", WithDirectConfigs(directConfigs))
+	engine, err := New("test", WithDirectConfigs(directConfigs))
 	require.NoError(t, err)
 	assert.NotNil(t, engine)
-	assert.Equal(t, "8080", engine.port)
 	assert.Equal(t, "test", engine.env)
 	assert.Equal(t, directConfigs, engine.directConfigs)
 	assert.NotNil(t, engine.logger)
@@ -36,10 +35,9 @@ func TestNew_WithDirectConfigs(t *testing.T) {
 }
 
 func TestNew_WithoutDirectConfigs(t *testing.T) {
-	engine, err := New("8080", "test")
+	engine, err := New("test")
 	require.NoError(t, err)
 	assert.NotNil(t, engine)
-	assert.Equal(t, "8080", engine.port)
 	assert.Equal(t, "test", engine.env)
 	assert.NotNil(t, engine.directConfigs)
 	assert.NotNil(t, engine.directConfigs.EngineConfig)
@@ -88,7 +86,7 @@ func TestEngine_DoneChan(t *testing.T) {
 		EngineConfig: &EngineConfig{},
 	}
 
-	engine, err := New("8080", "test", WithDirectConfigs(directConfigs))
+	engine, err := New("test", WithDirectConfigs(directConfigs))
 	require.NoError(t, err)
 
 	doneChan := engine.DoneChan()
@@ -115,7 +113,7 @@ func TestNew_WithLogger(t *testing.T) {
 		EngineConfig: &EngineConfig{},
 	}
 
-	engine, err := New("8080", "test", WithDirectConfigs(directConfigs), WithLogger(nil))
+	engine, err := New("test", WithDirectConfigs(directConfigs), WithLogger(nil))
 	require.NoError(t, err)
 	assert.NotNil(t, engine.logger)
 }
@@ -126,7 +124,7 @@ func TestNew_EmptyDirectConfigs(t *testing.T) {
 		EngineConfig: &EngineConfig{},
 	}
 
-	engine, err := New("8080", "test", WithDirectConfigs(directConfigs))
+	engine, err := New("test", WithDirectConfigs(directConfigs))
 	require.NoError(t, err)
 	assert.NotNil(t, engine)
 	assert.Len(t, engine.directConfigs.APIConfigs, 0)
@@ -146,7 +144,7 @@ func TestNew_MultipleOptions(t *testing.T) {
 		EngineConfig: &EngineConfig{},
 	}
 
-	engine, err := New("8080", "test", WithDirectConfigs(directConfigs), WithLogger(nil))
+	engine, err := New("test", WithDirectConfigs(directConfigs), WithLogger(nil))
 	require.NoError(t, err)
 	assert.NotNil(t, engine)
 	assert.Equal(t, directConfigs, engine.directConfigs)
@@ -160,12 +158,12 @@ func TestNew_WithIdleTimeout(t *testing.T) {
 	}
 
 	timeout := 5 * time.Minute
-	engine, err := New("8080", "test", WithDirectConfigs(directConfigs), WithIdleTimeout(timeout))
+	engine, err := New("test", WithDirectConfigs(directConfigs), WithIdleTimeout(timeout))
 	require.NoError(t, err)
 	assert.NotNil(t, engine)
 	assert.Equal(t, timeout, engine.idleTimeout)
 
-	engine2, err := New("8080", "test", WithDirectConfigs(directConfigs), WithIdleTimeout(0))
+	engine2, err := New("test", WithDirectConfigs(directConfigs), WithIdleTimeout(0))
 	require.NoError(t, err)
 	assert.NotNil(t, engine2)
 	assert.Equal(t, time.Duration(0), engine2.idleTimeout)
@@ -185,7 +183,7 @@ func TestEngine_ReloadConfigs(t *testing.T) {
 		EngineConfig: &EngineConfig{},
 	}
 
-	engine, err := New("8080", "test", WithDirectConfigs(initialConfigs))
+	engine, err := New("test", WithDirectConfigs(initialConfigs))
 	require.NoError(t, err)
 
 	err = engine.Start()
@@ -224,7 +222,7 @@ func TestEngine_ReloadConfigs_NilConfigs(t *testing.T) {
 		EngineConfig: &EngineConfig{},
 	}
 
-	engine, err := New("8080", "test", WithDirectConfigs(initialConfigs))
+	engine, err := New("test", WithDirectConfigs(initialConfigs))
 	require.NoError(t, err)
 
 	err = engine.ReloadConfigs(nil)
@@ -246,7 +244,7 @@ func TestEngine_ReloadConfigs_EmptyAPIConfigs(t *testing.T) {
 		EngineConfig: &EngineConfig{},
 	}
 
-	engine, err := New("8080", "test", WithDirectConfigs(initialConfigs))
+	engine, err := New("test", WithDirectConfigs(initialConfigs))
 	require.NoError(t, err)
 
 	emptyConfigs := &DirectConfigs{
@@ -258,171 +256,137 @@ func TestEngine_ReloadConfigs_EmptyAPIConfigs(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestWithExternalMode(t *testing.T) {
-	tests := []struct {
-		name         string
-		externalMode bool
-		want         bool
-	}{
-		{
-			name:         "external mode set to true",
-			externalMode: true,
-			want:         true,
+// stubConfig builds a minimal runnable config: GET listenPath -> stub action ->
+// template response, so tests can exercise routes end to end.
+func stubConfig(id, listenPath string) *apiconfig.APIConfig {
+	return &apiconfig.APIConfig{
+		ID: id,
+		HttpConfig: apiconfig.HttpConfig{
+			ListenPath: listenPath,
+			Method:     "GET",
+			Next:       "action.run",
 		},
-		{
-			name:         "external mode set to false",
-			externalMode: false,
-			want:         false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			engine, err := New("8080", "test", WithExternalMode(tt.externalMode))
-			require.NoError(t, err)
-			assert.Equal(t, tt.want, engine.externalMode)
-		})
-	}
-}
-
-func TestWithExternalMode_DefaultIsFalse(t *testing.T) {
-	engine, err := New("8080", "test")
-	require.NoError(t, err)
-	assert.False(t, engine.externalMode)
-}
-
-func TestEngine_Start_ExternalMode(t *testing.T) {
-	tests := []struct {
-		name          string
-		externalMode  bool
-		expectServer  bool
-		expectHandler bool
-	}{
-		{
-			name:          "external mode true - no server created",
-			externalMode:  true,
-			expectServer:  false,
-			expectHandler: true,
-		},
-		{
-			name:          "external mode false - server created",
-			externalMode:  false,
-			expectServer:  true,
-			expectHandler: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			directConfigs := &DirectConfigs{
-				APIConfigs: []*apiconfig.APIConfig{
-					{
-						ID: "test-api",
-						HttpConfig: apiconfig.HttpConfig{
-							ListenPath: "/test",
-							Method:     "GET",
-						},
-					},
-				},
-				EngineConfig: &EngineConfig{},
-			}
-
-			engine, err := New("0", "test", WithDirectConfigs(directConfigs), WithExternalMode(tt.externalMode))
-			require.NoError(t, err)
-
-			err = engine.Start()
-			require.NoError(t, err)
-			defer engine.Stop()
-
-			if tt.expectServer {
-				assert.NotNil(t, engine.server)
-			} else {
-				assert.Nil(t, engine.server)
-			}
-
-			if tt.expectHandler {
-				assert.NotNil(t, engine.handler)
-				assert.NotNil(t, engine.Handler())
-			}
-		})
-	}
-}
-
-func TestEngine_Handler_AccessibleInExternalMode(t *testing.T) {
-	directConfigs := &DirectConfigs{
-		APIConfigs: []*apiconfig.APIConfig{
-			{
-				ID: "health-api",
-				HttpConfig: apiconfig.HttpConfig{
-					ListenPath: "/health",
-					Method:     "GET",
-				},
+		Actions: map[string]apiconfig.Action{
+			"run": {
+				Name:   "run",
+				Type:   "stub",
+				Next:   "response.ok",
+				Config: map[string]interface{}{"result": "ok"},
 			},
 		},
-		EngineConfig: &EngineConfig{},
+		Responses: map[string]apiconfig.ResponseConfig{
+			"ok": {
+				Name:     "ok",
+				Code:     200,
+				Type:     "template",
+				Template: id,
+			},
+		},
 	}
+}
 
-	engine, err := New("8080", "test", WithDirectConfigs(directConfigs), WithExternalMode(true))
+func TestEngine_ServeHTTP_BeforeStart(t *testing.T) {
+	engine, err := New("test")
 	require.NoError(t, err)
-
-	err = engine.Start()
-	require.NoError(t, err)
-	defer engine.Stop()
-
-	handler := engine.Handler()
-	require.NotNil(t, handler)
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	w := httptest.NewRecorder()
+	engine.ServeHTTP(w, req)
 
-	handler.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Equal(t, "ok", w.Body.String())
+	assert.Equal(t, http.StatusServiceUnavailable, w.Code)
 }
 
-func TestEngine_ReloadConfigs_ExternalMode(t *testing.T) {
-	initialConfigs := &DirectConfigs{
-		APIConfigs: []*apiconfig.APIConfig{
-			{
-				ID: "initial-api",
-				HttpConfig: apiconfig.HttpConfig{
-					ListenPath: "/initial",
-					Method:     "GET",
-				},
-			},
-		},
+func TestEngine_ServeHTTP(t *testing.T) {
+	directConfigs := &DirectConfigs{
+		APIConfigs:   []*apiconfig.APIConfig{stubConfig("hello", "/hello")},
 		EngineConfig: &EngineConfig{},
 	}
 
-	engine, err := New("8080", "test", WithDirectConfigs(initialConfigs), WithExternalMode(true))
+	engine, err := New("test", WithDirectConfigs(directConfigs))
 	require.NoError(t, err)
 
-	err = engine.Start()
-	require.NoError(t, err)
+	require.NoError(t, engine.Start())
 	defer engine.Stop()
 
-	assert.Nil(t, engine.server)
+	get := func(path string) *httptest.ResponseRecorder {
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
+		return w
+	}
 
-	newConfigs := &DirectConfigs{
-		APIConfigs: []*apiconfig.APIConfig{
-			{
-				ID: "reloaded-api",
-				HttpConfig: apiconfig.HttpConfig{
-					ListenPath: "/reloaded",
-					Method:     "POST",
-				},
-			},
-		},
+	health := get("/health")
+	assert.Equal(t, http.StatusOK, health.Code)
+	assert.Equal(t, "ok", health.Body.String())
+
+	hello := get("/hello")
+	assert.Equal(t, http.StatusOK, hello.Code)
+	assert.Equal(t, "hello", hello.Body.String())
+}
+
+// ReloadConfigs must take effect for anyone serving the engine, with no
+// re-wiring: the engine's identity is the stable handler and reload swaps the
+// routing table inside it.
+func TestEngine_ReloadConfigs_SwapsRoutes(t *testing.T) {
+	initialConfigs := &DirectConfigs{
+		APIConfigs:   []*apiconfig.APIConfig{stubConfig("initial", "/initial")},
 		EngineConfig: &EngineConfig{},
 	}
 
-	err = engine.ReloadConfigs(newConfigs)
+	engine, err := New("test", WithDirectConfigs(initialConfigs))
 	require.NoError(t, err)
 
+	require.NoError(t, engine.Start())
+	defer engine.Stop()
+
+	get := func(path string) *httptest.ResponseRecorder {
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
+		return w
+	}
+
+	require.Equal(t, http.StatusOK, get("/initial").Code)
+	require.Equal(t, http.StatusNotFound, get("/reloaded").Code)
+
+	newConfigs := &DirectConfigs{
+		APIConfigs:   []*apiconfig.APIConfig{stubConfig("reloaded", "/reloaded")},
+		EngineConfig: &EngineConfig{},
+	}
+	require.NoError(t, engine.ReloadConfigs(newConfigs))
+
 	assert.Equal(t, newConfigs, engine.directConfigs)
-	assert.Nil(t, engine.server)
-	assert.NotNil(t, engine.Handler())
+	reloaded := get("/reloaded")
+	assert.Equal(t, http.StatusOK, reloaded.Code)
+	assert.Equal(t, "reloaded", reloaded.Body.String())
+	assert.Equal(t, http.StatusNotFound, get("/initial").Code)
+}
+
+// Requests and reloads run concurrently in production (a request can arrive
+// mid-reload); the routes swap must be safe under the race detector.
+func TestEngine_ReloadConfigs_ConcurrentWithRequests(t *testing.T) {
+	engine, err := New("test", WithDirectConfigs(&DirectConfigs{
+		APIConfigs:   []*apiconfig.APIConfig{stubConfig("initial", "/initial")},
+		EngineConfig: &EngineConfig{},
+	}))
+	require.NoError(t, err)
+	require.NoError(t, engine.Start())
+	defer engine.Stop()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < 50; i++ {
+			w := httptest.NewRecorder()
+			engine.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/health", nil))
+		}
+	}()
+
+	for i := 0; i < 20; i++ {
+		require.NoError(t, engine.ReloadConfigs(&DirectConfigs{
+			APIConfigs:   []*apiconfig.APIConfig{stubConfig("swap", "/swap")},
+			EngineConfig: &EngineConfig{},
+		}))
+	}
+	<-done
 }
 
 func TestEngine_GetCorsConfig(t *testing.T) {
@@ -436,7 +400,7 @@ func TestEngine_GetCorsConfig(t *testing.T) {
 			},
 		}
 
-		engine, err := New("8080", "test", WithDirectConfigs(directConfigs))
+		engine, err := New("test", WithDirectConfigs(directConfigs))
 		require.NoError(t, err)
 
 		corsConfig := engine.getCorsConfig()
@@ -450,7 +414,7 @@ func TestEngine_GetCorsConfig(t *testing.T) {
 			EngineConfig: &EngineConfig{},
 		}
 
-		engine, err := New("8080", "test", WithDirectConfigs(directConfigs))
+		engine, err := New("test", WithDirectConfigs(directConfigs))
 		require.NoError(t, err)
 
 		corsConfig := engine.getCorsConfig()

@@ -2,10 +2,10 @@ package server
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Servflow/servflow/pkg/apiconfig"
@@ -44,6 +44,7 @@ import (
 	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/Servflow/servflow/pkg/storage"
 	"github.com/Servflow/servflow/pkg/tracing"
+	"github.com/gorilla/mux"
 	"github.com/mark3labs/mcp-go/server"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -74,14 +75,6 @@ func WithLogger(core zapcore.Core) Option {
 func WithDirectConfigs(directConfigs *DirectConfigs) Option {
 	return func(e *Engine) {
 		e.directConfigs = directConfigs
-	}
-}
-
-// WithExternalMode prevents the engine from creating a server if set to true.
-// The engines handler can be accessed via .Handler()
-func WithExternalMode(externalMode bool) Option {
-	return func(e *Engine) {
-		e.externalMode = externalMode
 	}
 }
 
@@ -182,11 +175,17 @@ type DirectConfigs struct {
 	EngineConfig *EngineConfig
 }
 
+// Engine routes workflow requests. It is an http.Handler and never binds a
+// listener itself: callers own their http.Server (the standalone binary serves
+// the engine directly; servflow-pro composes it with the dashboard first).
 type Engine struct {
-	server            *http.Server
-	port              string
-	env               string
-	directConfigs     *DirectConfigs
+	env           string
+	directConfigs *DirectConfigs
+	// routes holds the current routing table. Reload builds a complete
+	// replacement router and swaps this pointer, so every request — no matter
+	// who serves the engine — routes through the latest table, race-free.
+	// In-flight requests finish on the router they started with.
+	routes            atomic.Pointer[mux.Router]
 	mcpServer         *server.MCPServer
 	logger            *zap.Logger
 	ctx               context.Context
@@ -196,18 +195,15 @@ type Engine struct {
 	timerMutex        sync.Mutex
 	tracerShutdown    func(context.Context) error
 	requestHook       RequestHook
-	externalMode      bool
-	handler           http.HandlerFunc
 	backgroundManager *plan.BackgroundManager
 	workspaceProvider WorkspaceProvider
 	initErr           error
 }
 
-func New(port, env string, opts ...Option) (*Engine, error) {
+func New(env string, opts ...Option) (*Engine, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	e := &Engine{
-		port:   port,
 		env:    env,
 		ctx:    ctx,
 		cancel: cancel,
@@ -235,8 +231,16 @@ func New(port, env string, opts ...Option) (*Engine, error) {
 	return e, nil
 }
 
-func (e *Engine) Handler() http.HandlerFunc {
-	return e.handler
+// ServeHTTP dispatches to the current routing table. The table is looked up
+// per request, so a ReloadConfigs takes effect on the very next request with
+// no re-wiring by the caller.
+func (e *Engine) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	routes := e.routes.Load()
+	if routes == nil {
+		http.Error(w, "engine not started", http.StatusServiceUnavailable)
+		return
+	}
+	routes.ServeHTTP(w, r)
 }
 
 func (e *Engine) DoneChan() <-chan struct{} {
@@ -253,38 +257,20 @@ func (e *Engine) RegisterIntegrations(configs []apiconfig.IntegrationConfig) err
 	return integration.RegisterIntegrationsFromConfig(configs)
 }
 
+// Start prepares the engine to serve: it compiles the initial routing table and
+// starts lifecycle helpers (background manager, idle timer). It does not bind a
+// listener — serve the engine by passing it to an http.Server as its Handler.
 func (e *Engine) Start() error {
 	e.ctx = logging.WithLogger(e.ctx, e.logger)
 
 	e.backgroundManager = plan.NewBackgroundManager(e.ctx)
 
-	e.handler = e.createHandler()
+	e.routes.Store(e.createMuxHandler(e.directConfigs.APIConfigs))
 
-	if !e.externalMode {
-		logging.DebugContext(e.ctx, "Starting HTTP server...")
-		srv, err := e.createServer(e.port)
-		if err != nil {
-			return fmt.Errorf("error creating server: %w", err)
-		}
-		e.server = srv
+	e.initIdleTimer()
 
-		e.initIdleTimer()
-
-		logging.InfoContext(e.ctx, "starting engine...")
-		e.startServer()
-		logging.InfoContext(e.ctx, "engine started")
-	}
-
+	logging.InfoContext(e.ctx, "engine started")
 	return nil
-}
-
-func (e *Engine) startServer() {
-	go func() {
-		err := e.server.ListenAndServe()
-		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logging.ErrorContext(e.ctx, "error starting server", err)
-		}
-	}()
 }
 
 func (e *Engine) createLogger(env string) *zap.Logger {
@@ -317,13 +303,8 @@ func (e *Engine) ReloadConfigs(newDirectConfigs *DirectConfigs) error {
 	// Integrations must already be registered (via RegisterIntegrations) before
 	// this call: planning resolves each action's integration eagerly, so a newly
 	// added integration must be in the manager before its config is planned.
-	newHandler := e.createMuxHandler(newDirectConfigs.APIConfigs)
-
-	e.handler = newHandler.ServeHTTP
 	e.directConfigs = newDirectConfigs
-	if !e.externalMode && e.server != nil {
-		e.server.Handler = newHandler
-	}
+	e.routes.Store(e.createMuxHandler(newDirectConfigs.APIConfigs))
 
 	logging.InfoContext(e.ctx, "API configurations reloaded successfully")
 	return nil
@@ -363,15 +344,15 @@ func (e *Engine) Stop() error {
 	if err := cl.Close(); err != nil {
 		return err
 	}
-	if e.server != nil {
-		if err := e.server.Shutdown(e.ctx); err != nil {
-			return err
-		}
-	}
 	e.cancel()
 	return nil
 }
 
+// ShutdownServer stops the engine's request-side lifecycle (idle timer,
+// background work) without the full teardown Stop performs — Stop also closes
+// shared resources like the storage client, which a caller running several
+// engines in one process must not do per engine. Shutting down the caller's
+// http.Server is the caller's job.
 func (e *Engine) ShutdownServer() error {
 	e.timerMutex.Lock()
 	if e.idleTimer != nil {
@@ -382,10 +363,6 @@ func (e *Engine) ShutdownServer() error {
 
 	if e.backgroundManager != nil {
 		e.backgroundManager.Shutdown()
-	}
-
-	if e.server != nil {
-		return e.server.Shutdown(context.Background())
 	}
 
 	return nil

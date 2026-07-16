@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 
@@ -35,7 +37,6 @@ func RunServer(cfg *config.Config) error {
 	}
 
 	eng, err := server.New(
-		cfg.Port,
 		cfg.Env,
 		server.WithFileConfig(cfg.ConfigFolder, cfg.EngineConfigFile),
 	)
@@ -47,11 +48,27 @@ func RunServer(cfg *config.Config) error {
 		return err
 	}
 
+	// The engine is an http.Handler; binding a port is this binary's job.
+	srv := &http.Server{
+		Addr:    ":" + cfg.Port,
+		Handler: eng,
+	}
+	go func() {
+		log.Printf("starting engine on %s", cfg.Port)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("server error: %v", err)
+			stop()
+		}
+	}()
+
 	select {
 	case <-eng.DoneChan():
-		return nil
+		return srv.Shutdown(context.Background())
 	case <-ctx.Done():
 		log.Println("Shutting down server...")
+		if err := srv.Shutdown(context.Background()); err != nil {
+			return err
+		}
 		if err := storageClient.Close(); err != nil {
 			return err
 		}

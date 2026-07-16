@@ -2,10 +2,9 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
-	"net"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -16,11 +15,6 @@ import (
 )
 
 func TestDirectConfigEngine_Integration(t *testing.T) {
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	port := listener.Addr().(*net.TCPAddr).Port
-	listener.Close()
-
 	apiConfigs := []*apiconfig.APIConfig{
 		{
 			ID: "test-hello",
@@ -81,19 +75,15 @@ func TestDirectConfigEngine_Integration(t *testing.T) {
 		EngineConfig: &EngineConfig{},
 	}
 
-	engine, err := New(fmt.Sprintf("%d", port), "test", WithDirectConfigs(directConfigs))
+	engine, err := New("test", WithDirectConfigs(directConfigs))
 	require.NoError(t, err)
 
-	errChan := make(chan error, 1)
-	go func() {
-		if err := engine.Start(); err != nil {
-			errChan <- err
-		}
-	}()
+	require.NoError(t, engine.Start())
 
-	time.Sleep(100 * time.Millisecond)
-
-	baseURL := fmt.Sprintf("http://127.0.0.1:%d", port)
+	// The engine no longer binds; serve it the way callers do.
+	srv := httptest.NewServer(engine)
+	defer srv.Close()
+	baseURL := srv.URL
 
 	t.Run("GET /hello endpoint", func(t *testing.T) {
 		resp, err := http.Get(baseURL + "/hello")
@@ -143,12 +133,6 @@ func TestDirectConfigEngine_Integration(t *testing.T) {
 		assert.Equal(t, "ok", string(body))
 	})
 
-	select {
-	case err := <-errChan:
-		t.Fatalf("Engine startup error: %v", err)
-	case <-time.After(10 * time.Millisecond):
-	}
-
 	err = engine.Stop()
 	require.NoError(t, err)
 }
@@ -169,7 +153,7 @@ func TestDirectConfigEngine_ValidationError(t *testing.T) {
 		EngineConfig: &EngineConfig{},
 	}
 
-	engine, err := New("8081", "test", WithDirectConfigs(directConfigs))
+	engine, err := New("test", WithDirectConfigs(directConfigs))
 	require.NoError(t, err)
 
 	assert.NotNil(t, engine)
@@ -182,7 +166,7 @@ func TestDirectConfigEngine_EmptyConfigs(t *testing.T) {
 		EngineConfig: &EngineConfig{},
 	}
 
-	engine, err := New("8082", "test", WithDirectConfigs(directConfigs))
+	engine, err := New("test", WithDirectConfigs(directConfigs))
 	require.NoError(t, err)
 
 	err = engine.Start()
@@ -227,7 +211,7 @@ func TestDirectConfigEngine_ContextCancellation(t *testing.T) {
 		EngineConfig: &EngineConfig{},
 	}
 
-	engine, err := New("8083", "test", WithDirectConfigs(directConfigs))
+	engine, err := New("test", WithDirectConfigs(directConfigs))
 	require.NoError(t, err)
 
 	doneChan := engine.DoneChan()
@@ -242,11 +226,6 @@ func TestDirectConfigEngine_ContextCancellation(t *testing.T) {
 }
 
 func TestDirectConfigEngine_IdleTimeout(t *testing.T) {
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	port := listener.Addr().(*net.TCPAddr).Port
-	listener.Close()
-
 	apiConfigs := []*apiconfig.APIConfig{
 		{
 			ID: "test-idle",
@@ -281,18 +260,15 @@ func TestDirectConfigEngine_IdleTimeout(t *testing.T) {
 		EngineConfig: &EngineConfig{},
 	}
 
-	engine, err := New(fmt.Sprintf("%d", port), "test", WithDirectConfigs(directConfigs), WithIdleTimeout(200*time.Millisecond))
+	engine, err := New("test", WithDirectConfigs(directConfigs), WithIdleTimeout(200*time.Millisecond))
 	require.NoError(t, err)
 
-	errChan := make(chan error, 1)
-	go func() {
-		if err := engine.Start(); err != nil {
-			errChan <- err
-		}
-	}()
+	require.NoError(t, engine.Start())
 
-	time.Sleep(50 * time.Millisecond)
-	baseURL := fmt.Sprintf("http://127.0.0.1:%d", port)
+	// The engine no longer binds; serve it the way callers do.
+	srv := httptest.NewServer(engine)
+	defer srv.Close()
+	baseURL := srv.URL
 
 	resp, err := http.Get(baseURL + "/test")
 	require.NoError(t, err)

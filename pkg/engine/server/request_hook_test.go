@@ -111,7 +111,7 @@ func TestRequestHookWithEngineOption(t *testing.T) {
 		return true
 	}
 
-	engine, err := New("0", "test", WithRequestHook(hook))
+	engine, err := New("test", WithRequestHook(hook))
 	assert.NoError(t, err)
 	assert.NotNil(t, engine.requestHook)
 

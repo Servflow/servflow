@@ -20,24 +20,7 @@ import (
 // TODO move stuff and test engine easily
 // TODO only expose profile if debug
 
-func (e *Engine) createServer(port string) (*http.Server, error) {
-	logger := logging.FromContext(e.ctx)
-
-	logger.Info("starting engine on " + port)
-	httpServer := &http.Server{
-		Addr:    ":" + port,
-		Handler: e.handler,
-	}
-
-	return httpServer, nil
-}
-
-func (e *Engine) createHandler() http.HandlerFunc {
-	handler := e.createMuxHandler(e.directConfigs.APIConfigs)
-	return handler.ServeHTTP
-}
-
-func (e *Engine) createMuxHandler(configs []*apiconfig.APIConfig) http.Handler {
+func (e *Engine) createMuxHandler(configs []*apiconfig.APIConfig) *mux.Router {
 	logger := logging.FromContext(e.ctx)
 	if len(configs) == 0 {
 		logger.Warn("no API configurations - engine will run with no API endpoints")

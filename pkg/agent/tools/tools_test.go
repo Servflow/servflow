@@ -90,7 +90,7 @@ func TestNewClient(t *testing.T) {
 		expected, err := json.Marshal(expectedDescription)
 		require.NoError(t, err)
 
-		description, err := manager.ToolListDescription()
+		description, err := manager.ToolListDescription(context.Background())
 		require.NoError(t, err)
 		assert.JSONEq(t, string(expected), description)
 
@@ -144,7 +144,7 @@ func TestNewClient(t *testing.T) {
 		client.failedConfig[0].Endpoint = secondServer.URL
 		client.failedConfig[0].ToolsList = []string{"test-third"}
 
-		description, err := client.ToolListDescription()
+		description, err := client.ToolListDescription(context.Background())
 		fmt.Println(description)
 		require.NoError(t, err)
 		assert.Empty(t, client.failedConfig)
@@ -175,6 +175,32 @@ func TestNewClient(t *testing.T) {
 		expected, err := json.Marshal(expectedDescription)
 		require.NoError(t, err)
 		assert.JSONEq(t, string(expected), description)
+	})
+
+	t.Run("retry with multiple failed configs does not skip or duplicate", func(t *testing.T) {
+		manager, err := NewManager()
+		require.NoError(t, err)
+
+		// Interleave failing and succeeding configs: an in-place deletion while
+		// ranging by index would skip the entry after a removed one and could
+		// re-process (and re-add) a later one.
+		manager.failedConfig = []ServerConfig{
+			{Endpoint: "http://invalid-url-1", ToolsList: []string{"test-third"}},
+			{Endpoint: testServer.URL, ToolsList: []string{"test-first"}},
+			{Endpoint: "http://invalid-url-2", ToolsList: []string{"test-third"}},
+			{Endpoint: testServer.URL, ToolsList: []string{"test-third"}},
+		}
+
+		// ToolList triggers addFailedConfigs.
+		manager.ToolList(context.Background())
+
+		// Only the two unreachable configs remain, in their original order; both
+		// reachable ones were registered and dropped exactly once.
+		require.Len(t, manager.failedConfig, 2)
+		assert.Equal(t, "http://invalid-url-1", manager.failedConfig[0].Endpoint)
+		assert.Equal(t, "http://invalid-url-2", manager.failedConfig[1].Endpoint)
+		assert.Contains(t, manager.toolDescriptions, "test-first")
+		assert.Contains(t, manager.toolDescriptions, "test-third")
 	})
 
 	t.Run("server config with headers", func(t *testing.T) {
@@ -238,7 +264,7 @@ func TestNewClient(t *testing.T) {
 		}, resp)
 
 		// Verify tool description still works
-		description, err := manager.ToolListDescription()
+		description, err := manager.ToolListDescription(context.Background())
 		require.NoError(t, err)
 		assert.Contains(t, description, "test-first")
 	})
@@ -293,7 +319,7 @@ func TestNewClient(t *testing.T) {
 		require.NotNil(t, manager)
 
 		// Test tool description
-		description, err := manager.ToolListDescription()
+		description, err := manager.ToolListDescription(context.Background())
 		require.NoError(t, err)
 
 		expectedDesc := map[string]toolDescription{

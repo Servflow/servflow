@@ -56,32 +56,32 @@ func (mr *MockToolManagerMockRecorder) CallTool(ctx, toolName, params any) *gomo
 }
 
 // ToolList mocks base method.
-func (m *MockToolManager) ToolList() []ToolInfo {
+func (m *MockToolManager) ToolList(ctx context.Context) []ToolInfo {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ToolList")
+	ret := m.ctrl.Call(m, "ToolList", ctx)
 	ret0, _ := ret[0].([]ToolInfo)
 	return ret0
 }
 
 // ToolList indicates an expected call of ToolList.
-func (mr *MockToolManagerMockRecorder) ToolList() *gomock.Call {
+func (mr *MockToolManagerMockRecorder) ToolList(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ToolList", reflect.TypeOf((*MockToolManager)(nil).ToolList))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ToolList", reflect.TypeOf((*MockToolManager)(nil).ToolList), ctx)
 }
 
 // ToolListDescription mocks base method.
-func (m *MockToolManager) ToolListDescription() (string, error) {
+func (m *MockToolManager) ToolListDescription(ctx context.Context) (string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ToolListDescription")
+	ret := m.ctrl.Call(m, "ToolListDescription", ctx)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ToolListDescription indicates an expected call of ToolListDescription.
-func (mr *MockToolManagerMockRecorder) ToolListDescription() *gomock.Call {
+func (mr *MockToolManagerMockRecorder) ToolListDescription(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ToolListDescription", reflect.TypeOf((*MockToolManager)(nil).ToolListDescription))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ToolListDescription", reflect.TypeOf((*MockToolManager)(nil).ToolListDescription), ctx)
 }
 
 // MockLLmProvider is a mock of LLmProvider interface.

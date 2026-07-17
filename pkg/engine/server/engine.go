@@ -210,7 +210,7 @@ func New(env string, opts ...Option) (*Engine, error) {
 	}
 
 	if e.logger == nil {
-		e.logger = e.createLogger(env)
+		e.logger = logging.Build(env)
 	}
 
 	for _, opt := range opts {
@@ -254,7 +254,7 @@ func (e *Engine) DoneChan() <-chan struct{} {
 // than once; each call re-initializes the supplied integrations by id.
 func (e *Engine) RegisterIntegrations(configs []apiconfig.IntegrationConfig) error {
 	logging.DebugContext(e.ctx, "Registering integrations...")
-	return integration.RegisterIntegrationsFromConfig(configs)
+	return integration.RegisterIntegrationsFromConfig(e.ctx, configs)
 }
 
 // Start prepares the engine to serve: it compiles the initial routing table and
@@ -271,22 +271,6 @@ func (e *Engine) Start() error {
 
 	logging.InfoContext(e.ctx, "engine started")
 	return nil
-}
-
-func (e *Engine) createLogger(env string) *zap.Logger {
-	var c zap.Config
-	if env == "production" {
-		c = zap.NewProductionConfig()
-	} else {
-		c = zap.NewDevelopmentConfig()
-	}
-	c.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-
-	logger, err := c.Build()
-	if err != nil {
-		panic("failed to initialize logger: " + err.Error())
-	}
-	return logger
 }
 
 func (e *Engine) ReloadConfigs(newDirectConfigs *DirectConfigs) error {

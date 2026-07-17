@@ -60,7 +60,7 @@ func (e *Engine) createMuxHandler(configs []*apiconfig.APIConfig) *mux.Router {
 		}
 
 		h := e.wrapMiddlewareWithReqIDLogger(e.logger, handler)
-		logger.Info("registered handler for " + conf.ID)
+		logger.Info("registered handler", zap.String("config_id", conf.ID))
 
 		r.Handle(listenPath, h).Methods(method, http.MethodOptions)
 	}

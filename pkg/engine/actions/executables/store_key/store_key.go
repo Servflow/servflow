@@ -7,9 +7,7 @@ import (
 	"fmt"
 
 	"github.com/Servflow/servflow/pkg/engine/actions"
-	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/Servflow/servflow/pkg/storage"
-	"go.uber.org/zap"
 )
 
 type StoreKey struct {
@@ -50,8 +48,6 @@ func (s *StoreKey) Config() string {
 }
 
 func (s *StoreKey) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
-	logger := logging.FromContext(ctx).With(zap.String("execution_type", s.Type()))
-	_ = logging.WithLogger(ctx, logger)
 
 	var cfg Config
 	if err := json.Unmarshal([]byte(modifiedConfig), &cfg); err != nil {

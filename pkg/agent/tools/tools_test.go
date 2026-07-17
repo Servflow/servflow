@@ -177,6 +177,32 @@ func TestNewClient(t *testing.T) {
 		assert.JSONEq(t, string(expected), description)
 	})
 
+	t.Run("retry with multiple failed configs does not skip or duplicate", func(t *testing.T) {
+		manager, err := NewManager()
+		require.NoError(t, err)
+
+		// Interleave failing and succeeding configs: an in-place deletion while
+		// ranging by index would skip the entry after a removed one and could
+		// re-process (and re-add) a later one.
+		manager.failedConfig = []ServerConfig{
+			{Endpoint: "http://invalid-url-1", ToolsList: []string{"test-third"}},
+			{Endpoint: testServer.URL, ToolsList: []string{"test-first"}},
+			{Endpoint: "http://invalid-url-2", ToolsList: []string{"test-third"}},
+			{Endpoint: testServer.URL, ToolsList: []string{"test-third"}},
+		}
+
+		// ToolList triggers addFailedConfigs.
+		manager.ToolList(context.Background())
+
+		// Only the two unreachable configs remain, in their original order; both
+		// reachable ones were registered and dropped exactly once.
+		require.Len(t, manager.failedConfig, 2)
+		assert.Equal(t, "http://invalid-url-1", manager.failedConfig[0].Endpoint)
+		assert.Equal(t, "http://invalid-url-2", manager.failedConfig[1].Endpoint)
+		assert.Contains(t, manager.toolDescriptions, "test-first")
+		assert.Contains(t, manager.toolDescriptions, "test-third")
+	})
+
 	t.Run("server config with headers", func(t *testing.T) {
 		// Create a test server that captures headers
 		testHeaderServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

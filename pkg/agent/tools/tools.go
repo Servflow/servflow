@@ -287,14 +287,14 @@ func (m *Manager) generateToolDescription() (string, error) {
 }
 
 func (m *Manager) addFailedConfigs(ctx context.Context) {
-	for i, config := range m.failedConfig {
-		err := m.addServerConfig(config)
-		if err != nil {
+	var remaining []ServerConfig
+	for _, config := range m.failedConfig {
+		if err := m.addServerConfig(config); err != nil {
 			logging.FromContext(ctx).Error("failed to add server config", zap.Error(err))
-			continue
+			remaining = append(remaining, config)
 		}
-		m.failedConfig = append(m.failedConfig[:i], m.failedConfig[i+1:]...)
 	}
+	m.failedConfig = remaining
 }
 
 func (m *Manager) CallTool(ctx context.Context, toolName string, params map[string]any) ([]mcp.Content, error) {

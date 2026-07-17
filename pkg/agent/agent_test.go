@@ -84,7 +84,7 @@ func TestOrchestrator_TestQuery(t *testing.T) {
 	if err := json.Unmarshal([]byte(toolList), &toolInfoList); err != nil {
 		t.Fatal(err)
 	}
-	mockToolManager.EXPECT().ToolList().Return(toolInfoList)
+	mockToolManager.EXPECT().ToolList(gomock.Any()).Return(toolInfoList)
 	mockToolManager.EXPECT().
 		CallTool(gomock.Any(), "get_weather", map[string]any{"location": "lagos"}).
 		Return([]mcp.Content{mcp.TextContent{Type: "text", Text: "Temperature: 28°C, Condition: Sunny"}}, nil)
@@ -126,7 +126,7 @@ func TestOrchestrator_ProviderError(t *testing.T) {
 	if err := json.Unmarshal([]byte(toolList), &toolInfoList); err != nil {
 		t.Fatal(err)
 	}
-	mockToolManager.EXPECT().ToolList().Return(toolInfoList)
+	mockToolManager.EXPECT().ToolList(gomock.Any()).Return(toolInfoList)
 
 	providerError := errors.New("provider error")
 	mockLLmHandler.EXPECT().
@@ -218,7 +218,7 @@ func TestOrchestrator_ToolErrorWithRetry(t *testing.T) {
 	if err := json.Unmarshal([]byte(toolList), &toolInfoList); err != nil {
 		t.Fatal(err)
 	}
-	mockToolManager.EXPECT().ToolList().Return(toolInfoList)
+	mockToolManager.EXPECT().ToolList(gomock.Any()).Return(toolInfoList)
 	mockToolManager.EXPECT().
 		CallTool(gomock.Any(), "get_weather", map[string]any{"location": "lagos"}).
 		Return(nil, errors.New("tool error"))
@@ -285,7 +285,7 @@ func TestOrchestrator_ToolErrorWithLLMWrapup(t *testing.T) {
 	if err := json.Unmarshal([]byte(toolList), &toolInfoList); err != nil {
 		t.Fatal(err)
 	}
-	mockToolManager.EXPECT().ToolList().Return(toolInfoList)
+	mockToolManager.EXPECT().ToolList(gomock.Any()).Return(toolInfoList)
 	mockToolManager.EXPECT().
 		CallTool(gomock.Any(), "get_weather", map[string]any{"location": "lagos"}).
 		Return(nil, errors.New("tool error"))
@@ -352,7 +352,7 @@ func TestSession_ConversationIDMessageRetrieval(t *testing.T) {
 		}
 
 		// Setup mock expectations
-		mockToolManager.EXPECT().ToolList().Return(toolInfoList).AnyTimes()
+		mockToolManager.EXPECT().ToolList(gomock.Any()).Return(toolInfoList).AnyTimes()
 		mockToolManager.EXPECT().
 			CallTool(gomock.Any(), "get_weather", map[string]any{"location": "New York"}).
 			Return([]mcp.Content{mcp.TextContent{Type: "text", Text: "Temperature: 22°C, Condition: Cloudy"}}, nil)
@@ -370,7 +370,7 @@ func TestSession_ConversationIDMessageRetrieval(t *testing.T) {
 		// Create session with conversation ID
 		session, err := NewSession(systemPrompt, mockLLmHandler,
 			WithToolManager(mockToolManager),
-			WithConversationID(conversationID),
+			WithConversationID(context.Background(), conversationID),
 			WithInstructions(testInstructions))
 		require.NoError(t, err)
 
@@ -414,7 +414,7 @@ func TestSession_ConversationIDMessageRetrieval(t *testing.T) {
 			}
 
 			// Setup mock expectations for second session
-			mockToolManager2.EXPECT().ToolList().Return(toolInfoList).AnyTimes()
+			mockToolManager2.EXPECT().ToolList(gomock.Any()).Return(toolInfoList).AnyTimes()
 			mockToolManager2.EXPECT().
 				CallTool(gomock.Any(), "get_weather", map[string]any{"location": "Boston"}).
 				Return([]mcp.Content{mcp.TextContent{Type: "text", Text: "Temperature: 25°C, Condition: Sunny"}}, nil)
@@ -475,7 +475,7 @@ func TestSession_ConversationIDMessageRetrieval(t *testing.T) {
 
 			newSession, err := NewSession(systemPrompt, mockLLmHandler2,
 				WithToolManager(mockToolManager2),
-				WithConversationID(conversationID),
+				WithConversationID(context.Background(), conversationID),
 				WithInstructions(testInstructions))
 			require.NoError(t, err)
 
@@ -525,7 +525,7 @@ func TestSession_ConversationIDMessageRetrieval(t *testing.T) {
 	// Test error case: empty conversation ID
 	t.Run("error on empty conversation ID", func(t *testing.T) {
 		mockLLmHandler := NewMockLLmProvider(ctrl)
-		_, err := NewSession(systemPrompt, mockLLmHandler, WithConversationID(""))
+		_, err := NewSession(systemPrompt, mockLLmHandler, WithConversationID(context.Background(), ""))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "conversationID can not be empty")
 	})
@@ -573,7 +573,7 @@ func TestSession_WithReturnOnlyLastMessage(t *testing.T) {
 	if err := json.Unmarshal([]byte(toolList), &toolInfoList); err != nil {
 		t.Fatal(err)
 	}
-	mockToolManager.EXPECT().ToolList().Return(toolInfoList)
+	mockToolManager.EXPECT().ToolList(gomock.Any()).Return(toolInfoList)
 	mockToolManager.EXPECT().
 		CallTool(gomock.Any(), "get_weather", map[string]any{"location": "default"}).
 		Return([]mcp.Content{mcp.TextContent{Type: "text", Text: "Weather: Sunny, 25°C"}}, nil)
@@ -604,7 +604,7 @@ func TestSession_WithReturnOnlyLastMessage(t *testing.T) {
 	session2, err := NewSession(systemPrompt, mockLLmHandler, WithToolManager(mockToolManager), WithInstructions(testInstructions))
 	require.NoError(t, err)
 
-	mockToolManager.EXPECT().ToolList().Return(toolInfoList)
+	mockToolManager.EXPECT().ToolList(gomock.Any()).Return(toolInfoList)
 	mockToolManager.EXPECT().
 		CallTool(gomock.Any(), "get_weather", map[string]any{"location": "default"}).
 		Return([]mcp.Content{mcp.TextContent{Type: "text", Text: "Weather: Sunny, 25°C"}}, nil)
@@ -768,7 +768,7 @@ func TestWithInstructions(t *testing.T) {
 	if err := json.Unmarshal([]byte(toolList), &toolInfoList); err != nil {
 		t.Fatal(err)
 	}
-	mockToolManager.EXPECT().ToolList().Return(toolInfoList)
+	mockToolManager.EXPECT().ToolList(gomock.Any()).Return(toolInfoList)
 
 	// Mock expectation to verify custom instructions are used
 	mockLLmHandler.EXPECT().
@@ -803,7 +803,7 @@ func TestSession_GetMetadata(t *testing.T) {
 	if err := json.Unmarshal([]byte(toolList), &toolInfoList); err != nil {
 		t.Fatal(err)
 	}
-	mockToolManager.EXPECT().ToolList().Return(toolInfoList)
+	mockToolManager.EXPECT().ToolList(gomock.Any()).Return(toolInfoList)
 
 	firstResponse := LLMResponse{
 		Content: []ContentResponse{{Text: "I'll check the weather"}},

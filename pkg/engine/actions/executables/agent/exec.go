@@ -67,7 +67,7 @@ func (a *Agent) Execute(ctx context.Context, modifiedConfig string) (interface{}
 
 	options := []agent.Option{agent.WithToolManager(a.toolManager)}
 	if newConfig.ConversationID != "" {
-		options = append(options, agent.WithConversationID(newConfig.ConversationID))
+		options = append(options, agent.WithConversationID(ctx, newConfig.ConversationID))
 	}
 	if newConfig.ReturnLastMessage {
 		options = append(options, agent.WithReturnOnlyLastMessage())

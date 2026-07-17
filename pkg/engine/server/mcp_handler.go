@@ -62,7 +62,7 @@ func (e *Engine) createMCPHandler(config *apiconfig.APIConfig) error {
 
 	e.mcpServer.AddTool(mcp.NewTool(config.McpTool.Name, options...), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		start := time.Now()
-		logger := logger.With(zap.String("toolName", config.McpTool.Name))
+		logger := logger.With(zap.String("tool_name", config.McpTool.Name))
 
 		reqCtx, ok := requestctx.FromContext(ctx)
 		if !ok {
@@ -109,7 +109,7 @@ func (e *Engine) createMCPHandler(config *apiconfig.APIConfig) error {
 			},
 		}
 		timeTaken := time.Since(start)
-		logger.Debug("Response timeTaken", zap.String("timeTaken", timeTaken.String()))
+		logger.Debug("finished handling tool call", zap.Duration("time_taken", timeTaken))
 
 		return &response, nil
 	})

@@ -94,7 +94,7 @@ func WithServerConfig(config ServerConfig) ClientOption {
 		err := manager.addServerConfig(config)
 		if err != nil {
 			if errors.Is(err, errInitializingClient) {
-				logging.FromContext(context.Background()).Warn("Failed to add server config", zap.Error(err))
+				logging.GetNewLogger().Warn("failed to add server config", zap.Error(err)) // logging:root-ok (config load, no request ctx)
 				manager.failedConfig = append(manager.failedConfig, config)
 				return nil
 			}
@@ -204,7 +204,7 @@ func generateWorkflowToolExec(config *WorkflowToolConfig) functionExec {
 			zap.Any("params", params),
 			zap.String("tool", config.Name),
 			zap.String("start", config.Start),
-			zap.String("returnValue", config.ReturnValue),
+			zap.String("return_value", config.ReturnValue),
 		)
 		reqCtx, ok := requestctx.FromContext(ctx)
 		if !ok {
@@ -259,13 +259,13 @@ func generateWorkflowToolExec(config *WorkflowToolConfig) functionExec {
 	}
 }
 
-func (m *Manager) ToolListDescription() (string, error) {
-	m.addFailedConfigs()
+func (m *Manager) ToolListDescription(ctx context.Context) (string, error) {
+	m.addFailedConfigs(ctx)
 	return m.generateToolDescription()
 }
 
-func (m *Manager) ToolList() []agent.ToolInfo {
-	m.addFailedConfigs()
+func (m *Manager) ToolList(ctx context.Context) []agent.ToolInfo {
+	m.addFailedConfigs(ctx)
 	toolList := make([]agent.ToolInfo, 0)
 	for _, config := range m.toolDescriptions {
 		toolList = append(toolList, agent.ToolInfo{
@@ -286,11 +286,11 @@ func (m *Manager) generateToolDescription() (string, error) {
 	return string(toolList), nil
 }
 
-func (m *Manager) addFailedConfigs() {
+func (m *Manager) addFailedConfigs(ctx context.Context) {
 	for i, config := range m.failedConfig {
 		err := m.addServerConfig(config)
 		if err != nil {
-			logging.FromContext(context.Background()).Error("Failed to add server config", zap.Error(err))
+			logging.FromContext(ctx).Error("failed to add server config", zap.Error(err))
 			continue
 		}
 		m.failedConfig = append(m.failedConfig[:i], m.failedConfig[i+1:]...)
@@ -300,7 +300,7 @@ func (m *Manager) addFailedConfigs() {
 func (m *Manager) CallTool(ctx context.Context, toolName string, params map[string]any) ([]mcp.Content, error) {
 	exec, ok := m.toolsExec[toolName]
 	if !ok {
-		m.addFailedConfigs()
+		m.addFailedConfigs(ctx)
 		exec, ok = m.toolsExec[toolName]
 		if !ok {
 			return nil, fmt.Errorf("tool %s not found", toolName)

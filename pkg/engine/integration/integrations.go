@@ -257,7 +257,7 @@ func GetIntegration(ctx context.Context, id string) (Integration, error) {
 	}
 }
 
-func RegisterIntegrationsFromConfig(integrationsConfig []apiconfig.IntegrationConfig) error {
+func RegisterIntegrationsFromConfig(ctx context.Context, integrationsConfig []apiconfig.IntegrationConfig) error {
 	wg := &sync.WaitGroup{}
 	wg.Add(len(integrationsConfig))
 	type errorReport struct {
@@ -326,7 +326,7 @@ func RegisterIntegrationsFromConfig(integrationsConfig []apiconfig.IntegrationCo
 		}(&dsConfig)
 	}
 
-	logger := logging.FromContext(context.Background())
+	logger := logging.FromContext(ctx)
 
 	var hasError bool
 	for {
@@ -334,7 +334,7 @@ func RegisterIntegrationsFromConfig(integrationsConfig []apiconfig.IntegrationCo
 		case errRp := <-errChan:
 			if errRp != nil {
 				hasError = true
-				logger.Error("error starting integration", zap.String("integrationID", errRp.integrationID), zap.Error(errRp.error))
+				logger.Error("error starting integration", zap.String("integration_id", errRp.integrationID), zap.Error(errRp.error))
 			}
 		case <-doneChan:
 			if hasError {

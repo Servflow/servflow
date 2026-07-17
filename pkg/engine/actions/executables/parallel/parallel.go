@@ -10,6 +10,8 @@ import (
 
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/plan"
+	"github.com/Servflow/servflow/pkg/logging"
+	"go.uber.org/zap"
 )
 
 type Config struct {
@@ -87,7 +89,7 @@ func (e *Exec) Execute(ctx context.Context, modifiedConfig string) (interface{},
 		wg.Add(1)
 		go func(s string) {
 			defer wg.Done()
-			fmt.Printf("Executing step: %s\n", s)
+			logging.FromContext(newCtx).Debug("executing parallel step", zap.String("step", s))
 			_, err := plan.ExecuteFromContext(newCtx, s)
 			if err != nil {
 				select {

@@ -23,8 +23,8 @@ const conversationStoragePrefix = "agent_conversation_"
 
 type ToolManager interface {
 	CallTool(ctx context.Context, toolName string, params map[string]any) ([]mcp.Content, error)
-	ToolListDescription() (string, error)
-	ToolList() []ToolInfo
+	ToolListDescription(ctx context.Context) (string, error)
+	ToolList(ctx context.Context) []ToolInfo
 }
 
 type LLmProvider interface {
@@ -58,7 +58,7 @@ func WithToolManager(toolManager ToolManager) Option {
 	}
 }
 
-func WithConversationID(id string) Option {
+func WithConversationID(ctx context.Context, id string) Option {
 	return func(a *Session) error {
 		if id == "" {
 			return fmt.Errorf("conversationID can not be empty")
@@ -84,7 +84,7 @@ func WithConversationID(id string) Option {
 				err = json.Unmarshal(data, &toolCall)
 				return toolCall, err
 			default:
-				logging.GetNewLogger().Warn("invalid type in log storage", zap.Int("type", int(msg.Type)))
+				logging.FromContext(ctx).Warn("invalid type in log storage", zap.Int("type", int(msg.Type)))
 			}
 			return nil, nil
 		})
@@ -188,7 +188,7 @@ func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 	logger := logging.FromContext(ctx).With(zap.String("module", "agent"))
 	out := make(chan agentOutput)
 
-	toolList := a.toolManager.ToolList()
+	toolList := a.toolManager.ToolList(ctx)
 	go func() {
 		endTurn := false
 		iterations := 0
@@ -220,7 +220,7 @@ func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 
 			// process content output
 			for _, c := range r.Content {
-				logger.Info("LLm response: " + c.Text)
+				logger.Info("llm response", zap.String("text", c.Text))
 				a.addToMessages(logger, MessageTypeContent{
 					Message: Message{Type: MessageTypeText},
 					Role:    RoleTypeAssistant,
@@ -244,7 +244,7 @@ func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 
 			// TODO call tools in parallel
 			for _, tool := range r.Tools {
-				logger.Info("attempting to execute tool: "+tool.Name, zap.Any("params", tool.Input))
+				logger.Info("attempting to execute tool", zap.String("tool", tool.Name), zap.Any("params", tool.Input))
 				toolResp, err := a.toolManager.CallTool(ctx, tool.Name, tool.Input)
 				if err != nil {
 					a.addToMessages(logger, MessageToolCallResponse{
@@ -264,7 +264,7 @@ func (a *Session) startLoop(ctx context.Context) chan agentOutput {
 					response := responses[i]
 					a.addToMessages(logger, response, out)
 				}
-				logger.Info("successfully executed tool: " + tool.Name)
+				logger.Info("successfully executed tool", zap.String("tool", tool.Name))
 			}
 		}
 		close(out)

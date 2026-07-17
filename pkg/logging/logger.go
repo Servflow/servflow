@@ -3,14 +3,19 @@ package logging
 import (
 	"context"
 	"os"
+	"sync"
 
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
-func GetNewLogger() *zap.Logger {
-	env := os.Getenv("SERVFLOW_ENV")
+// Build constructs a zap logger for the given environment: "production" gets
+// the JSON production config, anything else the console development config,
+// both with ISO8601 timestamps. SERVFLOW_LOG_LEVEL, when set to a valid zap
+// level, overrides the config's default level. This is the single logger
+// construction path for engine and embedders alike.
+func Build(env string) *zap.Logger {
 	var cfg zap.Config
 	switch env {
 	case "production":
@@ -18,12 +23,34 @@ func GetNewLogger() *zap.Logger {
 	default:
 		cfg = zap.NewDevelopmentConfig()
 	}
+	cfg.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+
+	if lvl := os.Getenv("SERVFLOW_LOG_LEVEL"); lvl != "" {
+		if parsed, err := zapcore.ParseLevel(lvl); err == nil {
+			cfg.Level = zap.NewAtomicLevelAt(parsed)
+		}
+	}
 
 	logger, err := cfg.Build()
 	if err != nil {
 		panic(err)
 	}
 	return logger
+}
+
+var (
+	rootOnce sync.Once
+	root     *zap.Logger
+)
+
+// GetNewLogger returns the process-wide root logger, built once from
+// SERVFLOW_ENV. Despite the historical name it is a singleton: every
+// context-less FromContext call and bootstrap shares this instance.
+func GetNewLogger() *zap.Logger {
+	rootOnce.Do(func() {
+		root = Build(os.Getenv("SERVFLOW_ENV"))
+	})
+	return root
 }
 
 // loggerKey is the context key for storing logger instances
@@ -47,7 +74,7 @@ func FromContext(ctx context.Context) *zap.Logger {
 			return WrapWithScrubber(GetNewLogger(), rc)
 		}
 	}
-	// Fallback to singleton during migration
+	// Context-less fallback: the shared root.
 	return GetNewLogger()
 }
 

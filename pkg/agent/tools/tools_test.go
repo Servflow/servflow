@@ -90,7 +90,7 @@ func TestNewClient(t *testing.T) {
 		expected, err := json.Marshal(expectedDescription)
 		require.NoError(t, err)
 
-		description, err := manager.ToolListDescription()
+		description, err := manager.ToolListDescription(context.Background())
 		require.NoError(t, err)
 		assert.JSONEq(t, string(expected), description)
 
@@ -144,7 +144,7 @@ func TestNewClient(t *testing.T) {
 		client.failedConfig[0].Endpoint = secondServer.URL
 		client.failedConfig[0].ToolsList = []string{"test-third"}
 
-		description, err := client.ToolListDescription()
+		description, err := client.ToolListDescription(context.Background())
 		fmt.Println(description)
 		require.NoError(t, err)
 		assert.Empty(t, client.failedConfig)
@@ -238,7 +238,7 @@ func TestNewClient(t *testing.T) {
 		}, resp)
 
 		// Verify tool description still works
-		description, err := manager.ToolListDescription()
+		description, err := manager.ToolListDescription(context.Background())
 		require.NoError(t, err)
 		assert.Contains(t, description, "test-first")
 	})
@@ -293,7 +293,7 @@ func TestNewClient(t *testing.T) {
 		require.NotNil(t, manager)
 
 		// Test tool description
-		description, err := manager.ToolListDescription()
+		description, err := manager.ToolListDescription(context.Background())
 		require.NoError(t, err)
 
 		expectedDesc := map[string]toolDescription{

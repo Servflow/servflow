@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,6 +11,7 @@ import (
 	"github.com/Servflow/servflow/config"
 	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/engine/server"
+	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/Servflow/servflow/pkg/storage"
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
@@ -53,19 +53,27 @@ func RunServer(cfg *config.Config) error {
 		Addr:    ":" + cfg.Port,
 		Handler: eng,
 	}
+	logger := logging.GetNewLogger()
 	go func() {
-		log.Printf("starting engine on %s", cfg.Port)
+		logger.Info("starting engine", zap.String("port", cfg.Port))
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Printf("server error: %v", err)
+			logger.Error("server error", zap.Error(err))
 			stop()
 		}
 	}()
 
 	select {
 	case <-eng.DoneChan():
-		return srv.Shutdown(context.Background())
+		// The engine ended itself (idle timeout). Drain the listener, then run
+		// the same full teardown as the signal path: Stop flushes the tracer,
+		// shuts down integrations, and closes the storage client.
+		logger.Info("engine finished, shutting down server")
+		if err := srv.Shutdown(context.Background()); err != nil {
+			return err
+		}
+		return eng.Stop()
 	case <-ctx.Done():
-		log.Println("Shutting down server...")
+		logger.Info("shutting down server")
 		if err := srv.Shutdown(context.Background()); err != nil {
 			return err
 		}
@@ -150,7 +158,7 @@ func CreateApp() *cli.App {
 				},
 				Action: func(c *cli.Context) error {
 					if err := godotenv.Load(); err != nil {
-						log.Printf("Warning: %v", err)
+						logging.GetNewLogger().Warn("could not load .env file", zap.Error(err))
 					}
 
 					var cfg config.Config
@@ -173,8 +181,9 @@ func CreateApp() *cli.App {
 						return cli.Exit("Config folder for APIs must be specified either via environment variable SERVFLOW_CONFIGFOLDERS_APIS or as the first argument to 'run' command", 1)
 					}
 
-					log.Printf("Starting ServFlow with config folders - APIs: %s, Engine Config: %s",
-						cfg.ConfigFolder, cfg.EngineConfigFile)
+					logging.GetNewLogger().Info("starting servflow",
+						zap.String("config_folder", cfg.ConfigFolder),
+						zap.String("engine_config", cfg.EngineConfigFile))
 
 					return RunServer(&cfg)
 				},

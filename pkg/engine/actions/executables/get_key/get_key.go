@@ -7,9 +7,7 @@ import (
 
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/plan"
-	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/Servflow/servflow/pkg/storage"
-	"go.uber.org/zap"
 )
 
 type GetKey struct {
@@ -50,8 +48,6 @@ func (g *GetKey) Config() string {
 }
 
 func (g *GetKey) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
-	logger := logging.FromContext(ctx).With(zap.String("execution_type", g.Type()))
-	_ = logging.WithLogger(ctx, logger)
 
 	var cfg Config
 	if err := json.Unmarshal([]byte(modifiedConfig), &cfg); err != nil {

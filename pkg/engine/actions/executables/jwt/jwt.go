@@ -50,7 +50,7 @@ func (a *JWT) SupportsReplica() bool {
 
 func (a *JWT) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
 	logger := logging.FromContext(ctx).With(zap.String("execution_type", a.Type()))
-	_ = logging.WithLogger(ctx, logger)
+	ctx = logging.WithLogger(ctx, logger)
 
 	field := modifiedConfig
 	if a.config.Mode == "" {
@@ -59,7 +59,7 @@ func (a *JWT) Execute(ctx context.Context, modifiedConfig string) (interface{}, 
 	isEncodeMode := a.config.Mode == "encode"
 
 	if isEncodeMode {
-		resp, err := a.encode(context.Background(), field)
+		resp, err := a.encode(ctx, field)
 		return resp, nil, err
 	} else {
 		resp, err := a.decode(ctx, field)

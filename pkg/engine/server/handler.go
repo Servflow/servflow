@@ -226,7 +226,7 @@ func (h *APIHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 		wr.WriteHeader(resp.Code)
 		wr.Write(resp.Body)
 		timeTaken := time.Since(start)
-		logger.Debug("Finished handling request", zap.String("timeTaken", timeTaken.String()))
+		logger.Debug("finished handling request", zap.Duration("time_taken", timeTaken))
 	})
 
 	// When an entry handler is configured, its middleware runs here — after the

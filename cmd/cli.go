@@ -64,7 +64,14 @@ func RunServer(cfg *config.Config) error {
 
 	select {
 	case <-eng.DoneChan():
-		return srv.Shutdown(context.Background())
+		// The engine ended itself (idle timeout). Drain the listener, then run
+		// the same full teardown as the signal path: Stop flushes the tracer,
+		// shuts down integrations, and closes the storage client.
+		logger.Info("engine finished, shutting down server")
+		if err := srv.Shutdown(context.Background()); err != nil {
+			return err
+		}
+		return eng.Stop()
 	case <-ctx.Done():
 		logger.Info("shutting down server")
 		if err := srv.Shutdown(context.Background()); err != nil {

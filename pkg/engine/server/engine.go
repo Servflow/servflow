@@ -314,7 +314,10 @@ func (e *Engine) Stop() error {
 		}
 	}
 
-	shutdownCtx, cancel := context.WithTimeout(e.ctx, 10*time.Second)
+	// Parent the shutdown timeout on Background, not e.ctx: when the engine
+	// stopped itself (idle timeout), e.ctx is already canceled and a timeout
+	// derived from it would expire immediately, skipping the graceful close.
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := integration.GetManager().Shutdown(shutdownCtx); err != nil {
 		logging.ErrorContext(e.ctx, "failed to shutdown integrations", err)

@@ -64,6 +64,10 @@ func (e *Engine) createBasicHandler(config *apiconfig.APIConfig) (http.Handler, 
 		handlerConfig: config.HttpConfig.HandlerConfig,
 	}
 
+	if e.configSpanAttrs != nil {
+		a.extraSpanAttrs = e.configSpanAttrs(config)
+	}
+
 	return a.CreateChain(config, e.getCorsConfig()), nil
 }
 
@@ -79,6 +83,9 @@ type APIHandler struct {
 	// handlerConfig is the raw config for the entry handler, made available to
 	// the middleware via entryhandlers.WithConfig.
 	handlerConfig map[string]interface{}
+	// extraSpanAttrs are host-supplied attributes stamped on the root entry
+	// span (e.g. sf.agent), resolved once when this handler was built.
+	extraSpanAttrs map[string]string
 }
 
 const mcpServerVersion = "0.1.0"
@@ -134,6 +141,10 @@ func (h *APIHandler) initTracing(req *http.Request) (context.Context, trace.Span
 		attribute.String("sf.http.path", req.URL.Path),
 	)
 
+	for k, v := range h.extraSpanAttrs {
+		span.SetAttributes(attribute.String(k, v))
+	}
+
 	// Add query parameters to trace
 	queryParams := req.URL.Query()
 	for key, values := range queryParams {
@@ -184,6 +195,17 @@ func (h *APIHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	if span != nil {
 		span.SetAttributes(attribute.String("sf.request_id", rectx.ID()))
 	}
+	// Derive the request/context copy FIRST, then bind the template functions to
+	// that same copy — the one the entry-handler middleware (and the plan) will
+	// serve. requestTemplateFunctions' `body` closure reads req.Body lazily; an
+	// entry handler that reads and restores the body (e.g. github_webhook's HMAC
+	// check) reassigns Body on the request it is handed, so the `body` function
+	// must be captured on that same *http.Request. Capturing it on the pre-copy
+	// request instead leaves `body "..."` reading a drained reader (renders
+	// empty) once a handler has consumed the body.
+	ctx = plan.WithRequest(ctx, req)
+	req = req.WithContext(ctx)
+
 	rectx.AddRequestTemplateFunctions(requestTemplateFunctions(req), false)
 
 	err := rectx.LoadRequestFiles(req)
@@ -193,9 +215,6 @@ func (h *APIHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 		http.Error(wr, "Error processing request", http.StatusInternalServerError)
 		return
 	}
-
-	ctx = plan.WithRequest(ctx, req)
-	req = req.WithContext(ctx)
 
 	// planRunner executes the workflow plan and writes the HTTP response. It is
 	// the terminal handler that any entry-handler middleware wraps.

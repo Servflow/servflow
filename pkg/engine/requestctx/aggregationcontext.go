@@ -34,6 +34,11 @@ type RequestContext struct {
 	// Shared by pointer with child workflow contexts via ShareSecretsWith.
 	// Own mutex; never nil (see NewRequestContext).
 	secrets *secretTable
+
+	// loopStack holds the active loop iteration state. It is a stack so nested
+	// loop actions each expose their own current element/index to templates via
+	// the loop_item/loop_index functions; the top frame is the innermost loop.
+	loopStack []loopFrame
 }
 
 // AddTokenUsage adds LLM token usage to this request's running total. Safe for
@@ -46,6 +51,13 @@ func (rc *RequestContext) AddTokenUsage(input, output int64) {
 // TokenUsage returns the accumulated request-level token totals.
 func (rc *RequestContext) TokenUsage() (input, output int64) {
 	return rc.tokenInput.Load(), rc.tokenOutput.Load()
+}
+
+// loopFrame is one active loop iteration: the current element and its 0-based
+// index. The loop action pushes a frame per iteration and pops it afterwards.
+type loopFrame struct {
+	item  interface{}
+	index int
 }
 
 // TODO move this and dpl together
@@ -101,6 +113,26 @@ func (rc *RequestContext) GetWorkspace() Workspace {
 	rc.Lock()
 	defer rc.Unlock()
 	return rc.workspace
+}
+
+// PushLoop begins a loop iteration, making item and index the values returned by
+// the loop_item/loop_index template functions until the matching PopLoop. Frames
+// stack so a nested loop shadows its parent and restores it on PopLoop.
+func (rc *RequestContext) PushLoop(item interface{}, index int) {
+	rc.Lock()
+	defer rc.Unlock()
+	rc.loopStack = append(rc.loopStack, loopFrame{item: item, index: index})
+}
+
+// PopLoop ends the current loop iteration, restoring any enclosing loop's state.
+// It is a no-op when no loop is active.
+func (rc *RequestContext) PopLoop() {
+	rc.Lock()
+	defer rc.Unlock()
+	if len(rc.loopStack) == 0 {
+		return
+	}
+	rc.loopStack = rc.loopStack[:len(rc.loopStack)-1]
 }
 
 func NewRequestContext(id string) *RequestContext {

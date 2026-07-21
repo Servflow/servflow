@@ -21,6 +21,7 @@ import (
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/http"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/javascript"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/jwt"
+	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/loop"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/mongoquery"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/parallel"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/save"

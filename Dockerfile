@@ -13,16 +13,16 @@ RUN go mod download
 
 COPY . .
 
-RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} CGO_ENABLED=0 go build -ldflags "-X main.version=${VERSION}" -o servflow .
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} CGO_ENABLED=0 go build -ldflags "-X main.version=${VERSION}" -o servflow-engine .
 
 FROM alpine:3.20
 
 WORKDIR /app
 
-COPY --from=builder /app/servflow servflow
+COPY --from=builder /app/servflow-engine servflow-engine
 
 ENV SERVFLOW_PORT=8080
 ENV SERVFLOW_LOGLEVEL=production
 EXPOSE 8080
 USER root
-ENTRYPOINT ["./servflow"]
+ENTRYPOINT ["./servflow-engine"]

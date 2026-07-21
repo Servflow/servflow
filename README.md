@@ -7,7 +7,7 @@
 
 [![GitHub Release](https://img.shields.io/github/release/servflow/servflow.svg)](https://github.com/servflow/servflow/releases)
 [![License](https://img.shields.io/github/license/servflow/servflow.svg)](LICENSE)
-[![Docker Pulls](https://img.shields.io/docker/pulls/servflow/servflow.svg)](https://hub.docker.com/r/servflow/servflow)
+[![Docker Pulls](https://img.shields.io/docker/pulls/servflow/servflow-engine.svg)](https://hub.docker.com/r/servflow/servflow-engine)
 [![Issues](https://img.shields.io/github/issues/servflow/servflow.svg)](https://github.com/servflow/servflow/issues)
 
 📚 **[Complete Documentation & Tutorials](https://docs.servflow.io)** • 📁 **[Download Examples](#-examples)** • 💬 **[Community](https://github.com/servflow/servflow/discussions)**
@@ -22,6 +22,8 @@
 **ServFlow Engine** is a free, standalone declarative API engine that transforms YAML configurations into production-ready APIs. No backend code required.
 
 ServFlow Engine is part of the ServFlow platform. Use it standalone (free forever) or with the ServFlow Dashboard for visual development.
+
+> **Naming note**: this project publishes as **`servflow-engine`** (binary `servflow-engine`, Docker image `servflow/servflow-engine`). The `servflow` name — including the Docker image `servflow/servflow` and older engine tags on it — now refers to the full ServFlow product.
 
 ### ✨ Why ServFlow Engine?
 
@@ -65,17 +67,12 @@ Get ServFlow Engine running in under 2 minutes:
 
 ### 1. Install ServFlow Engine
 
-**macOS & Linux** (Recommended):
-```bash
-curl -fsSL https://raw.githubusercontent.com/servflow/servflow/main/install.sh | bash
-```
-
 **Manual Download**:
-Download the latest binary from [GitHub Releases](https://github.com/servflow/servflow/releases)
+Download the latest `servflow-engine` binary from [GitHub Releases](https://github.com/servflow/servflow/releases)
 
 **Docker**:
 ```bash
-docker pull servflow/servflow:latest
+docker pull servflow/servflow-engine:latest
 ```
 
 ### 2. Download Examples & Start
@@ -86,7 +83,7 @@ git clone https://github.com/servflow/servflow.git
 cd servflow/examples/hello-world
 
 # Start with the hello-world example
-servflow start --integrations integrations.yaml configs/
+servflow-engine start --integrations integrations.yaml configs/
 ```
 
 ### 3. Test Your API
@@ -197,31 +194,25 @@ http:
 
 ### Binary Installation
 
-#### Quick Install Script
-```bash
-curl -fsSL https://raw.githubusercontent.com/servflow/servflow/main/install.sh | bash
-```
-
-#### Manual Download
 Download from [GitHub Releases](https://github.com/servflow/servflow/releases):
-- **Linux (x64)**: `servflow-vX.X.X-linux-amd64.tar.gz`
-- **macOS (Intel)**: `servflow-vX.X.X-darwin-amd64.tar.gz`  
-- **macOS (Apple Silicon)**: `servflow-vX.X.X-darwin-arm64.tar.gz`
-- **Windows (x64)**: `servflow-vX.X.X-windows-amd64.zip`
+- **Linux (x64)**: `servflow-engine_Linux_x86_64.tar.gz`
+- **macOS (Intel)**: `servflow-engine_Darwin_x86_64.tar.gz`
+- **macOS (Apple Silicon)**: `servflow-engine_Darwin_arm64.tar.gz`
+- **Windows (x64)**: `servflow-engine_Windows_x86_64.zip`
 
 ### Docker Installation
 
 ```bash
 # Pull the latest image
-docker pull servflow/servflow:latest
+docker pull servflow/servflow-engine:latest
 
 # Run with configuration
 docker run -d \
-  --name servflow \
+  --name servflow-engine \
   -p 8080:8080 \
   -v $(pwd)/integrations.yaml:/app/integrations.yaml \
   -v $(pwd)/configs:/app/configs \
-  servflow/servflow:latest start --integrations /app/integrations.yaml /app/configs
+  servflow/servflow-engine:latest start --integrations /app/integrations.yaml /app/configs
 ```
 
 ---
@@ -240,8 +231,8 @@ touch integrations.yaml
 export MONGODB_STRING="mongodb://localhost:27017/mydb"
 export OPENAI_API_KEY="sk-your-api-key-here"
 
-# Start ServFlow
-servflow start --integrations integrations.yaml configs/
+# Start ServFlow Engine
+servflow-engine start --integrations integrations.yaml configs/
 ```
 
 ### Health Check
@@ -298,17 +289,17 @@ We welcome contributions! Check out our examples and documentation for ways to h
 
 ## 🔍 Common Issues
 
-### "servflow: command not found"
+### "servflow-engine: command not found"
 ```bash
 # Make sure binary is executable and in PATH
-chmod +x servflow
-sudo mv servflow /usr/local/bin/
+chmod +x servflow-engine
+sudo mv servflow-engine /usr/local/bin/
 ```
 
 ### "Config folder for APIs must be specified"  
 ```bash
 # Provide the correct path to your configs
-servflow start --integrations integrations.yaml configs/
+servflow-engine start --integrations integrations.yaml configs/
 ```
 
 ### Need more help?
@@ -327,7 +318,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - 🌐 **Website**: [servflow.io](https://servflow.io)
 - 📚 **Documentation**: [docs.servflow.io](https://docs.servflow.io)  
 - 📦 **Releases**: [GitHub Releases](https://github.com/servflow/servflow/releases)
-- 🐳 **Docker**: [Docker Hub](https://hub.docker.com/r/servflow/servflow)
+- 🐳 **Docker**: [Docker Hub](https://hub.docker.com/r/servflow/servflow-engine)
 - 💬 **Community**: [GitHub Discussions](https://github.com/servflow/servflow/discussions)
 
 ---

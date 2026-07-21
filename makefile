@@ -1,7 +1,7 @@
 STATICCHECK_VERSION := 2025.1.1
 
 HOST := servflow
-IMAGE_NAME := servflow
+IMAGE_NAME := servflow-engine
 TAG := $(shell git describe --tags --abbrev=0)
 DOCKER_IMAGE := $(HOST)/$(IMAGE_NAME):$(TAG)
 

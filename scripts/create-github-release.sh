@@ -29,7 +29,7 @@ RELEASE_BODY="Release $TAG_NAME
 
 ## Docker Images
 
-Docker image: \`servflow/servflow:$TAG_NAME\`
+Docker image: \`servflow/servflow-engine:$TAG_NAME\`
 
 ## Installation
 
@@ -37,9 +37,9 @@ Download the appropriate binary for your platform from the assets below.
 
 ### Linux/macOS
 \`\`\`bash
-tar -xzf servflow-$TAG_NAME-linux-amd64.tar.gz
-chmod +x servflow-*
-sudo mv servflow-* /usr/local/bin/servflow
+tar -xzf servflow-engine_Linux_x86_64.tar.gz
+chmod +x servflow-engine
+sudo mv servflow-engine /usr/local/bin/servflow-engine
 \`\`\`
 
 ### Windows

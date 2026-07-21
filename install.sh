@@ -1,7 +1,11 @@
 #!/bin/bash
 set -e
 
-REPO="servflow/servflow"
+# Installs the ServFlow product binary (`servflow`), released from the
+# Servflow/servflow-pro repository. The standalone engine published from this
+# repository is available as `servflow-engine` on GitHub Releases and Docker
+# Hub (servflow/servflow-engine); it has no install script.
+REPO="Servflow/servflow-pro"
 BINARY_NAME="servflow"
 INSTALL_DIR="/usr/local/bin"
 TEMP_DIR=$(mktemp -d)
@@ -28,28 +32,26 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1" >&2
 }
 
+# Prints the GoReleaser archive platform token: {Darwin|Linux}_{x86_64|arm64}
 detect_platform() {
     local os arch
 
     case "$OSTYPE" in
         linux*)
-            os="linux"
+            os="Linux"
             ;;
         darwin*)
-            os="darwin"
-            ;;
-        msys*|cygwin*|win*)
-            os="windows"
+            os="Darwin"
             ;;
         *)
-            print_error "Unsupported operating system: $OSTYPE"
+            print_error "Unsupported operating system: $OSTYPE (prebuilt binaries exist for Linux and macOS)"
             exit 1
             ;;
     esac
 
     case "$(uname -m)" in
         x86_64|amd64)
-            arch="amd64"
+            arch="x86_64"
             ;;
         arm64|aarch64)
             arch="arm64"
@@ -60,7 +62,7 @@ detect_platform() {
             ;;
     esac
 
-    echo "${os}-${arch}"
+    echo "${os}_${arch}"
 }
 
 get_latest_version() {
@@ -79,13 +81,10 @@ get_latest_version() {
 download_and_extract() {
     local version="$1"
     local platform="$2"
-    local archive_ext="tar.gz"
 
-    if [[ "$platform" == *"windows"* ]]; then
-        archive_ext="zip"
-    fi
-
-    local filename="${BINARY_NAME}-${version}-${platform}.${archive_ext}"
+    # Archive naming must stay in sync with the `archives` name_template in
+    # servflow-pro's .goreleaser.yaml: servflow_{Title Os}_{x86_64|arm64}.tar.gz
+    local filename="${BINARY_NAME}_${platform}.tar.gz"
     local download_url="https://github.com/${REPO}/releases/download/${version}/${filename}"
     local temp_archive="${TEMP_DIR}/${filename}"
 
@@ -97,38 +96,16 @@ download_and_extract() {
     fi
 
     print_status "Extracting archive..."
-    if [[ "$archive_ext" == "zip" ]]; then
-        if ! command -v unzip >/dev/null 2>&1; then
-            print_error "unzip is required but not installed"
-            exit 1
-        fi
-        unzip -q "$temp_archive" -d "$TEMP_DIR"
-    else
-        tar -xzf "$temp_archive" -C "$TEMP_DIR"
-    fi
+    tar -xzf "$temp_archive" -C "$TEMP_DIR"
 
-    local binary_name="${BINARY_NAME}"
-    if [[ "$platform" == *"windows"* ]]; then
-        binary_name="${BINARY_NAME}.exe"
-    fi
-
-    # Try to find the binary in extracted archive
     local extracted_binary
-
-    # First try direct path (binary at root of archive)
-    if [ -f "${TEMP_DIR}/${binary_name}" ]; then
-        extracted_binary="${TEMP_DIR}/${binary_name}"
-    # Try platform-suffixed binary name (e.g., servflow-darwin-arm64)
-    elif [ -f "${TEMP_DIR}/${BINARY_NAME}-${platform}" ]; then
-        extracted_binary="${TEMP_DIR}/${BINARY_NAME}-${platform}"
-    # Try with .exe suffix for Windows platform-suffixed binaries
-    elif [[ "$platform" == *"windows"* ]] && [ -f "${TEMP_DIR}/${BINARY_NAME}-${platform}.exe" ]; then
-        extracted_binary="${TEMP_DIR}/${BINARY_NAME}-${platform}.exe"
+    if [ -f "${TEMP_DIR}/${BINARY_NAME}" ]; then
+        extracted_binary="${TEMP_DIR}/${BINARY_NAME}"
     else
-        # Try to find binary in subdirectory or any binary with servflow in name
-        extracted_binary=$(find "$TEMP_DIR" -name "${BINARY_NAME}*" -type f | head -1)
+        # Fall back to any binary with the expected name prefix
+        extracted_binary=$(find "$TEMP_DIR" -name "${BINARY_NAME}*" -type f ! -name "*.tar.gz" | head -1)
         if [ -z "$extracted_binary" ] || [ ! -f "$extracted_binary" ]; then
-            print_error "Binary '$binary_name' not found in extracted archive"
+            print_error "Binary '$BINARY_NAME' not found in extracted archive"
             print_error "Archive contents:"
             ls -la "$TEMP_DIR"
             exit 1
@@ -141,15 +118,9 @@ download_and_extract() {
 
 install_binary() {
     local temp_file="$1"
-    local binary_name="${BINARY_NAME}"
+    local install_path="${INSTALL_DIR}/${BINARY_NAME}"
 
-    if [[ "$OSTYPE" == *"windows"* ]]; then
-        binary_name="${BINARY_NAME}.exe"
-    fi
-
-    local install_path="${INSTALL_DIR}/${binary_name}"
-
-    print_status "Installing ${binary_name} to ${install_path}..."
+    print_status "Installing ${BINARY_NAME} to ${install_path}..."
 
     # Create install directory if it doesn't exist
     if [ ! -d "$INSTALL_DIR" ]; then
@@ -181,18 +152,12 @@ install_binary() {
 }
 
 verify_installation() {
-    local binary_name="${BINARY_NAME}"
-
-    if [[ "$OSTYPE" == *"windows"* ]]; then
-        binary_name="${BINARY_NAME}.exe"
-    fi
-
     print_status "Verifying installation..."
 
-    if command -v "$binary_name" >/dev/null 2>&1; then
+    if command -v "$BINARY_NAME" >/dev/null 2>&1; then
         local version
-        version=$("$binary_name" --version 2>/dev/null || echo "unknown")
-        print_success "Servflow installed successfully! Version: $version"
+        version=$("$BINARY_NAME" --version 2>/dev/null || echo "unknown")
+        print_success "ServFlow installed successfully! Version: $version"
     else
         print_warning "Binary installed but not found in PATH"
         print_warning "You may need to restart your terminal or add ${INSTALL_DIR} to PATH"
@@ -206,7 +171,7 @@ cleanup() {
 }
 
 main() {
-    print_status "Starting Servflow installation..."
+    print_status "Starting ServFlow installation..."
 
     trap cleanup EXIT
 
@@ -220,7 +185,7 @@ main() {
         version=$(get_latest_version)
     fi
 
-    print_status "Installing Servflow version: $version"
+    print_status "Installing ServFlow version: $version"
 
     local platform
     platform=$(detect_platform)
@@ -240,7 +205,7 @@ main() {
     echo
     print_status "Next steps:"
     echo "  1. Run 'servflow --help' to see available commands"
-    echo "  2. Run 'servflow start' to start the server"
+    echo "  2. Run 'servflow start --config config.toml --dashboard' to start the server"
     echo "  3. Visit http://localhost:8080 to access the web interface"
     echo
     print_status "Documentation: https://docs.servflow.io"

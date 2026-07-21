@@ -8,6 +8,11 @@
 
 version: 2
 
+# The repo stays `servflow`, but everything published from it (archives,
+# binaries, GitHub release names) ships as `servflow-engine` — the `servflow`
+# name now belongs to the full product released from servflow-pro.
+project_name: servflow-engine
+
 before:
   hooks:
     # You may remove this if you don't use go modules.

@@ -176,3 +176,25 @@ func TestSecretTableConcurrency(t *testing.T) {
 	assert.True(t, rc.HasSecrets())
 	assert.NotContains(t, rc.Scrub("supersecretvalue"), "supersecretvalue")
 }
+
+// TestFileKeyMaterialTracked verifies {{ file }} tracks private-key contents
+// (the github-ci plugin delivers the App PEM as a workspace file), while
+// ordinary files are left as workflow data.
+func TestFileKeyMaterialTracked(t *testing.T) {
+	rc, ctx := newTestRC(t)
+	pem := "-----BEGIN RSA PRIVATE KEY-----\nFileDeliveredKeyMaterialLine0123456789abcdef\n-----END RSA PRIVATE KEY-----"
+	rc.SetWorkspace(&mockWorkspace{files: map[string][]byte{"app.pem": []byte(pem)}})
+
+	out, err := rc.Resolve(ctx, `{{ file "app.pem" }}`)
+	require.NoError(t, err)
+	assert.Equal(t, pem, out)
+	assert.True(t, rc.HasSecrets())
+	assert.NotContains(t, rc.Scrub("leaked: FileDeliveredKeyMaterialLine0123456789abcdef"), "KeyMaterial")
+
+	rc2 := NewRequestContext("t2")
+	rc2.SetWorkspace(&mockWorkspace{files: map[string][]byte{"notes.txt": []byte("hello world, plain file")}})
+	ctx2 := WithAggregationContext(context.Background(), rc2)
+	_, err = rc2.Resolve(ctx2, `{{ file "notes.txt" }}`)
+	require.NoError(t, err)
+	assert.False(t, rc2.HasSecrets())
+}

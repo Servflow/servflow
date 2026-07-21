@@ -2,18 +2,15 @@ package tracing
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/propagation"
-	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
@@ -82,11 +79,20 @@ func (p *attributeStampProcessor) OnEnd(sdktrace.ReadOnlySpan)      {}
 func (p *attributeStampProcessor) Shutdown(context.Context) error   { return nil }
 func (p *attributeStampProcessor) ForceFlush(context.Context) error { return nil }
 
-// InitTracer configures the global trace and metric providers from cfg and
-// returns a shutdown func that flushes and closes both. Traces and metrics share
-// the same transport and endpoint.
+// InitTracer configures the global trace provider from cfg and returns a
+// shutdown func that flushes and closes it.
+//
+// Metrics are currently DISABLED. The OTLP metric pipeline (a PeriodicReader
+// pushing the GenAI "floor" metrics to <endpoint>/v1/metrics) was spamming
+// export errors on deployments whose collector only accepts /v1/traces. The
+// meter provider is left unset (global no-op) and initGenAIInstruments is not
+// called, so the GenAI histograms stay nil and their Record calls are inert
+// (see Inference.RecordUsage/End). Per-request token totals still land on spans
+// via addTokens/SetRequestTokens, so no trace-level data is lost. To re-enable,
+// restore the meter provider + metric exporter here and call
+// initGenAIInstruments(mp).
 func InitTracer(ctx context.Context, cfg Config) (func(context.Context) error, error) {
-	traceExporter, metricExporter, err := buildExporters(ctx, cfg)
+	traceExporter, err := buildTraceExporter(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -112,49 +118,32 @@ func InitTracer(ctx context.Context, cfg Config) (func(context.Context) error, e
 	}
 	tp := sdktrace.NewTracerProvider(tpOpts...)
 
-	// Metrics back the GenAI "floor" metrics (gen_ai.client.token.usage /
-	// operation.duration).
-	mp := sdkmetric.NewMeterProvider(
-		sdkmetric.WithResource(res),
-		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(metricExporter)),
-	)
-
 	otel.SetTracerProvider(tp)
-	otel.SetMeterProvider(mp)
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
 
 	tracer = otel.Tracer(cfg.ServiceName)
-	initGenAIInstruments(mp)
 	initialized = true
 
 	return func(ctx context.Context) error {
-		return errors.Join(tp.Shutdown(ctx), mp.Shutdown(ctx))
+		return tp.Shutdown(ctx)
 	}, nil
 }
 
-// buildExporters constructs the OTLP/HTTP trace and metric exporters. The
-// /v1/traces and /v1/metrics signal paths are derived from CollectorEndpoint.
-func buildExporters(ctx context.Context, cfg Config) (*otlptrace.Exporter, sdkmetric.Exporter, error) {
+// buildTraceExporter constructs the OTLP/HTTP trace exporter. The /v1/traces
+// signal path is derived from CollectorEndpoint.
+func buildTraceExporter(ctx context.Context, cfg Config) (*otlptrace.Exporter, error) {
 	traceOpts := []otlptracehttp.Option{
 		otlptracehttp.WithEndpointURL(signalURL(cfg.CollectorEndpoint, "/v1/traces")),
 	}
-	metricOpts := []otlpmetrichttp.Option{
-		otlpmetrichttp.WithEndpointURL(signalURL(cfg.CollectorEndpoint, "/v1/metrics")),
-	}
 	if len(cfg.Headers) > 0 {
 		traceOpts = append(traceOpts, otlptracehttp.WithHeaders(cfg.Headers))
-		metricOpts = append(metricOpts, otlpmetrichttp.WithHeaders(cfg.Headers))
 	}
 
 	traceExporter, err := otlptracehttp.New(ctx, traceOpts...)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create http trace exporter: %w", err)
+		return nil, fmt.Errorf("failed to create http trace exporter: %w", err)
 	}
-	metricExporter, err := otlpmetrichttp.New(ctx, metricOpts...)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create http metric exporter: %w", err)
-	}
-	return traceExporter, metricExporter, nil
+	return traceExporter, nil
 }
 
 // signalURL joins an OTLP base endpoint with a signal path. When the base

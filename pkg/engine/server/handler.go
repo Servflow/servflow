@@ -62,10 +62,13 @@ func (e *Engine) createBasicHandler(config *apiconfig.APIConfig) (http.Handler, 
 		p:             p,
 		handlerType:   config.HttpConfig.Handler,
 		handlerConfig: config.HttpConfig.HandlerConfig,
+		baseLogger:    e.logger,
 	}
 
 	if e.configSpanAttrs != nil {
-		a.extraSpanAttrs = e.configSpanAttrs(config)
+		for k, v := range e.configSpanAttrs(config) {
+			a.spanAttrs = append(a.spanAttrs, attribute.String(k, v))
+		}
 	}
 
 	return a.CreateChain(config, e.getCorsConfig()), nil
@@ -83,9 +86,13 @@ type APIHandler struct {
 	// handlerConfig is the raw config for the entry handler, made available to
 	// the middleware via entryhandlers.WithConfig.
 	handlerConfig map[string]interface{}
-	// extraSpanAttrs are host-supplied attributes stamped on the root entry
-	// span (e.g. sf.agent), resolved once when this handler was built.
-	extraSpanAttrs map[string]string
+	// baseLogger is the engine logger; ServeHTTP derives the request logger
+	// from it via requestctx.Start.
+	baseLogger *zap.Logger
+	// spanAttrs are host-supplied request-wide span attributes (e.g. sf.agent),
+	// resolved when this handler was built and applied to every span of each
+	// request via requestctx.Start.
+	spanAttrs []attribute.KeyValue
 }
 
 const mcpServerVersion = "0.1.0"
@@ -141,10 +148,6 @@ func (h *APIHandler) initTracing(req *http.Request) (context.Context, trace.Span
 		attribute.String("sf.http.path", req.URL.Path),
 	)
 
-	for k, v := range h.extraSpanAttrs {
-		span.SetAttributes(attribute.String(k, v))
-	}
-
 	// Add query parameters to trace
 	queryParams := req.URL.Query()
 	for key, values := range queryParams {
@@ -172,37 +175,31 @@ func (h *APIHandler) initTracing(req *http.Request) (context.Context, trace.Span
 // ServeHttp extracts the context parameters and begins excuting the plan (step)
 func (h *APIHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	start := time.Now()
-	ctx := req.Context()
+	if h.baseLogger == nil {
+		h.baseLogger = zap.NewNop()
+	}
+	ctx, rectx := requestctx.Start(req.Context(), requestctx.Options{
+		Logger: h.baseLogger.With(
+			zap.String("method", req.Method), zap.String("path", req.URL.Path)),
+		SpanAttributes: h.spanAttrs,
+	})
+	req = req.WithContext(ctx)
+	// The lifecycle (bound in StartHTTPEntry) owns the root span: Done stamps
+	// the token totals and ends it once dispatched chains drain — root Duration
+	// = the request's true total time.
+	defer rectx.Done()
 	logger := logging.FromContext(ctx)
 	logger.Debug("Handling request")
 
 	ctx, span := h.initTracing(req)
-	if span != nil {
-		defer span.End()
-		// Registered after span.End so it runs first (LIFO): attach the
-		// request-level token total before the root span closes.
-		defer tracing.SetRequestTokens(ctx, span)
-	}
 
-	rectx, ok := requestctx.FromContext(ctx)
-	if !ok {
-		logger.Error("Could not get request context")
-		tracing.SetHTTPStatus(span, http.StatusInternalServerError, errors.New("could not get request context"))
-		http.Error(wr, "Error processing request", http.StatusInternalServerError)
-		return
-	}
-
-	if span != nil {
-		span.SetAttributes(attribute.String("sf.request_id", rectx.ID()))
-	}
 	// Derive the request/context copy FIRST, then bind the template functions to
 	// that same copy — the one the entry-handler middleware (and the plan) will
 	// serve. requestTemplateFunctions' `body` closure reads req.Body lazily; an
 	// entry handler that reads and restores the body (e.g. github_webhook's HMAC
 	// check) reassigns Body on the request it is handed, so the `body` function
-	// must be captured on that same *http.Request. Capturing it on the pre-copy
-	// request instead leaves `body "..."` reading a drained reader (renders
-	// empty) once a handler has consumed the body.
+	// must be captured on that same *http.Request. initTracing has already
+	// read-and-restored the body onto this req before the copy.
 	ctx = plan.WithRequest(ctx, req)
 	req = req.WithContext(ctx)
 

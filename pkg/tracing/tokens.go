@@ -31,9 +31,18 @@ func addTokens(ctx context.Context, input, output int64) {
 	}
 }
 
-// SetRequestTokens attaches the request-level token totals to span. Call just
-// before ending a root span. No-op when the span is nil or ctx carries no
-// request context.
+// stampRequestTokens writes the request-level token totals onto span.
+func stampRequestTokens(rc *requestctx.RequestContext, span trace.Span) {
+	in, out := rc.TokenUsage()
+	span.SetAttributes(
+		attribute.Int64(AttrUsageInput, in),
+		attribute.Int64(AttrUsageOutput, out),
+		attribute.Int64(AttrUsageTotal, in+out),
+	)
+}
+
+// Deprecated: root spans stamp token totals via the RequestContext lifecycle
+// (BindRootSpan); no new call sites.
 func SetRequestTokens(ctx context.Context, span trace.Span) {
 	if span == nil {
 		return
@@ -42,10 +51,5 @@ func SetRequestTokens(ctx context.Context, span trace.Span) {
 	if !ok {
 		return
 	}
-	in, out := rc.TokenUsage()
-	span.SetAttributes(
-		attribute.Int64(AttrUsageInput, in),
-		attribute.Int64(AttrUsageOutput, out),
-		attribute.Int64(AttrUsageTotal, in+out),
-	)
+	stampRequestTokens(rc, span)
 }

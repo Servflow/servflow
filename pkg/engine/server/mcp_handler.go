@@ -10,6 +10,7 @@ import (
 	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
+	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/Servflow/servflow/pkg/tracing"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -62,29 +63,28 @@ func (e *Engine) createMCPHandler(config *apiconfig.APIConfig) error {
 
 	e.mcpServer.AddTool(mcp.NewTool(config.McpTool.Name, options...), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		start := time.Now()
-		logger := logger.With(zap.String("tool_name", config.McpTool.Name))
 
-		reqCtx, ok := requestctx.FromContext(ctx)
-		if !ok {
-			logger.Error("could not get request context")
-			return nil, fmt.Errorf("error handling request")
-		}
+		ctx, reqCtx := requestctx.Start(ctx, requestctx.Options{
+			Logger: logger.With(zap.String("tool_name", config.McpTool.Name)),
+			TemplateFuncs: template.FuncMap{
+				"tool_param": func(key string) string {
+					args := request.GetArguments()
+					r, ok := args[key].(string)
+					if !ok {
+						return ""
+					}
 
-		// TODO add unit test for this
-		reqCtx.AddRequestTemplateFunctions(template.FuncMap{
-			"tool_param": func(key string) string {
-				args := request.GetArguments()
-				r, ok := args[key].(string)
-				if !ok {
-					return ""
-				}
-
-				return r
+					return r
+				},
 			},
-		}, true)
+			TemplateFuncsExclusive: true,
+		})
+		// The lifecycle owns the MCP root span (bound in StartMCPTool): Done
+		// ends it once any dispatched chains drain.
+		defer reqCtx.Done()
+		logger := logging.FromContext(ctx)
 
-		ctx, span := tracing.StartMCPTool(ctx, config.McpTool.Name)
-		defer span.End()
+		ctx, _ = tracing.StartMCPTool(ctx, config.McpTool.Name) // lifecycle-owned; no manual End
 
 		if _, err := p.Execute(ctx, config.McpTool.Start); err != nil {
 			logger.Error("error executing planner", zap.Error(err))

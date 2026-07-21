@@ -7,6 +7,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"text/template"
+
+	"go.opentelemetry.io/otel/attribute"
 )
 
 var ErrNoContext = errors.New("no context provided in request")
@@ -34,6 +36,13 @@ type RequestContext struct {
 	// Shared by pointer with child workflow contexts via ShareSecretsWith.
 	// Own mutex; never nil (see NewRequestContext).
 	secrets *secretTable
+
+	// spanAttrs are the request-wide attributes stamped on this request's root
+	// span by pkg/tracing. Set once in Start before the ctx is shared;
+	// read-only afterwards.
+	spanAttrs []attribute.KeyValue
+	// lc is the request completion latch (see lifecycle.go).
+	lc lifecycle
 }
 
 // AddTokenUsage adds LLM token usage to this request's running total. Safe for
@@ -103,6 +112,12 @@ func (rc *RequestContext) GetWorkspace() Workspace {
 	return rc.workspace
 }
 
+// NewRequestContext builds a bare RequestContext.
+//
+// Production entry points should NOT call this directly: open a request via
+// Start, which consolidates id generation, span attributes, the request
+// logger, template funcs and parent linking. NewRequestContext remains the
+// low-level constructor used by Start, tests and NewTestContext.
 func NewRequestContext(id string) *RequestContext {
 	return &RequestContext{
 		requestID:        id,

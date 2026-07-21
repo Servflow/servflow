@@ -150,7 +150,9 @@ func (a *ActionV2) dispatchBackgroundChains(ctx context.Context, logger *zap.Log
 
 		logger.Debug("dispatching background chain", zap.String("dispatch_id", dispatchID))
 
+		endFlow := reqCtx.BeginFlow("dispatch:" + dispatchID)
 		bgMgr.Dispatch(func(bgCtx context.Context) {
+			defer endFlow() // FIRST: a panic or early return must still end the flow
 			// Detach the request context's cancellation so the chain survives the
 			// HTTP request completing, while retaining its values — crucially the
 			// live, recording OTEL span. Re-injecting only a remote span context

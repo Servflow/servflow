@@ -1,15 +1,12 @@
 package server
 
 import (
-	"fmt"
 	"net/http"
 	"net/http/pprof"
 	"strings"
-	"time"
 
 	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/plan"
-	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/mark3labs/mcp-go/server"
 	"go.uber.org/zap"
@@ -59,7 +56,7 @@ func (e *Engine) createMuxHandler(configs []*apiconfig.APIConfig) *mux.Router {
 			continue
 		}
 
-		h := e.wrapMiddlewareWithReqIDLogger(e.logger, handler)
+		h := e.wrapMiddleware(handler)
 		logger.Info("registered handler", zap.String("config_id", conf.ID))
 
 		r.Handle(listenPath, h).Methods(method, http.MethodOptions)
@@ -67,23 +64,20 @@ func (e *Engine) createMuxHandler(configs []*apiconfig.APIConfig) *mux.Router {
 
 	if e.mcpServer != nil {
 		httpHandler := server.NewStreamableHTTPServer(e.mcpServer)
-		r.HandleFunc("/mcp", e.wrapMiddlewareWithReqIDLogger(e.logger, httpHandler).ServeHTTP).Methods(http.MethodGet, http.MethodOptions, http.MethodPost)
+		r.HandleFunc("/mcp", e.wrapMiddleware(httpHandler).ServeHTTP).Methods(http.MethodGet, http.MethodOptions, http.MethodPost)
 	}
 
 	return r
 }
 
-func (e *Engine) wrapMiddlewareWithReqIDLogger(logger *zap.Logger, handler http.Handler) http.Handler {
+// wrapMiddleware installs the process-level concerns shared by every request:
+// idle-timer reset, the background manager, and the request hook. The
+// request-scoped facilities (request id, RequestContext, logger, span
+// attributes) are opened by the terminal handlers via requestctx.Start.
+func (e *Engine) wrapMiddleware(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		e.resetIdleTimer()
-		requestID := fmt.Sprintf("request_%d", time.Now().UnixNano())
-		aggCtx := requestctx.NewRequestContext(requestID)
-		ctx := requestctx.WithAggregationContext(r.Context(), aggCtx)
-		logger := logger.With(zap.String("request_id", requestID), zap.String("method", r.Method), zap.String("path", r.URL.Path))
-		// Scrub any secret values revealed during this request from every log
-		// line derived from this logger (no-op until a reveal happens).
-		logger = logging.WrapWithScrubber(logger, aggCtx)
-		ctx = logging.WithLogger(ctx, logger)
+		ctx := r.Context()
 		if e.backgroundManager != nil {
 			ctx = plan.WithBackgroundManager(ctx, e.backgroundManager)
 		}

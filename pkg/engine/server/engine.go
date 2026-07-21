@@ -161,6 +161,19 @@ func WithWorkspaceProvider(provider WorkspaceProvider) Option {
 	}
 }
 
+// ConfigSpanAttributes supplies extra attributes to stamp on a config's root
+// entry span (e.g. the owning agent's name). It is resolved once per config
+// when its handler is built, not per request.
+type ConfigSpanAttributes func(config *apiconfig.APIConfig) map[string]string
+
+// WithConfigSpanAttributes installs a resolver whose returned attributes are
+// stamped on the root entry span of every request served for that config.
+func WithConfigSpanAttributes(f ConfigSpanAttributes) Option {
+	return func(e *Engine) {
+		e.configSpanAttrs = f
+	}
+}
+
 // resolveWorkspace resolves the workspace capability for a config via the
 // configured provider, returning nil when no provider is installed.
 func (e *Engine) resolveWorkspace(config *apiconfig.APIConfig) (requestctx.Workspace, error) {
@@ -197,6 +210,7 @@ type Engine struct {
 	requestHook       RequestHook
 	backgroundManager *plan.BackgroundManager
 	workspaceProvider WorkspaceProvider
+	configSpanAttrs   ConfigSpanAttributes
 	initErr           error
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
@@ -132,6 +133,63 @@ func TestEntryHandler_ConfigAvailableToMiddleware(t *testing.T) {
 	runner.handler.ServeHTTP(w, req)
 
 	assert.Equal(t, "abc123", gotSecret)
+}
+
+// TestEntryHandler_BodyReadableAfterHandlerConsumesIt is the regression guard
+// for the aliasing bug where the `body` template function and the entry-handler
+// middleware operated on different *http.Request copies. A handler that reads
+// and restores the request body (as github_webhook does for HMAC verification)
+// reassigns Body on the request it is served; if the `body` function was bound
+// to a different copy, it read the drained original reader and every
+// `body "..."` rendered empty. Here the handler drains+restores the body and
+// the plan reads a field from it via `body "action"` — it must see the real
+// value, not "".
+func TestEntryHandler_BodyReadableAfterHandlerConsumesIt(t *testing.T) {
+	entryhandlers.Register("test_drainbody", func(_ map[string]interface{}, next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Mirror github_webhook: fully read the raw body, then restore it.
+			_ = requestctx.ReadAndRestoreBody(r)
+			next.ServeHTTP(w, r)
+		})
+	})
+
+	config := &apiconfig.APIConfig{
+		ID: "drainbody-cfg",
+		HttpConfig: apiconfig.HttpConfig{
+			ListenPath: "/hook",
+			Method:     "POST",
+			Next:       "action.greet",
+			Handler:    "test_drainbody",
+		},
+		Actions: map[string]apiconfig.Action{
+			"greet": {
+				Name:   "greet",
+				Type:   "stub",
+				Next:   "response.ok",
+				Config: map[string]interface{}{"message": "hello"},
+			},
+		},
+		Responses: map[string]apiconfig.ResponseConfig{
+			"ok": {
+				Name:     "ok",
+				Code:     200,
+				Type:     "template",
+				Template: `{"action":"{{ body "action" }}"}`,
+			},
+		},
+	}
+	runner := NewTestRunner(t, config).Init()
+
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/hook",
+		strings.NewReader(`{"action":"synchronize"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	runner.handler.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	// Before the fix this rendered {"action":""} because the handler drained a
+	// different request copy than the `body` function read.
+	assert.JSONEq(t, `{"action":"synchronize"}`, w.Body.String())
 }
 
 func TestEntryHandler_ConfigTemplatesResolvedByEngine(t *testing.T) {

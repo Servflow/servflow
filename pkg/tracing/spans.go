@@ -58,6 +58,7 @@ func (sp scrubSpan) SetStatus(code codes.Code, description string) {
 // low-cardinality (the step class); the per-instance label lives in AttrName.
 const (
 	AttrName         = "sf.name"        // friendly per-instance label rendered by dashboards
+	AttrAgent        = "sf.agent"       // name of the agent that owns the workflow config, stamped by the host (pro)
 	AttrWorkflow     = "sf.workflow"    // stable workflow config id, carried on root entry spans for grouping/search
 	AttrStepType     = "sf.step.type"   // request | action | condition | response | trigger | scheduled
 	AttrActionType   = "sf.action_type" // concrete action type (http, callworkflow, parallel, ...)

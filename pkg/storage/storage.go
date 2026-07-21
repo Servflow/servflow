@@ -12,9 +12,8 @@ import (
 )
 
 type Client struct {
-	db   *badger.DB
-	once sync.Once
-	mu   sync.Mutex
+	db *badger.DB
+	mu sync.Mutex
 }
 
 var client *Client
@@ -52,31 +51,27 @@ func GetClient() (*Client, error) {
 }
 
 func (c *Client) ensureOpen() error {
-	var openErr error
+	_, err := c.dbHandle()
+	return err
+}
 
-	c.once.Do(func() {
-		c.mu.Lock()
-		defer c.mu.Unlock()
-
-		db, err := openDB()
-		if err != nil {
-			openErr = err
-			return
-		}
-		c.db = db
-	})
-
-	if openErr != nil {
-		return openErr
-	}
-
+// dbHandle returns the open badger DB, opening it if necessary. It takes the
+// client mutex for the whole read-open-store sequence so that concurrent
+// Close/reset (which mutate c.db under the same lock) can never race the field
+// access. Callers must not hold c.mu.
+func (c *Client) dbHandle() (*badger.DB, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
 	if c.db == nil {
-		return errors.New("failed to initialize client")
+		db, err := openDB()
+		if err != nil {
+			return nil, err
+		}
+		c.db = db
 	}
 
-	return nil
+	return c.db, nil
 }
 
 func isDBClosedError(err error) bool {
@@ -88,7 +83,6 @@ func (c *Client) reset() error {
 	defer c.mu.Unlock()
 
 	c.db = nil
-	c.once = sync.Once{}
 
 	db, err := openDB()
 	if err != nil {
@@ -113,7 +107,6 @@ func (c *Client) Close() error {
 
 	err := c.db.Close()
 	c.db = nil
-	c.once = sync.Once{}
 	return err
 }
 
@@ -127,8 +120,8 @@ func WriteToLog(key string, value []Serializable) error {
 		ts := time.Now().UnixNano()
 		k := []byte(fmt.Sprintf("%s:%s:%d", servflowPrefix, strings.Trim(key, ":"), ts))
 
-		_, err = withRetryOnClose(func(c *Client) (struct{}, error) {
-			err := c.db.Update(func(txn *badger.Txn) error {
+		_, err = withRetryOnClose(func(db *badger.DB) (struct{}, error) {
+			err := db.Update(func(txn *badger.Txn) error {
 				return txn.Set(k, b)
 			})
 			return struct{}{}, err
@@ -148,9 +141,9 @@ func GetLogEntriesByPrefix(prefix string, deserializeFunc func([]byte) (any, err
 	}
 	bPrefix := []byte(fmt.Sprintf("%s:%s:", servflowPrefix, prefix))
 
-	return withRetryOnClose(func(c *Client) ([]any, error) {
+	return withRetryOnClose(func(db *badger.DB) ([]any, error) {
 		result := make([]any, 0)
-		err := c.db.View(func(txn *badger.Txn) error {
+		err := db.View(func(txn *badger.Txn) error {
 			opts := badger.DefaultIteratorOptions
 			opts.PrefetchSize = 10
 			it := txn.NewIterator(opts)
@@ -176,7 +169,11 @@ func GetLogEntriesByPrefix(prefix string, deserializeFunc func([]byte) (any, err
 	})
 }
 
-func withRetryOnClose[T any](operation func(*Client) (T, error)) (T, error) {
+// withRetryOnClose runs operation against the currently-open badger DB. The DB
+// handle is snapshotted under the client mutex, so the operation never touches
+// c.db directly and cannot race a concurrent Close/reset. If the DB was closed
+// out from under us mid-operation, it is reopened once and the operation retried.
+func withRetryOnClose[T any](operation func(*badger.DB) (T, error)) (T, error) {
 	var zero T
 
 	c, err := GetClient()
@@ -184,13 +181,22 @@ func withRetryOnClose[T any](operation func(*Client) (T, error)) (T, error) {
 		return zero, err
 	}
 
-	result, err := operation(c)
+	db, err := c.dbHandle()
+	if err != nil {
+		return zero, err
+	}
+
+	result, err := operation(db)
 	if isDBClosedError(err) {
 		if resetErr := c.reset(); resetErr != nil {
 			return zero, resetErr
 		}
 
-		result, err = operation(c)
+		if db, err = c.dbHandle(); err != nil {
+			return zero, err
+		}
+
+		result, err = operation(db)
 	}
 
 	return result, err
@@ -203,8 +209,8 @@ func Set(key string, value string) error {
 
 	k := []byte(fmt.Sprintf("%s:%s:%s", servflowPrefix, kvPrefix, key))
 
-	_, err := withRetryOnClose(func(c *Client) (struct{}, error) {
-		err := c.db.Update(func(txn *badger.Txn) error {
+	_, err := withRetryOnClose(func(db *badger.DB) (struct{}, error) {
+		err := db.Update(func(txn *badger.Txn) error {
 			return txn.Set(k, []byte(value))
 		})
 		return struct{}{}, err
@@ -225,11 +231,11 @@ func Get(key string) (string, bool, error) {
 
 	k := []byte(fmt.Sprintf("%s:%s:%s", servflowPrefix, kvPrefix, key))
 
-	result, err := withRetryOnClose(func(c *Client) (GetResult, error) {
+	result, err := withRetryOnClose(func(db *badger.DB) (GetResult, error) {
 		var value []byte
 		var found bool
 
-		err := c.db.View(func(txn *badger.Txn) error {
+		err := db.View(func(txn *badger.Txn) error {
 			item, err := txn.Get(k)
 			if err != nil {
 				if err == badger.ErrKeyNotFound {

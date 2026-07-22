@@ -393,7 +393,7 @@ func TestHTTPActionWithEscapeTemplateViaPlanExecute(t *testing.T) {
 	require.NoError(t, err)
 
 	// Execute the plan
-	_, err = p.Execute(ctx, requestctx.ActionConfigPrefix+"test_http")
+	_, err = p.Execute(ctx, apiconfig.ActionConfigPrefix+"test_http")
 	require.NoError(t, err)
 
 	// Verify the server was called
@@ -468,7 +468,7 @@ func TestHTTPActionObjectBodyViaPlanExecute(t *testing.T) {
 	}, "")
 	require.NoError(t, err)
 
-	_, err = p.Execute(ctx, requestctx.ActionConfigPrefix+"test_http")
+	_, err = p.Execute(ctx, apiconfig.ActionConfigPrefix+"test_http")
 	require.NoError(t, err)
 
 	require.True(t, serverCalled, "Test server should have been called")

@@ -65,7 +65,7 @@ func TestAction_Execute(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, &stepWrapper{id: "next", step: &nextStep}, next)
 
-			field, err := requestctx.ReplaceVariableValuesInContext(ctx, "{{ .test }}")
+			field, err := requestctx.ExecuteTemplateString(ctx, "{{ .test }}")
 			require.NoError(t, err)
 			assert.Equal(t, "response string", field)
 		})
@@ -102,7 +102,7 @@ func TestAction_Execute(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, &stepWrapper{id: "next", step: &nextStep}, next)
 
-			field, err := requestctx.ReplaceVariableValuesInContext(ctx, "{{ .test }}")
+			field, err := requestctx.ExecuteTemplateString(ctx, "{{ .test }}")
 			require.NoError(t, err)
 			assert.Equal(t, "response string", field)
 		})
@@ -132,7 +132,7 @@ func TestAction_Execute(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, &stepWrapper{id: "next", step: &nextStep}, next)
 
-			field, err := requestctx.ReplaceVariableValuesInContext(ctx, "{{ .custom_out }}")
+			field, err := requestctx.ExecuteTemplateString(ctx, "{{ .custom_out }}")
 			require.NoError(t, err)
 			assert.Equal(t, "custom response", field)
 		})
@@ -295,7 +295,7 @@ func TestAction_ExecuteWithReplica(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, &stepWrapper{id: "next", step: &nextStep}, next)
 
-		field, err := requestctx.ReplaceVariableValuesInContext(ctx, "{{ .test }}")
+		field, err := requestctx.ExecuteTemplateString(ctx, "{{ .test }}")
 		require.NoError(t, err)
 		assert.Equal(t, "replica response", field)
 	})
@@ -329,7 +329,7 @@ func TestAction_ExecuteWithReplica(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, &stepWrapper{id: "next", step: &nextStep}, next)
 
-		field, err := requestctx.ReplaceVariableValuesInContext(ctx, "{{ .test }}")
+		field, err := requestctx.ExecuteTemplateString(ctx, "{{ .test }}")
 		require.NoError(t, err)
 		assert.Equal(t, "direct response", field)
 	})
@@ -364,7 +364,7 @@ func TestAction_ExecuteWithReplica(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, &stepWrapper{id: "next", step: &nextStep}, next)
 
-		field, err := requestctx.ReplaceVariableValuesInContext(ctx, "{{ .test }}")
+		field, err := requestctx.ExecuteTemplateString(ctx, "{{ .test }}")
 		require.NoError(t, err)
 		assert.Equal(t, "fallback response", field)
 	})

@@ -62,7 +62,7 @@ func TestRequestHook(t *testing.T) {
 				requestHook: tt.hook,
 			}
 
-			wrappedHandler := engine.wrapMiddlewareWithReqIDLogger(logger, testHandler)
+			wrappedHandler := engine.wrapMiddleware(testHandler)
 
 			req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/test", nil)
 			w := httptest.NewRecorder()
@@ -93,7 +93,7 @@ func TestRequestHookHasAccessToEnrichedContext(t *testing.T) {
 		requestHook: hook,
 	}
 
-	wrappedHandler := engine.wrapMiddlewareWithReqIDLogger(logger, testHandler)
+	wrappedHandler := engine.wrapMiddleware(testHandler)
 
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/test", nil)
 	w := httptest.NewRecorder()
@@ -119,7 +119,7 @@ func TestRequestHookWithEngineOption(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	wrappedHandler := engine.wrapMiddlewareWithReqIDLogger(engine.logger, testHandler)
+	wrappedHandler := engine.wrapMiddleware(testHandler)
 
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/test", nil)
 	w := httptest.NewRecorder()
@@ -147,7 +147,7 @@ func TestRequestHookCanModifyResponse(t *testing.T) {
 		requestHook: hook,
 	}
 
-	wrappedHandler := engine.wrapMiddlewareWithReqIDLogger(logger, testHandler)
+	wrappedHandler := engine.wrapMiddleware(testHandler)
 
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/test", nil)
 	w := httptest.NewRecorder()

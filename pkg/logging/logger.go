@@ -53,12 +53,9 @@ func GetNewLogger() *zap.Logger {
 	return root
 }
 
-// loggerKey is the context key for storing logger instances
-type loggerKey struct{}
-
 // WithLogger adds a logger to the context
 func WithLogger(ctx context.Context, logger *zap.Logger) context.Context {
-	return context.WithValue(ctx, loggerKey{}, logger)
+	return requestctx.WithLogger(ctx, logger)
 }
 
 // FromContext retrieves a logger from the context.
@@ -67,7 +64,7 @@ func WithLogger(ctx context.Context, logger *zap.Logger) context.Context {
 // resolved secrets must not be able to log them through the fallback path.
 func FromContext(ctx context.Context) *zap.Logger {
 	if ctx != nil {
-		if logger, ok := ctx.Value(loggerKey{}).(*zap.Logger); ok {
+		if logger, ok := requestctx.LoggerFromContext(ctx); ok {
 			return logger
 		}
 		if rc, ok := requestctx.FromContext(ctx); ok {

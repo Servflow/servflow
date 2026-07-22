@@ -313,7 +313,7 @@ func TestNewClient(t *testing.T) {
 			Description: "Test workflow execution",
 			Params:      []string{"param1", "param2"},
 			ReturnValue: `{{ printf "%s%s" .variable_actions_workflow_action.result (tool_param "param1") }}`,
-			Start:       requestctx2.ActionConfigPrefix + "workflow_action",
+			Start:       apiconfig.ActionConfigPrefix + "workflow_action",
 		}))
 		require.NoError(t, err)
 		require.NotNil(t, manager)
@@ -408,7 +408,7 @@ func TestNewClient(t *testing.T) {
 				Type:       apiconfig.FileInputTypeAction,
 				Identifier: "file_action",
 			},
-			Start: requestctx2.ActionConfigPrefix + "file_action",
+			Start: apiconfig.ActionConfigPrefix + "file_action",
 		}))
 		require.NoError(t, err)
 		require.NotNil(t, manager)
@@ -434,7 +434,7 @@ func TestNewClient(t *testing.T) {
 			Description: "Test invalid type",
 			Params:      []string{"param1"},
 			Type:        "invalid",
-			Start:       requestctx2.ActionConfigPrefix + "some_action",
+			Start:       apiconfig.ActionConfigPrefix + "some_action",
 		}))
 		assert.ErrorContains(t, err, "invalid workflow tool type: invalid")
 	})

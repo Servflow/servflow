@@ -67,6 +67,8 @@ const (
 	AttrToolName     = "sf.tool_name"
 	AttrToolType     = "sf.tool_type"   // mcp | workflow
 	AttrToolParams   = "sf.tool_params" // JSON of model-supplied tool-call arguments (sensitive keys redacted, size-capped)
+
+	AttrRequestID = requestctx.AttrRequestID // stamped on the root span via the rc
 )
 
 // start creates a span with a low-cardinality name and always attaches the
@@ -85,6 +87,19 @@ func start(ctx context.Context, spanName, display string, attrs ...attribute.Key
 	return ctx, span
 }
 
+// bindRoot hands a root entry span to the request lifecycle: the
+// RequestContext defers its End until the main flow AND all child flows
+// complete, and stamps the request token totals right before ending. It also
+// stamps the request-wide attributes (sf.request_id, host attrs like sf.agent)
+// on the root span only — child spans do not carry them. Without an rc in ctx
+// (tests, tracing-disabled callers) the caller keeps manual End responsibility.
+func bindRoot(ctx context.Context, span trace.Span) {
+	if rc, ok := requestctx.FromContext(ctx); ok {
+		span.SetAttributes(rc.SpanAttributes()...)
+		rc.BindRootSpan(span, func(s trace.Span) { stampRequestTokens(rc, s) })
+	}
+}
+
 // rootDisplay picks the friendly label for a workflow root span: the
 // human-readable name when set, otherwise the stable config id.
 func rootDisplay(name, id string) string {
@@ -98,9 +113,11 @@ func rootDisplay(name, id string) string {
 // friendly display name and id its stable config id; both identify which
 // workflow the trace belongs to.
 func StartHTTPEntry(ctx context.Context, name, id string) (context.Context, trace.Span) {
-	return start(ctx, "HTTP Entry", rootDisplay(name, id),
+	ctx, span := start(ctx, "HTTP Entry", rootDisplay(name, id),
 		attribute.String(AttrStepType, "request"),
 		attribute.String(AttrWorkflow, id))
+	bindRoot(ctx, span)
+	return ctx, span
 }
 
 // SetHTTPStatus records the final HTTP status code on the entry span and, per
@@ -149,25 +166,31 @@ func StartResponse(ctx context.Context, id, name string) (context.Context, trace
 // StartWorkflowExecute spans a workflow invoked through a trigger (e.g. callworkflow).
 // name is the workflow's friendly display name and id its stable config id.
 func StartWorkflowExecute(ctx context.Context, name, id string) (context.Context, trace.Span) {
-	return start(ctx, "Workflow Execute", rootDisplay(name, id),
+	ctx, span := start(ctx, "Workflow Execute", rootDisplay(name, id),
 		attribute.String(AttrStepType, "trigger"),
 		attribute.String(AttrWorkflow, id))
+	bindRoot(ctx, span)
+	return ctx, span
 }
 
 // StartScheduledExecution spans a scheduled (cron) workflow run.
 // name is the workflow's friendly display name and id its stable config id.
 func StartScheduledExecution(ctx context.Context, name, id string) (context.Context, trace.Span) {
-	return start(ctx, "Scheduled Execution", rootDisplay(name, id),
+	ctx, span := start(ctx, "Scheduled Execution", rootDisplay(name, id),
 		attribute.String(AttrStepType, "scheduled"),
 		attribute.String(AttrWorkflow, id))
+	bindRoot(ctx, span)
+	return ctx, span
 }
 
 // StartDashboardRun spans a manual workflow run triggered from the builder dashboard.
 // name is the workflow's friendly display name and id its stable config id.
 func StartDashboardRun(ctx context.Context, name, id string) (context.Context, trace.Span) {
-	return start(ctx, "Dashboard Run", rootDisplay(name, id),
+	ctx, span := start(ctx, "Dashboard Run", rootDisplay(name, id),
 		attribute.String(AttrStepType, "request"),
 		attribute.String(AttrWorkflow, id))
+	bindRoot(ctx, span)
+	return ctx, span
 }
 
 // StartAgentInvoke spans a whole agent-action run (the GenAI invoke_agent
@@ -187,12 +210,14 @@ func StartAgentInvoke(ctx context.Context, name string) (context.Context, trace.
 // StartMCPTool spans the invocation of an MCP tool. Carries both the sf.* tool
 // keys and the GenAI execute_tool attributes.
 func StartMCPTool(ctx context.Context, name string) (context.Context, trace.Span) {
-	return start(ctx, "MCP Tool", name,
+	ctx, span := start(ctx, "MCP Tool", name,
 		attribute.String(AttrToolName, name),
 		attribute.String(AttrToolType, "mcp"),
 		attribute.String(AttrGenAIOperation, opExecuteTool),
 		attribute.String(AttrGenAIToolName, name),
 		attribute.String(AttrGenAIToolType, "mcp"))
+	bindRoot(ctx, span)
+	return ctx, span
 }
 
 // StartAgentTool spans the invocation of an agent workflow tool. Carries both

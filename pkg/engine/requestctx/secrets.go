@@ -1,6 +1,7 @@
 package requestctx
 
 import (
+	"sort"
 	"strings"
 	"sync"
 )
@@ -21,6 +22,11 @@ const (
 	// replacing very short strings (e.g. "a") would corrupt unrelated output
 	// far more than it protects, so such values are not tracked.
 	minTrackedValueLen = 4
+
+	// minTrackedLineLen is the threshold for tracking individual lines of a
+	// multi-line secret. Higher than minTrackedValueLen because a single line
+	// is likelier to collide with unrelated output.
+	minTrackedLineLen = 16
 )
 
 // secretTable records the secret values resolved during one request AND every
@@ -37,28 +43,66 @@ func newSecretTable() *secretTable {
 }
 
 // track records a resolved secret value so scrubbers can mask it wherever it
-// surfaces for the rest of the request.
+// surfaces for the rest of the request. Transformed copies produced by
+// template functions (escaped, url-encoded, ...) are tracked automatically by
+// the taint wrapper (see taint.go), which calls track with the transform's
+// real output — no transform prediction here.
+//
+// For multi-line secrets (e.g. PEM keys) each substantial line is tracked too:
+// lines are verbatim substrings of the value, so a copy whose newlines are
+// re-encoded or reflowed by an external system is still masked.
 func (t *secretTable) track(name, value string) {
 	if len(value) < minTrackedValueLen {
 		return
 	}
 	t.mu.Lock()
+	defer t.mu.Unlock()
 	t.values[value] = name
-	t.mu.Unlock()
+	if strings.Contains(value, "\n") {
+		for _, line := range strings.Split(value, "\n") {
+			line = strings.TrimSpace(line)
+			if len(line) >= minTrackedLineLen {
+				t.values[line] = name
+			}
+		}
+	}
+}
+
+// matchName reports the name of a tracked secret whose value appears in s.
+// Used by the taint wrapper to decide whether a transform's output is derived
+// from a secret.
+func (t *secretTable) matchName(s string) (string, bool) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	if len(t.values) == 0 || s == "" {
+		return "", false
+	}
+	for v, name := range t.values {
+		if strings.Contains(s, v) {
+			return name, true
+		}
+	}
+	return "", false
 }
 
 // scrub replaces any tracked secret value found in s with «sf:name». Exact
 // match against the (tiny) tracked set; a no-op for requests that resolved no
-// secrets.
+// secrets. Longer entries replace first so a full multi-line value is masked
+// as one marker rather than line by line.
 func (t *secretTable) scrub(s string) string {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	if len(t.values) == 0 || s == "" {
 		return s
 	}
-	for v, name := range t.values {
+	keys := make([]string, 0, len(t.values))
+	for v := range t.values {
+		keys = append(keys, v)
+	}
+	sort.Slice(keys, func(i, j int) bool { return len(keys[i]) > len(keys[j]) })
+	for _, v := range keys {
 		if strings.Contains(s, v) {
-			s = strings.ReplaceAll(s, v, scrubMarkerPrefix+name+scrubMarkerSuffix)
+			s = strings.ReplaceAll(s, v, scrubMarkerPrefix+t.values[v]+scrubMarkerSuffix)
 		}
 	}
 	return s

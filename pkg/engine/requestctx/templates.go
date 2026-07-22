@@ -115,6 +115,19 @@ func (rc *RequestContext) getFuncMap(funcMap template.FuncMap) template.FuncMap 
 	for k, v := range funcMap {
 		m[k] = v
 	}
+	// Route the string-producing text/template built-ins through the FuncMap
+	// (they bypass it otherwise) unless the caller already overrode them.
+	for k, v := range taintableBuiltins() {
+		if _, exists := m[k]; !exists {
+			m[k] = v
+		}
+	}
+	// Taint-wrap every function so a transform applied to a secret keeps the
+	// secret tracked for scrubbing — whoever registered the function and
+	// however deep the transform chain. See taint.go.
+	for k, v := range m {
+		m[k] = rc.taintWrap(v)
+	}
 	return m
 }
 
@@ -132,13 +145,6 @@ func stringEscape(s interface{}) string {
 
 func now() string {
 	return time.Now().Format("2006-01-02 15:04:05")
-}
-
-// secret is the base (host-side, no RequestContext) template func used by
-// paths with no request in flight (config load, CLI). Request-scoped templates
-// use tmplFuncSecret, which additionally tracks the value for scrubbing.
-func secret(key string) string {
-	return secrets.FetchSecret(key)
 }
 
 // tmplFuncSecret is the request-scoped `secret` template function. It returns
@@ -358,5 +364,20 @@ func (rc *RequestContext) tmplFuncFile(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return string(data), nil
+	content := string(data)
+	// Private-key material (e.g. a GitHub App PEM delivered as a workspace
+	// file) is tracked for scrubbing like a {{ secret }} value. The taint
+	// wrapper can't cover it: it keys off function arguments, and this func's
+	// argument is a path, not the secret. Deliberately narrow — public certs
+	// and ordinary files are workflow data, and over-tracking would scrub
+	// legitimate content out of action outputs.
+	if looksLikeKeyMaterial(content) {
+		rc.secrets.track("file:"+path, content)
+	}
+	return content, nil
+}
+
+// looksLikeKeyMaterial reports whether file contents are a private key.
+func looksLikeKeyMaterial(s string) bool {
+	return strings.Contains(s, "PRIVATE KEY-----")
 }

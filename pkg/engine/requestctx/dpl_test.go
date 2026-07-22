@@ -100,12 +100,12 @@ func TestBackwardCompatibility(t *testing.T) {
 	err := AddRequestVariables(ctx, map[string]interface{}{"greet": map[string]interface{}{"message": "hello"}}, "")
 	require.NoError(t, err)
 
-	result, err := ReplaceVariableValuesInContext(ctx, "{{ .variable_actions_greet.message }}")
+	result, err := ExecuteTemplateString(ctx, "{{ .variable_actions_greet.message }}")
 	require.NoError(t, err)
 	assert.Equal(t, "hello", result)
 }
 
-func TestReplaceVariableValuesInContext(t *testing.T) {
+func TestExecuteTemplateStringVariables(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
@@ -193,10 +193,10 @@ func TestReplaceVariableValuesInContext(t *testing.T) {
 			ctx := NewTestContext()
 			err := AddRequestVariables(ctx, tt.values, "")
 			require.NoError(t, err)
-			result, err := ReplaceVariableValuesInContext(ctx, tt.input)
+			result, err := ExecuteTemplateString(ctx, tt.input)
 			require.NoError(t, err)
 			if result != tt.expected {
-				t.Errorf("ReplaceVariableValues(%q, %v) = %q, want %q", tt.input, tt.values, result, tt.expected)
+				t.Errorf("ExecuteTemplateString(%q, %v) = %q, want %q", tt.input, tt.values, result, tt.expected)
 			}
 		})
 	}
@@ -292,7 +292,7 @@ func TestCreateTextTemplate(t *testing.T) {
 	}
 }
 
-func TestBaseParseTextTemplate(t *testing.T) {
+func TestExecuteTemplateStringSecrets(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
@@ -334,7 +334,7 @@ func TestBaseParseTextTemplate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := BaseParseTextTemplate(tt.input, nil)
+			result, err := ExecuteTemplateString(NewTestContext(), tt.input)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -413,59 +413,6 @@ func TestExecuteTemplateWithActionFunctionMap(t *testing.T) {
 				assert.Equal(t, tt.expected, result)
 			}
 		})
-	}
-}
-
-func TestWrapWithJSON(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{
-			name:     "basic wrap test",
-			input:    "{\"key\": \"{{ data }}\"}",
-			expected: "{\"key\": {{ jsonout ( data )}}}",
-		},
-		{
-			name:     "nested wrap test",
-			input:    "{\"outerKey\": \"{{ innerKey }}\", \"anotherKey\": \"{{ anotherInnerKey }}\"}",
-			expected: "{\"outerKey\": {{ jsonout ( innerKey )}}, \"anotherKey\": {{ jsonout ( anotherInnerKey )}}}",
-		},
-		{
-			name:     "no template tags",
-			input:    "{\"key\": \"value\"}",
-			expected: "{\"key\": \"value\"}",
-		},
-		{
-			name:     "empty input",
-			input:    "",
-			expected: "",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := wrapWithJSON(tt.input)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
-func BenchmarkReplaceVariableValuesInContext(b *testing.B) {
-	ctx := NewTestContext()
-	err := AddRequestVariables(ctx, map[string]interface{}{"variable1": "test", "variable2": "test2"}, "")
-	require.NoError(b, err)
-	input := "Start {{$variable1}} middle {{$variable2}} end."
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
-		in, err := ReplaceVariableValuesInContext(ctx, input)
-		if err != nil {
-			b.Fatal("Error in ReplaceVariableValuesInContext:", err)
-		}
-		if in != "Start test middle test2 end." {
-			b.Fatal("invalid value")
-		}
 	}
 }
 

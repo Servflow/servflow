@@ -57,11 +57,8 @@ func (rc *RequestContext) TokenUsage() (input, output int64) {
 	return rc.tokenInput.Load(), rc.tokenOutput.Load()
 }
 
-// TODO move this and dpl together
-const errTag = "error"
-
 // AddValidationErrors gets the validation errors added by the various conditional template functions,
-// then adds the errors under the errTag in the request variable for parsing
+// then adds the errors under the ErrorTagStripped key in the request variable for parsing
 func AddValidationErrors(ctx context.Context) error {
 	reqCtx, err := FromContextOrError(ctx)
 	if err != nil {
@@ -72,7 +69,7 @@ func AddValidationErrors(ctx context.Context) error {
 	for i, err := range reqCtx.validationErrors {
 		errMessages[i] = err.Error()
 	}
-	reqCtx.addRequestVariables(map[string]interface{}{errTag: errMessages}, "")
+	reqCtx.addRequestVariables(map[string]interface{}{ErrorTagStripped: errMessages}, "")
 	return nil
 }
 

@@ -9,8 +9,6 @@ import (
 	"regexp"
 	"strings"
 	"text/template"
-
-	"github.com/Servflow/servflow/pkg/apiconfig"
 )
 
 // TODO move to same package as requestctx
@@ -24,15 +22,20 @@ type DataType int
 
 const noValue = "<no value>"
 
+// Request-variable namespace constants. Unlike the step-reference prefixes
+// (whose canonical home is the apiconfig package), these describe how request
+// and action outputs are keyed in the request-variable map that templates
+// render against, so their home is here in the request layer.
 const (
-	// Step-reference prefixes moved to the apiconfig package (canonical home).
-	// Aliased here for backwards compatibility; prefer apiconfig.* in new code.
-	ActionConfigPrefix          = apiconfig.ActionConfigPrefix
-	ConditionalConfigPrefix     = apiconfig.ConditionalConfigPrefix
-	ResponsesConfigPrefix       = apiconfig.ResponsesConfigPrefix
+	// BareVariablesPrefixStripped prefixes every entry in the request-variable
+	// map; templates address them as "{{ .variable_... }}".
 	BareVariablesPrefixStripped = "variable_"
-	VariableActionPrefix        = BareVariablesPrefixStripped + "actions_"
-	ErrorTagStripped            = "error"
+	// VariableActionPrefix is the request-variable prefix under which an
+	// action's stored output lives ("variable_actions_<id>").
+	VariableActionPrefix = BareVariablesPrefixStripped + "actions_"
+	// ErrorTagStripped is the request-variable key under which conditional
+	// validation errors are collected.
+	ErrorTagStripped = "error"
 )
 
 const (

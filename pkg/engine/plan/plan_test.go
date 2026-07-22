@@ -73,7 +73,7 @@ func TestPlan_Execute(t *testing.T) {
 	}{
 		{
 			name:         "success from response template",
-			startAction:  requestctx2.ActionConfigPrefix + "action1",
+			startAction:  apiconfig.ActionConfigPrefix + "action1",
 			contextSetup: func(ctx context.Context) {},
 			mockAssertions: func(exec1, exec2, exec3 *MockActionExecutable) {
 				exec1.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil, nil)
@@ -84,7 +84,7 @@ func TestPlan_Execute(t *testing.T) {
 		},
 		{
 			name:         "chain without response step yields nil result",
-			startAction:  requestctx2.ActionConfigPrefix + "action2",
+			startAction:  apiconfig.ActionConfigPrefix + "action2",
 			contextSetup: func(ctx context.Context) {},
 			mockAssertions: func(exec1, exec2, exec3 *MockActionExecutable) {
 				exec2.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil, nil)
@@ -104,7 +104,7 @@ func TestPlan_Execute(t *testing.T) {
 		},
 		{
 			name:        "execute in action",
-			startAction: requestctx2.ActionConfigPrefix + "action3",
+			startAction: apiconfig.ActionConfigPrefix + "action3",
 			contextSetup: func(ctx context.Context) {
 				requestctx2.AddRequestVariables(ctx, map[string]interface{}{"testValue": "test value"}, "")
 			},
@@ -113,7 +113,7 @@ func TestPlan_Execute(t *testing.T) {
 					DoAndReturn(func(ctx context.Context, _ string) (interface{}, map[string]string, error) {
 						// An action can re-enter the plan to run a sub-chain; the
 						// sub-chain has no response step, so it returns a nil result.
-						resp, err := ExecuteFromContext(ctx, requestctx2.ActionConfigPrefix+"action2")
+						resp, err := ExecuteFromContext(ctx, apiconfig.ActionConfigPrefix+"action2")
 						require.NoError(t, err)
 						assert.Nil(t, resp)
 						return "test value", nil, nil
@@ -367,7 +367,7 @@ func TestPlan_WorkspacePassedToActions(t *testing.T) {
 			require.NoError(t, err)
 
 			ctx := requestctx2.NewTestContext()
-			_, err = plan.Execute(ctx, requestctx2.ActionConfigPrefix+"test_action")
+			_, err = plan.Execute(ctx, apiconfig.ActionConfigPrefix+"test_action")
 			require.NoError(t, err)
 
 			if tc.expectNil {
@@ -435,6 +435,6 @@ func TestPlan_WorkspaceTemplateFunction(t *testing.T) {
 	require.NoError(t, err)
 
 	ctx := requestctx2.NewTestContext()
-	_, err = plan.Execute(ctx, requestctx2.ActionConfigPrefix+"test_action")
+	_, err = plan.Execute(ctx, apiconfig.ActionConfigPrefix+"test_action")
 	require.NoError(t, err)
 }

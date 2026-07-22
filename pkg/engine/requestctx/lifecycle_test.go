@@ -138,7 +138,7 @@ func TestLifecycle_DrainTimeout(t *testing.T) {
 func TestLifecycle_NoSpan(t *testing.T) {
 	_, rc := Start(context.Background(), Options{ID: "r6"})
 	var called atomic.Bool
-	rc.OnComplete(func() { called.Store(true) })
+	rc.RegisterOnCompleteHook(func() { called.Store(true) })
 	rc.Done()
 	assert.True(t, called.Load(), "OnComplete must fire even with no span")
 }
@@ -318,7 +318,7 @@ func TestLifecycle_StressConcurrent(t *testing.T) {
 		rc.BindRootSpan(span)
 
 		var completions atomic.Int32
-		rc.OnComplete(func() { completions.Add(1) })
+		rc.RegisterOnCompleteHook(func() { completions.Add(1) })
 
 		const N = 100
 		var wg sync.WaitGroup

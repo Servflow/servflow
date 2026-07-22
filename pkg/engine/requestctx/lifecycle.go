@@ -77,7 +77,7 @@ func Start(ctx context.Context, opts Options) (context.Context, *RequestContext)
 	if opts.Parent != nil {
 		opts.Parent.ShareSecretsWith(rc)
 		end := opts.Parent.BeginFlow("workflow:" + id)
-		rc.OnComplete(end)
+		rc.RegisterOnCompleteHook(end)
 	}
 	ctx = WithAggregationContext(ctx, rc)
 	if opts.Logger != nil {
@@ -127,9 +127,9 @@ func (rc *RequestContext) BeginFlow(name string) (end func()) {
 	}
 }
 
-// OnComplete registers fn to run at full completion; fires immediately if the
+// RegisterOnCompleteHook registers fn to run at full completion; fires immediately if the
 // request already completed. Span-agnostic: works with tracing disabled.
-func (rc *RequestContext) OnComplete(fn func()) {
+func (rc *RequestContext) RegisterOnCompleteHook(fn func()) {
 	rc.lc.mu.Lock()
 	if rc.lc.completed {
 		rc.lc.mu.Unlock()
@@ -141,7 +141,7 @@ func (rc *RequestContext) OnComplete(fn func()) {
 }
 
 // Done marks the main flow complete. Non-blocking. The request fully completes
-// — root span End (Duration = TOTAL time), request files closed, OnComplete
+// — root span End (Duration = TOTAL time), request files closed, RegisterOnCompleteHook
 // callbacks — once Done has been called AND every BeginFlow has ended, or at
 // flowDrainTimeout.
 func (rc *RequestContext) Done() {
@@ -161,7 +161,7 @@ func (rc *RequestContext) Done() {
 // maybeComplete finishes the request exactly once, when the main flow is done
 // and child flows have drained (or force, on drain timeout). Effects run
 // outside the lock, in order: beforeEnd hooks → root span End → close request
-// files → OnComplete callbacks.
+// files → RegisterOnCompleteHook callbacks.
 func (rc *RequestContext) maybeComplete(force bool) {
 	rc.lc.mu.Lock()
 	if rc.lc.completed || !rc.lc.mainDone || (rc.lc.flows > 0 && !force) {

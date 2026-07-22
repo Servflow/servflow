@@ -81,9 +81,9 @@ func TestParallelExec_Execute(t *testing.T) {
 		parallelExec := &Exec{
 			config: Config{
 				Steps: []string{
-					requestctx.ActionConfigPrefix + "action1",
-					requestctx.ActionConfigPrefix + "action2",
-					requestctx.ActionConfigPrefix + "action3",
+					apiconfig.ActionConfigPrefix + "action1",
+					apiconfig.ActionConfigPrefix + "action2",
+					apiconfig.ActionConfigPrefix + "action3",
 				},
 				StopOnFailure: true,
 			},
@@ -125,9 +125,9 @@ func TestParallelExec_Execute(t *testing.T) {
 		parallelExec := &Exec{
 			config: Config{
 				Steps: []string{
-					requestctx.ActionConfigPrefix + "action1",
-					requestctx.ActionConfigPrefix + "action2",
-					requestctx.ActionConfigPrefix + "action3",
+					apiconfig.ActionConfigPrefix + "action1",
+					apiconfig.ActionConfigPrefix + "action2",
+					apiconfig.ActionConfigPrefix + "action3",
 				},
 				StopOnFailure: true,
 			},
@@ -171,9 +171,9 @@ func TestParallelExec_Execute(t *testing.T) {
 		parallelExec := &Exec{
 			config: Config{
 				Steps: []string{
-					requestctx.ActionConfigPrefix + "action1",
-					requestctx.ActionConfigPrefix + "action2",
-					requestctx.ActionConfigPrefix + "action3",
+					apiconfig.ActionConfigPrefix + "action1",
+					apiconfig.ActionConfigPrefix + "action2",
+					apiconfig.ActionConfigPrefix + "action3",
 				},
 				StopOnFailure: false,
 			},
@@ -230,9 +230,9 @@ func TestParallelExec_Execute(t *testing.T) {
 		parallelExec := &Exec{
 			config: Config{
 				Steps: []string{
-					requestctx.ActionConfigPrefix + "action1",
-					requestctx.ActionConfigPrefix + "action2",
-					requestctx.ActionConfigPrefix + "action3",
+					apiconfig.ActionConfigPrefix + "action1",
+					apiconfig.ActionConfigPrefix + "action2",
+					apiconfig.ActionConfigPrefix + "action3",
 				},
 				StopOnFailure: true,
 			},
@@ -278,9 +278,9 @@ func TestParallelExec_Execute(t *testing.T) {
 		parallelExec := &Exec{
 			config: Config{
 				Steps: []string{
-					requestctx.ActionConfigPrefix + "action1",
-					requestctx.ActionConfigPrefix + "action2",
-					requestctx.ActionConfigPrefix + "action3",
+					apiconfig.ActionConfigPrefix + "action1",
+					apiconfig.ActionConfigPrefix + "action2",
+					apiconfig.ActionConfigPrefix + "action3",
 				},
 				StopOnFailure: false,
 			},
@@ -325,7 +325,7 @@ func TestParallelExec_Execute(t *testing.T) {
 		parallelExec := &Exec{
 			config: Config{
 				Steps: []string{
-					requestctx.ActionConfigPrefix + "action1",
+					apiconfig.ActionConfigPrefix + "action1",
 				},
 				StopOnFailure: true,
 			},
@@ -375,7 +375,7 @@ func TestParallelExec_Execute(t *testing.T) {
 		parallelExec := &Exec{
 			config: Config{
 				Steps: []string{
-					requestctx.ActionConfigPrefix + "action1",
+					apiconfig.ActionConfigPrefix + "action1",
 				},
 				StopOnFailure: true,
 			},

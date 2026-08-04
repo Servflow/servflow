@@ -6,6 +6,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -307,7 +308,7 @@ func TestOrchestrator_ToolErrorWithLLMWrapup(t *testing.T) {
 	assert.Contains(t, result, "I'm unable to complete the weather request due to an error")
 }
 
-func TestSession_ConversationIDMessageRetrieval(t *testing.T) {
+func TestSession_ConversationThreadSharing(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -320,6 +321,11 @@ func TestSession_ConversationIDMessageRetrieval(t *testing.T) {
 	if err := json.Unmarshal([]byte(toolList), &toolInfoList); err != nil {
 		t.Fatal(err)
 	}
+
+	// A single shared conversation thread stands in for the request-context-owned
+	// thread every agent action in a plan reads from and appends to. In-memory
+	// (persist=false) so the test needs no storage backend.
+	conv := requestctx.NewConversation(conversationID)
 
 	t.Run("initial conversation with storage", func(t *testing.T) {
 		mockToolManager := NewMockToolManager(ctrl)
@@ -370,7 +376,7 @@ func TestSession_ConversationIDMessageRetrieval(t *testing.T) {
 		// Create session with conversation ID
 		session, err := NewSession(systemPrompt, mockLLmHandler,
 			WithToolManager(mockToolManager),
-			WithConversationID(context.Background(), conversationID),
+			WithConversation(conv),
 			WithInstructions(testInstructions))
 		require.NoError(t, err)
 
@@ -475,11 +481,11 @@ func TestSession_ConversationIDMessageRetrieval(t *testing.T) {
 
 			newSession, err := NewSession(systemPrompt, mockLLmHandler2,
 				WithToolManager(mockToolManager2),
-				WithConversationID(context.Background(), conversationID),
+				WithConversation(conv),
 				WithInstructions(testInstructions))
 			require.NoError(t, err)
 
-			// Verify that messages were loaded from storage + developer message
+			// Verify that messages were seeded from the shared thread
 			assert.Equal(t, 5, len(newSession.messages))
 
 			// Verify the loaded messages match what we expect
@@ -522,12 +528,15 @@ func TestSession_ConversationIDMessageRetrieval(t *testing.T) {
 		})
 	})
 
-	// Test error case: empty conversation ID
-	t.Run("error on empty conversation ID", func(t *testing.T) {
+	// A nil conversation is a safe no-op: the session keeps a purely local
+	// history rather than erroring (conversation creation is the request
+	// context's responsibility, not the session's).
+	t.Run("nil conversation is a no-op", func(t *testing.T) {
 		mockLLmHandler := NewMockLLmProvider(ctrl)
-		_, err := NewSession(systemPrompt, mockLLmHandler, WithConversationID(context.Background(), ""))
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "conversationID can not be empty")
+		session, err := NewSession(systemPrompt, mockLLmHandler, WithConversation(nil))
+		require.NoError(t, err)
+		assert.Nil(t, session.conversation)
+		assert.Empty(t, session.messages)
 	})
 }
 

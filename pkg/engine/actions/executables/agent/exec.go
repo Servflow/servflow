@@ -22,7 +22,6 @@ type Config struct {
 	SystemPrompt      string              `json:"systemPrompt" yaml:"systemPrompt"`
 	UserPrompt        string              `json:"userPrompt" yaml:"userPrompt"`
 	IntegrationID     string              `json:"integrationID" yaml:"integrationID"`
-	ConversationID    string              `json:"conversationID" yaml:"conversationID"`
 	ReturnLastMessage bool                `json:"returnLastMessage" yaml:"returnLastMessage"`
 	FileUpload        apiconfig.FileInput `json:"fileUpload" yaml:"fileUpload"`
 }
@@ -51,29 +50,46 @@ type Agent struct {
 	toolManager *tools.Manager
 }
 
-func (a *Agent) Config() string {
-	c, err := json.Marshal(a.config)
+// Execute is the V2 entrypoint: the action resolves its own templated fields
+// individually against the request context, so text produced by a template
+// (e.g. a JSON document interpolated into a prompt) can never corrupt the rest
+// of the config the way the V1 whole-string resolve-then-reparse did.
+//
+// Only the fields consumed NOW are resolved: the prompts and the file
+// identifier. ToolConfigs are deliberately left untouched — the tools manager
+// was built from the raw config at construction time and resolves tool-time
+// templates (returnValue, subgraph configs) when a tool is called.
+//
+// The conversation is no longer per-action: every agent action reads from and
+// appends to the request's shared conversation thread (owned by the request
+// context, selected once at plan start via the conversation id).
+func (a *Agent) Execute(ctx context.Context) (interface{}, map[string]string, error) {
+	rc, err := requestctx.FromContextOrError(ctx)
 	if err != nil {
-		return ""
-	}
-	return string(c)
-}
-
-func (a *Agent) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
-	var newConfig Config
-	if err := json.Unmarshal([]byte(modifiedConfig), &newConfig); err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("failed to get request context: %w", err)
 	}
 
-	options := []agent.Option{agent.WithToolManager(a.toolManager)}
-	if newConfig.ConversationID != "" {
-		options = append(options, agent.WithConversationID(ctx, newConfig.ConversationID))
+	resolved, err := rc.ResolveBatch(ctx,
+		a.config.SystemPrompt,
+		a.config.UserPrompt,
+		a.config.FileUpload.Identifier,
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to resolve agent config: %w", err)
 	}
-	if newConfig.ReturnLastMessage {
+	systemPrompt, userPrompt := resolved[0], resolved[1]
+	fileUpload := a.config.FileUpload
+	fileUpload.Identifier = resolved[2]
+
+	options := []agent.Option{
+		agent.WithToolManager(a.toolManager),
+		agent.WithConversation(rc.Conversation()),
+	}
+	if a.config.ReturnLastMessage {
 		options = append(options, agent.WithReturnOnlyLastMessage())
 	}
 	session, err := agent.NewSession(
-		newConfig.SystemPrompt,
+		systemPrompt,
 		a.integration,
 		options...,
 	)
@@ -81,14 +97,14 @@ func (a *Agent) Execute(ctx context.Context, modifiedConfig string) (interface{}
 		return nil, nil, err
 	}
 
-	ctx, span := tracing.StartAgentInvoke(ctx, newConfig.IntegrationID)
+	ctx, span := tracing.StartAgentInvoke(ctx, a.config.IntegrationID)
 	defer span.End()
 
-	fileInput, err := requestctx.GetFileFromContext(ctx, newConfig.FileUpload)
+	fileInput, err := requestctx.GetFileFromContext(ctx, fileUpload)
 	if err != nil && !errors.Is(err, requestctx.ErrFileNotFound) {
 		return nil, nil, fmt.Errorf("%w: %v", actions.ErrorFatal, err)
 	}
-	resp, err := session.Query(ctx, newConfig.UserPrompt, fileInput)
+	resp, err := session.Query(ctx, userPrompt, fileInput)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
@@ -185,12 +201,6 @@ func init() {
 			Placeholder: "AI integration identifier",
 			Required:    true,
 		},
-		"conversationID": {
-			Type:        actions.FieldTypeString,
-			Label:       "Conversation ID",
-			Placeholder: "Conversation identifier",
-			Required:    false,
-		},
 		"returnLastMessage": {
 			Type:        actions.FieldTypeBoolean,
 			Label:       "Return Last Message",
@@ -204,7 +214,8 @@ func init() {
 		Name:        "AI Agent",
 		Description: "Interacts with AI models to process queries and execute tool functions",
 		Fields:      fields,
-		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
+		UseV2: true,
+		ConstructorV2: func(config json.RawMessage) (actions.ActionExecutableV2, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {
 				return nil, fmt.Errorf("error creating agent action: %v", err)

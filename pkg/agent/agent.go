@@ -4,7 +4,6 @@ package agent
 import (
 	"context"
 	_ "embed"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -18,8 +17,6 @@ import (
 
 //go:embed new_instructions.md
 var instructions []byte
-
-const conversationStoragePrefix = "agent_conversation_"
 
 type ToolManager interface {
 	CallTool(ctx context.Context, toolName string, params map[string]any) ([]mcp.Content, error)
@@ -43,7 +40,7 @@ type Session struct {
 	toolManager           ToolManager
 	llm                   LLmProvider
 	messages              []any
-	conversationID        string
+	conversation          *requestctx.Conversation
 	returnOnlyLastMessage bool
 	customInstructions    string
 	llmResponses          []LLMResponse
@@ -58,40 +55,20 @@ func WithToolManager(toolManager ToolManager) Option {
 	}
 }
 
-func WithConversationID(ctx context.Context, id string) Option {
+// WithConversation binds the session to the request's shared conversation
+// thread. The session seeds its working context with the thread so far (so it
+// sees what earlier agents in the run said) and appends every message it
+// produces back to the thread. A nil conversation is a no-op — the session
+// keeps a purely local, unshared history.
+func WithConversation(conv *requestctx.Conversation) Option {
 	return func(a *Session) error {
-		if id == "" {
-			return fmt.Errorf("conversationID can not be empty")
+		a.conversation = conv
+		if conv == nil {
+			return nil
 		}
-		a.conversationID = id
-		messages, err := storage.GetLogEntriesByPrefix(conversationStoragePrefix+id, func(data []byte) (any, error) {
-			var msg Message
-			err := json.Unmarshal(data, &msg)
-			if err != nil {
-				return nil, err
-			}
-			switch msg.Type {
-			case MessageTypeText:
-				var contentMessage MessageTypeContent
-				err = json.Unmarshal(data, &contentMessage)
-				return contentMessage, err
-			case MessageTypeToolResponse:
-				var toolResponse MessageToolCallResponse
-				err = json.Unmarshal(data, &toolResponse)
-				return toolResponse, err
-			case MessageTypeToolCall:
-				var toolCall MessageToolCall
-				err = json.Unmarshal(data, &toolCall)
-				return toolCall, err
-			default:
-				logging.FromContext(ctx).Warn("invalid type in log storage", zap.Int("type", int(msg.Type)))
-			}
-			return nil, nil
-		})
-		if err != nil {
-			return err
+		for _, m := range conv.Messages() {
+			a.messages = append(a.messages, m)
 		}
-		a.messages = append(a.messages, messages...)
 		return nil
 	}
 }
@@ -303,14 +280,6 @@ func createToolResponseFromMCPContent(callID string, contentList []mcp.Content) 
 // TODO: think of context management strategy for image responses, they can cause bloat
 
 func (a *Session) addToMessages(logger *zap.Logger, message any, output chan agentOutput) {
-	storageKey := ""
-	if a.conversationID != "" {
-		storageKey = conversationStoragePrefix + a.conversationID
-	}
-
-	var (
-		serializable storage.Serializable
-	)
 	switch message := message.(type) {
 	case MessageTypeContent:
 		a.messages = append(a.messages, message)
@@ -319,21 +288,22 @@ func (a *Session) addToMessages(logger *zap.Logger, message any, output chan age
 				response: message.Content,
 			}
 		}
-
-		serializable = &message
 	case MessageToolCall:
 		a.messages = append(a.messages, message)
-		serializable = &message
 	case MessageToolCallResponse:
 		a.messages = append(a.messages, message)
-		serializable = &message
 	default:
 		logger.Warn("received message of unknown type", zap.Any("message", message))
+		return
 	}
 
-	if storageKey != "" {
-		if err := storage.WriteToLog(storageKey, []storage.Serializable{serializable}); err != nil {
-			logger.Error("failed to write serializable message", zap.Error(err))
+	// Contribute the message to the request's shared conversation thread so
+	// other agents in the run — and, when persistence is enabled, later runs —
+	// can see it. The concrete message types satisfy ConversationMessage via
+	// value receivers.
+	if a.conversation != nil {
+		if cm, ok := message.(ConversationMessage); ok {
+			a.conversation.Append(cm)
 		}
 	}
 }

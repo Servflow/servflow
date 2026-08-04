@@ -182,6 +182,10 @@ func (h *APIHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 		Logger: h.baseLogger.With(
 			zap.String("method", req.Method), zap.String("path", req.URL.Path)),
 		SpanAttributes: h.spanAttrs,
+		// An optional client-supplied id resumes a persisted conversation thread
+		// that every agent action in the plan shares; absent, a fresh in-memory
+		// thread is created for this request.
+		ConversationID: req.Header.Get("X-Conversation-Id"),
 	})
 	req = req.WithContext(ctx)
 	// The lifecycle (bound in StartHTTPEntry) owns the root span: Done stamps

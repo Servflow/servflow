@@ -56,8 +56,15 @@ type Options struct {
 	TemplateFuncsExclusive bool
 	// Parent links a sub-workflow to its caller: secrets are shared, and this
 	// request registers as a child flow of the parent, so the parent's total
-	// time transitively covers this request's entire lifetime.
+	// time transitively covers this request's entire lifetime. A child with no
+	// explicit ConversationID also joins the parent's conversation thread.
 	Parent *RequestContext
+	// ConversationID selects the run's conversation thread. When set, the thread
+	// is resumed from the log store (empty if new) so a later request with the
+	// same id continues it. When empty, a fresh thread with a generated id is
+	// created. Either way the thread is synced to the log store in the background;
+	// agents read and append in memory.
+	ConversationID string
 }
 
 // Start opens a request and its main flow. The caller MUST call Done() when
@@ -78,6 +85,22 @@ func Start(ctx context.Context, opts Options) (context.Context, *RequestContext)
 		opts.Parent.ShareSecretsWith(rc)
 		end := opts.Parent.BeginFlow("workflow:" + id)
 		rc.RegisterOnCompleteHook(end)
+	}
+	conv, owned := resolveConversation(opts)
+	rc.setConversation(conv)
+	if owned {
+		// The conversation lives in memory for the request and is written once, at
+		// completion — which is after the response is sent AND after child flows
+		// drain, so a sub-workflow's messages are included and the client waits on
+		// nothing. Only the owning request flushes; adopted threads are persisted
+		// by the request that created them.
+		flushLogger := opts.Logger
+		rc.RegisterOnCompleteHook(func() {
+			if err := conv.Flush(); err != nil && flushLogger != nil {
+				flushLogger.Warn("failed to persist conversation",
+					zap.String("conversation_id", conv.ID()), zap.Error(err))
+			}
+		})
 	}
 	ctx = WithAggregationContext(ctx, rc)
 	if opts.Logger != nil {

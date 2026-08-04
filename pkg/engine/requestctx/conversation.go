@@ -165,9 +165,10 @@ func decodeConversationMessage(data []byte) (any, error) {
 }
 
 // resolveConversation builds the Conversation for a request from its Options and
-// reports whether this request OWNS it (must run the background sync). A child
+// reports whether this request OWNS it (must flush it at completion). A child
 // request with no explicit ConversationID joins its parent's thread by pointer
-// and does NOT own it. Otherwise a fresh thread is created — always with an
+// and does NOT own it — the parent, which completes last, persists the thread
+// for both. Otherwise a fresh thread is created — always with an
 // identifier (generated when none was supplied). A supplied id is resumed from
 // the store best-effort: a load failure yields an empty thread rather than
 // failing request start.

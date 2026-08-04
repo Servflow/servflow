@@ -214,7 +214,7 @@ func init() {
 		Name:        "AI Agent",
 		Description: "Interacts with AI models to process queries and execute tool functions",
 		Fields:      fields,
-		UseV2: true,
+		UseV2:       true,
 		ConstructorV2: func(config json.RawMessage) (actions.ActionExecutableV2, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {

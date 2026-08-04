@@ -308,6 +308,89 @@ func TestOrchestrator_ToolErrorWithLLMWrapup(t *testing.T) {
 	assert.Contains(t, result, "I'm unable to complete the weather request due to an error")
 }
 
+// TestSession_AgentsInSameRequestShareConversation proves the property the whole
+// centralisation rests on: two agents running in the SAME request context get
+// the same conversation thread, so what one writes the next one reads. Unlike
+// TestSession_ConversationThreadSharing (which shares a Conversation built
+// directly), this sources the thread from the request context exactly as the
+// agent action does — requestctx.Start → rc.Conversation().
+func TestSession_AgentsInSameRequestShareConversation(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	ctx, rc := requestctx.Start(context.Background(), requestctx.Options{})
+	defer rc.Done()
+
+	// Every agent action resolves the thread the same way; it must be one object.
+	conv := rc.Conversation()
+	require.NotNil(t, conv, "request context must carry a conversation")
+	require.Same(t, conv, rc.Conversation(), "each agent must resolve the same thread")
+
+	// Agent 1 runs and contributes to the thread.
+	firstLLM := NewMockLLmProvider(ctrl)
+	firstTools := NewMockToolManager(ctrl)
+	firstTools.EXPECT().ToolList(gomock.Any()).Return(nil).AnyTimes()
+	firstLLM.EXPECT().ProvideResponse(gomock.Any(), gomock.Any()).
+		Return(LLMResponse{Content: []ContentResponse{{Text: "agent one reporting"}}}, nil)
+
+	agentOne, err := NewSession("first agent", firstLLM,
+		WithToolManager(firstTools),
+		WithConversation(rc.Conversation()))
+	require.NoError(t, err)
+	_, err = agentOne.Query(ctx, "what did you find?", nil)
+	require.NoError(t, err)
+
+	// Agent 2 starts later in the same request: it must SEE agent 1's exchange
+	// rather than beginning blank.
+	secondLLM := NewMockLLmProvider(ctrl)
+	secondTools := NewMockToolManager(ctrl)
+	secondTools.EXPECT().ToolList(gomock.Any()).Return(nil).AnyTimes()
+	secondLLM.EXPECT().ProvideResponse(gomock.Any(), gomock.Any()).
+		Do(func(_ context.Context, req LLMRequest) {
+			// assert, never require: this runs on the session's internal goroutine,
+			// where require's FailNow would kill the goroutine without closing the
+			// response channel — hanging the test instead of failing it.
+			if !assert.Len(t, req.Messages, 3) {
+				return
+			}
+			// agent 1's user turn + agent 1's answer + agent 2's own new query.
+			if seeded, ok := req.Messages[0].(MessageTypeContent); assert.True(t, ok,
+				"seeded message lost its concrete type: %T", req.Messages[0]) {
+				assert.Equal(t, RoleTypeUser, seeded.Role)
+				assert.Equal(t, "what did you find?", seeded.Content)
+			}
+			if answer, ok := req.Messages[1].(MessageTypeContent); assert.True(t, ok) {
+				assert.Equal(t, RoleTypeAssistant, answer.Role)
+				assert.Equal(t, "agent one reporting", answer.Content)
+			}
+		}).
+		Return(LLMResponse{Content: []ContentResponse{{Text: "agent two building on that"}}}, nil)
+
+	agentTwo, err := NewSession("second agent", secondLLM,
+		WithToolManager(secondTools),
+		WithConversation(rc.Conversation()))
+	require.NoError(t, err)
+	assert.Len(t, agentTwo.messages, 2, "agent two should be seeded with agent one's exchange")
+
+	_, err = agentTwo.Query(ctx, "anything to add?", nil)
+	require.NoError(t, err)
+
+	// Both agents' turns land on the one shared thread, in order.
+	got := conv.Messages()
+	require.Len(t, got, 4)
+	want := []string{
+		"what did you find?",
+		"agent one reporting",
+		"anything to add?",
+		"agent two building on that",
+	}
+	for i, w := range want {
+		msg, ok := got[i].(MessageTypeContent)
+		require.True(t, ok, "message %d has type %T", i, got[i])
+		assert.Equal(t, w, msg.Content, "message %d", i)
+	}
+}
+
 func TestSession_ConversationThreadSharing(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -323,8 +406,7 @@ func TestSession_ConversationThreadSharing(t *testing.T) {
 	}
 
 	// A single shared conversation thread stands in for the request-context-owned
-	// thread every agent action in a plan reads from and appends to. In-memory
-	// (persist=false) so the test needs no storage backend.
+	// thread every agent action in a plan reads from and appends to.
 	conv := requestctx.NewConversation(conversationID)
 
 	t.Run("initial conversation with storage", func(t *testing.T) {

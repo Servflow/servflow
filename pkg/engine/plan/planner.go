@@ -14,6 +14,12 @@ import (
 	"go.uber.org/zap"
 )
 
+// defaultDispatchTimeout caps a background dispatch chain when PlannerConfig
+// leaves DispatchTimeout unset. It has to accommodate an agent action, whose
+// runtime is the sum of every model round-trip plus tool calls across the loop —
+// a single LLM call is fast, but a multi-step agent easily runs for minutes.
+const defaultDispatchTimeout = 10 * time.Minute
+
 type ActionProvider interface {
 	GetActionExecutable(actionType string, config json.RawMessage) (actions.ActionExecutable, error)
 }
@@ -32,7 +38,7 @@ type PlannerConfig struct {
 	EndValue string
 
 	// DispatchTimeout is the timeout duration for background dispatch chains.
-	// If not set or set to 0, background actions will run without a timeout.
+	// If not set or set to 0, defaultDispatchTimeout applies.
 	DispatchTimeout time.Duration
 
 	// Workspace is the file capability that workspace-aware actions and template
@@ -96,7 +102,7 @@ func (p *PlannerV2) Plan() (*Plan, error) {
 
 	dispatchTimeout := p.config.DispatchTimeout
 	if dispatchTimeout == 0 {
-		dispatchTimeout = time.Minute
+		dispatchTimeout = defaultDispatchTimeout
 	}
 
 	// Build action name to ID mapping

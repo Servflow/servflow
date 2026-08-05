@@ -25,6 +25,7 @@ type RequestContext struct {
 	validationErrors []error
 	availableFiles   map[string]*FileValue
 	workspace        Workspace
+	conversation     *Conversation
 
 	// tokenInput/tokenOutput accumulate LLM token usage across every model call
 	// in this request. Observability-only — not exposed to workflow templates.

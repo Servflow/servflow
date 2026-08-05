@@ -2,44 +2,56 @@ package agent
 
 import (
 	"encoding/json"
-	"fmt"
 	"strings"
 
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
-type RoleType int
+// The conversation message types now live in requestctx (which owns the
+// run-scoped conversation thread). They are re-exported here as aliases so
+// existing callers — the LLM integrations' type switches, this package's
+// session loop, and tests — keep referring to them as agent.* unchanged.
+
+type RoleType = requestctx.RoleType
 
 const (
-	RoleTypeUnknown RoleType = iota
-	RoleTypeSystem
-	RoleTypeUser
-	RoleTypeAssistant
-	RoleTypeDeveloper
+	RoleTypeUnknown   = requestctx.RoleTypeUnknown
+	RoleTypeSystem    = requestctx.RoleTypeSystem
+	RoleTypeUser      = requestctx.RoleTypeUser
+	RoleTypeAssistant = requestctx.RoleTypeAssistant
+	RoleTypeDeveloper = requestctx.RoleTypeDeveloper
 )
 
-func (r RoleType) String() string {
-	switch r {
-	case RoleTypeSystem:
-		return "system"
-	case RoleTypeUser:
-		return "user"
-	case RoleTypeAssistant:
-		return "assistant"
-	case RoleTypeDeveloper:
-		return "developer"
-	default:
-		return "unknown"
-	}
-}
-
-type MessageType int
+type MessageType = requestctx.MessageType
 
 const (
-	MessageTypeText MessageType = iota
-	MessageTypeToolCall
-	MessageTypeToolResponse
+	MessageTypeText         = requestctx.MessageTypeText
+	MessageTypeToolCall     = requestctx.MessageTypeToolCall
+	MessageTypeToolResponse = requestctx.MessageTypeToolResponse
+)
+
+type (
+	Message                 = requestctx.Message
+	MessageTypeContent      = requestctx.MessageTypeContent
+	MessageToolCall         = requestctx.MessageToolCall
+	MessageToolCallResponse = requestctx.MessageToolCallResponse
+	ConversationMessage     = requestctx.ConversationMessage
+)
+
+type ToolResponseType = requestctx.ToolResponseType
+
+const (
+	ToolResponseTypeUnknown = requestctx.ToolResponseTypeUnknown
+	ToolResponseTypeText    = requestctx.ToolResponseTypeText
+	ToolResponseTypeImage   = requestctx.ToolResponseTypeImage
+)
+
+type ToolCallOutputType = requestctx.ToolCallOutputType
+
+const (
+	ToolCallOutputTypeText  = requestctx.ToolCallOutputTypeText
+	ToolCallOutputTypeImage = requestctx.ToolCallOutputTypeImage
 )
 
 type LLMRequest struct {
@@ -75,85 +87,6 @@ func TraceMessages(messages []any) string {
 		return ""
 	}
 	return string(b)
-}
-
-type MessageTypeContent struct {
-	Message
-	Role        RoleType
-	Content     string
-	FileContent *requestctx.FileValue `json:"-"`
-}
-
-func (c *MessageTypeContent) Serialize() ([]byte, error) {
-	return json.Marshal(c)
-}
-
-func (c *MessageTypeContent) Deserialize(bytes []byte) error {
-	return json.Unmarshal(bytes, c)
-}
-
-type Message struct {
-	Type MessageType `json:"type"`
-}
-
-type MessageToolCall struct {
-	Message
-	ID        string
-	Name      string
-	Arguments map[string]interface{}
-}
-
-func (t *MessageToolCall) Serialize() ([]byte, error) {
-	return json.Marshal(t)
-}
-
-func (t *MessageToolCall) Deserialize(bytes []byte) error {
-	return json.Unmarshal(bytes, t)
-}
-
-type ToolResponseType int
-
-const (
-	ToolResponseTypeUnknown ToolResponseType = iota
-	ToolResponseTypeText
-	ToolResponseTypeImage
-)
-
-type ToolCallOutputType int
-
-const (
-	ToolCallOutputTypeText ToolCallOutputType = iota
-	ToolCallOutputTypeImage
-)
-
-type MessageToolCallResponse struct {
-	Message
-	ToolResponseType ToolResponseType
-	ID               string
-	Text             string
-	ImageData        []byte
-	ImageMimeType    string
-}
-
-func (t *MessageToolCallResponse) GenerateContent() (content string, mimeType string, outputType ToolCallOutputType) {
-	switch t.ToolResponseType {
-	case ToolResponseTypeText:
-		return t.Text, "", ToolCallOutputTypeText
-	case ToolResponseTypeImage:
-		return fmt.Sprintf("data:%s;base64,%s", t.ImageMimeType, t.ImageData), t.ImageMimeType, ToolCallOutputTypeImage
-	default:
-		return t.Text, "", ToolCallOutputTypeText
-	}
-}
-
-// TODO consider removing image data when serializing for saving, so it won't be included in history
-
-func (t *MessageToolCallResponse) Serialize() ([]byte, error) {
-	return json.Marshal(t)
-}
-
-func (t *MessageToolCallResponse) Deserialize(bytes []byte) error {
-	return json.Unmarshal(bytes, t)
 }
 
 type ToolInfo struct {

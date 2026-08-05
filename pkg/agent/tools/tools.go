@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,6 +12,8 @@ import (
 
 	"github.com/Servflow/servflow/pkg/agent"
 	"github.com/Servflow/servflow/pkg/apiconfig"
+	"github.com/Servflow/servflow/pkg/engine/outputs"
+	"github.com/Servflow/servflow/pkg/engine/outputs/mcpcontent"
 	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
@@ -45,13 +46,28 @@ type ServerConfig struct {
 }
 
 type WorkflowToolConfig struct {
-	Name        string              `json:"name"`
-	Description string              `json:"description"`
-	Params      []string            `json:"params,omitempty"`
-	ReturnValue string              `json:"returnValue"`
-	ReturnFile  apiconfig.FileInput `json:"returnFile"`
-	Start       string              `json:"start"`
-	Type        string              `json:"type"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Params      []string `json:"params,omitempty"`
+	// ReturnValue is the expression rendered to produce the tool result.
+	//
+	// Deprecated: use Output with the "template" handler. ReturnValue is still
+	// honoured — it becomes a template output handler when Output is unset — but
+	// new configs should carry an Output instead, so every run shape describes
+	// its output the same way.
+	ReturnValue string `json:"returnValue"`
+	// ReturnFile is the context file returned as the tool result when Type is
+	// "file".
+	//
+	// Deprecated: use Output with the "file" handler. Still honoured; see
+	// ReturnValue.
+	ReturnFile apiconfig.FileInput `json:"returnFile"`
+	Start      string              `json:"start"`
+	Type       string              `json:"type"`
+	// Output names the output handler that produces this tool's result. When set
+	// it supersedes ReturnValue/ReturnFile, and lets a tool return, for example,
+	// the sub-agent's last message without naming an expression.
+	Output apiconfig.OutputConfig `json:"output,omitempty"`
 }
 
 const (
@@ -128,7 +144,12 @@ func WithWorkflowToolConfig(config WorkflowToolConfig) ClientOption {
 			},
 		}
 
-		manager.toolsExec[config.Name] = generateWorkflowToolExec(&config)
+		extractor, err := workflowToolExtractor(config)
+		if err != nil {
+			return fmt.Errorf("workflow tool %q: %w", config.Name, err)
+		}
+
+		manager.toolsExec[config.Name] = generateWorkflowToolExec(&config, extractor)
 
 		return nil
 	}
@@ -197,7 +218,28 @@ func marshalToolParams(params map[string]any) string {
 	return string(b[:cut]) + "…(truncated)"
 }
 
-func generateWorkflowToolExec(config *WorkflowToolConfig) functionExec {
+// workflowToolExtractor resolves the output handler that turns a finished
+// sub-workflow into this tool's result. An explicit Output wins; otherwise the
+// deprecated ReturnValue/ReturnFile fields are mapped onto the equivalent
+// built-in handler, so existing tool configs behave exactly as before.
+func workflowToolExtractor(config WorkflowToolConfig) (outputs.Extractor, error) {
+	if config.Output.Handler != "" {
+		return outputs.Resolve(config.Output)
+	}
+	switch config.Type {
+	case workflowToolResponseFile:
+		return outputs.File(config.ReturnFile), nil
+	case workflowToolResponseString:
+		if config.ReturnValue == "" {
+			return nil, nil
+		}
+		return outputs.Template(config.ReturnValue), nil
+	default:
+		return nil, nil
+	}
+}
+
+func generateWorkflowToolExec(config *WorkflowToolConfig, extractor outputs.Extractor) functionExec {
 	return func(ctx context.Context, params map[string]any) ([]mcp.Content, error) {
 		logging.DebugContext(ctx,
 			"Executing workflow",
@@ -223,39 +265,23 @@ func generateWorkflowToolExec(config *WorkflowToolConfig) functionExec {
 		// in the trace rather than inferred from a downstream action.
 		span.SetAttributes(attribute.String(tracing.AttrToolParams, marshalToolParams(params)))
 
-		if _, err := plan.ExecuteFromContext(ctx, config.Start); err != nil {
+		result, err := plan.ExecuteFromContext(ctx, config.Start)
+		if err != nil {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, err.Error())
 			return nil, err
 		}
 
-		// The workflow tool renders its own result from the request context once
-		// the workflow has run, rather than terminating in a response step.
-		switch config.Type {
-		case workflowToolResponseFile:
-			fileVal, err := requestctx.GetFileFromContext(ctx, config.ReturnFile)
-			if err != nil {
-				return nil, err
-			}
-			data, err := fileVal.GetContent()
-			if err != nil {
-				return nil, err
-			}
-			mimeType, err := fileVal.GetMimeType()
-			if err != nil {
-				return nil, err
-			}
-			base64Content := base64.StdEncoding.EncodeToString(data)
-			return []mcp.Content{mcp.NewImageContent(base64Content, mimeType)}, nil
-		case workflowToolResponseString:
-			body, err := requestctx.ExecuteTemplateString(ctx, config.ReturnValue)
-			if err != nil {
-				return nil, err
-			}
-			return []mcp.Content{mcp.NewTextContent(body)}, nil
-		default:
-			return []mcp.Content{mcp.NewTextContent("")}, nil
+		// The sub-workflow's output comes from its output handler unless it
+		// terminated in a response step; the tool then renders that value as MCP
+		// content.
+		result, err = outputs.Finalize(ctx, result, extractor)
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+			return nil, err
 		}
+		return mcpcontent.Render(result)
 	}
 }
 

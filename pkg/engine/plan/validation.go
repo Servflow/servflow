@@ -15,6 +15,7 @@ import (
 
 	"github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/actions"
+	"github.com/Servflow/servflow/pkg/engine/outputs"
 	"github.com/Servflow/servflow/pkg/engine/responses"
 	"github.com/Servflow/servflow/pkg/schemavalidate"
 )
@@ -39,6 +40,7 @@ func ValidateWithEntries(a *apiconfig.APIConfig, extraRoots ...string) error {
 	collectSchemaErrors(a, &validationErrors)
 	collectActionErrors(a, &validationErrors)
 	collectResponseErrors(a, &validationErrors)
+	collectOutputErrors(a, &validationErrors)
 	collectGraphErrors(a, &validationErrors, extraRoots)
 
 	if validationErrors.HasErrors() {
@@ -67,6 +69,19 @@ type ResponseConfigError struct {
 
 func (e *ResponseConfigError) Error() string {
 	return fmt.Sprintf("response '%s': %s", e.ResponseID, e.Message)
+}
+
+// OutputConfigError reports a problem with the config's output handler.
+type OutputConfigError struct {
+	// Handler is the configured output handler kind.
+	Handler string
+	// Field is the offending config field, when the error is field-specific.
+	Field   string
+	Message string
+}
+
+func (e *OutputConfigError) Error() string {
+	return fmt.Sprintf("output handler '%s': %s", e.Handler, e.Message)
 }
 
 type ValidationErrors struct {
@@ -124,6 +139,17 @@ func (ve *ValidationErrors) GetResponseConfigErrors() []*ResponseConfigError {
 		}
 	}
 	return responseErrors
+}
+
+func (ve *ValidationErrors) GetOutputConfigErrors() []*OutputConfigError {
+	var outputErrors []*OutputConfigError
+	for _, err := range ve.errors {
+		var outputErr *OutputConfigError
+		if errors.As(err, &outputErr) {
+			outputErrors = append(outputErrors, outputErr)
+		}
+	}
+	return outputErrors
 }
 
 func (ve *ValidationErrors) GetSchemaValidationErrors() []*schemavalidate.SchemaValidationError {
@@ -221,6 +247,31 @@ func collectResponseErrors(a *apiconfig.APIConfig, validationErrors *ValidationE
 				Message:    fmt.Sprintf("invalid response kind: %s", kind),
 			})
 		}
+	}
+}
+
+// collectOutputErrors checks that a configured output handler names a registered
+// kind and that its config is one the handler accepts. Building the extractor is
+// how the config is checked — it is the same call the runtime makes, so validate
+// paths (the CLI's --dry-run, the dashboard) cannot diverge from what will
+// actually load. A config with no output handler is valid: the workflow either
+// terminates in a response step or returns nothing.
+func collectOutputErrors(a *apiconfig.APIConfig, validationErrors *ValidationErrors) {
+	if a.Output.Handler == "" {
+		return
+	}
+	if !outputs.Has(a.Output.Handler) {
+		validationErrors.Add(&OutputConfigError{
+			Handler: a.Output.Handler,
+			Message: fmt.Sprintf("invalid output handler: %s", a.Output.Handler),
+		})
+		return
+	}
+	if _, err := outputs.Resolve(a.Output); err != nil {
+		validationErrors.Add(&OutputConfigError{
+			Handler: a.Output.Handler,
+			Message: err.Error(),
+		})
 	}
 }
 

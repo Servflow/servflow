@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,9 +11,9 @@ import (
 	"text/template"
 	"time"
 
-	sfhttp "github.com/Servflow/servflow/internal/http"
 	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/entryhandlers"
+	"github.com/Servflow/servflow/pkg/engine/outputs"
 	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
@@ -54,6 +53,14 @@ func (e *Engine) createBasicHandler(config *apiconfig.APIConfig) (http.Handler, 
 
 	logger.Debug("Starting plan generation from", zap.String("start", config.HttpConfig.Next))
 
+	// An HTTP workflow usually terminates in a response step; an output handler
+	// lets one produce its response from the request context instead (an agent
+	// workflow returning its last message, say) with no response step at all.
+	output, err := resolveOutput(config)
+	if err != nil {
+		return nil, err
+	}
+
 	a := &APIHandler{
 		apiPath:       config.HttpConfig.ListenPath,
 		apiName:       config.Name,
@@ -62,6 +69,7 @@ func (e *Engine) createBasicHandler(config *apiconfig.APIConfig) (http.Handler, 
 		p:             p,
 		handlerType:   config.HttpConfig.Handler,
 		handlerConfig: config.HttpConfig.HandlerConfig,
+		output:        output,
 		baseLogger:    e.logger,
 	}
 
@@ -86,6 +94,9 @@ type APIHandler struct {
 	// handlerConfig is the raw config for the entry handler, made available to
 	// the middleware via entryhandlers.WithConfig.
 	handlerConfig map[string]interface{}
+	// output extracts the run's output from the request context when the plan
+	// completes without a response step. Nil when none is configured.
+	output outputs.Extractor
 	// baseLogger is the engine logger; ServeHTTP derives the request logger
 	// from it via requestctx.Start.
 	baseLogger *zap.Logger
@@ -222,19 +233,19 @@ func (h *APIHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	planRunner := http.HandlerFunc(func(wr http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
 		result, err := h.p.Execute(ctx, h.planStart)
-		resp, ok := result.(*sfhttp.SfResponse)
-		if err != nil || !ok || resp == nil {
+		if err == nil {
+			// A response step's result wins; only a chain that finished without
+			// one falls through to the configured output handler.
+			result, err = outputs.Finalize(ctx, result, h.output)
+		}
+		resp, cerr := httpResponseFor(result)
+		if err != nil || cerr != nil {
 			tracing.SetHTTPStatus(span, http.StatusInternalServerError, err)
 			switch {
 			case err != nil:
 				h.logAndWriteInternalServerError(wr, err, logger)
-			case result != nil && !ok:
-				// A non-nil result that isn't an HTTP response means a non-http
-				// response kind was mounted on an HTTP endpoint. Surface the type
-				// rather than the misleading "response missing".
-				h.logAndWriteInternalServerError(wr, fmt.Errorf("unexpected result type %T for HTTP endpoint", result), logger)
 			default:
-				h.logAndWriteInternalServerError(wr, errors.New("error executing api, response missing"), logger)
+				h.logAndWriteInternalServerError(wr, cerr, logger)
 			}
 			return
 		}

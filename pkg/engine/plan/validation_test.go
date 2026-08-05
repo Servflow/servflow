@@ -490,6 +490,54 @@ func TestResponseConfigError_UnknownKind(t *testing.T) {
 	assert.True(t, found, "expected a ResponseConfigError for response 'bad'")
 }
 
+func TestOutputConfigError(t *testing.T) {
+	// The extractor is built during validation, so a config that validates is a
+	// config that will load: --dry-run and the runtime cannot disagree.
+	tests := map[string]struct {
+		output   apiconfig.OutputConfig
+		wantErr  bool
+		contains string
+	}{
+		"no output handler is valid": {
+			output: apiconfig.OutputConfig{},
+		},
+		"registered handler with valid config": {
+			output: apiconfig.OutputConfig{
+				Handler: "template",
+				Config:  map[string]interface{}{"template": "{{ .thing }}"},
+			},
+		},
+		"unregistered handler": {
+			output:   apiconfig.OutputConfig{Handler: "not-a-real-handler"},
+			wantErr:  true,
+			contains: "invalid output handler: not-a-real-handler",
+		},
+		"registered handler with an unusable config": {
+			output:   apiconfig.OutputConfig{Handler: "template"},
+			wantErr:  true,
+			contains: "template",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := Validate(&apiconfig.APIConfig{ID: "test-api", Output: tt.output})
+			if !tt.wantErr {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+
+			var validationErrs *ValidationErrors
+			require.True(t, errors.As(err, &validationErrs), "expected ValidationErrors type")
+			outputErrs := validationErrs.GetOutputConfigErrors()
+			require.Len(t, outputErrs, 1)
+			assert.Equal(t, tt.output.Handler, outputErrs[0].Handler)
+			assert.Contains(t, outputErrs[0].Message, tt.contains)
+		})
+	}
+}
+
 func TestValidationErrors_CollectsBothSchemaAndActionErrors(t *testing.T) {
 	registerTestAction(t, "combined-test-action", actions.ActionRegistrationInfo{
 		Name:        "Combined Test Action",

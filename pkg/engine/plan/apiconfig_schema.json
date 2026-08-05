@@ -49,11 +49,29 @@
       "additionalProperties": {
         "$ref": "#/definitions/IntegrationConfig"
       }
+    },
+    "output": {
+      "$ref": "#/definitions/OutputConfig",
+      "description": "Output handler that extracts the run's output when the workflow does not terminate in a response step"
     }
   },
   "required": ["id"],
   "additionalProperties": false,
   "definitions": {
+    "OutputConfig": {
+      "type": "object",
+      "properties": {
+        "handler": {
+          "type": "string",
+          "description": "Registered output handler kind, e.g. conversation, template, file or none"
+        },
+        "config": {
+          "type": ["object", "null"],
+          "description": "Configuration passed to the output handler"
+        }
+      },
+      "additionalProperties": false
+    },
     "HttpConfig": {
       "type": "object",
       "required": ["listenPath", "method", "next"],

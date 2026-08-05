@@ -31,6 +31,24 @@ type APIConfig struct {
 	HttpConfig   HttpConfig                   `json:"http" yaml:"http"`
 	McpTool      MCPToolConfig                `json:"mcpTool" yaml:"mcpTool"`
 	Integrations map[string]IntegrationConfig `json:"integrations,omitempty" yaml:"integrations,omitempty"`
+	// Output names the output handler that extracts this workflow's output from
+	// the request context after the plan runs, for workflows that do not
+	// terminate in a Response step. Empty means none.
+	Output OutputConfig `json:"output,omitempty" yaml:"output,omitempty"`
+}
+
+// OutputConfig selects and configures a workflow's output handler (see
+// pkg/engine/outputs). It is the counterpart of HttpConfig.Handler /
+// HandlerConfig on the way out: where an entry handler decides what happens to a
+// request before the plan, an output handler decides what the run returns after
+// it.
+type OutputConfig struct {
+	// Handler is the registered output handler kind, e.g. "conversation" to
+	// return the agent's last message or "template" to render an expression.
+	Handler string `json:"handler,omitempty" yaml:"handler,omitempty"`
+	// Config is the handler's configuration, passed to its factory at
+	// config-load time.
+	Config map[string]interface{} `json:"config,omitempty" yaml:"config,omitempty"`
 }
 
 func (a *APIConfig) IsMCPConfig() bool {
@@ -61,7 +79,12 @@ type MCPToolConfig struct {
 	Name        string             `json:"name" yaml:"name"`
 	Description string             `json:"description" yaml:"description"`
 	Args        map[string]ArgType `json:"args,omitempty" yaml:"args,omitempty"`
-	// Result is the expression to be used to get the result
+	// Result is the expression to be used to get the result.
+	//
+	// Deprecated: use APIConfig.Output with the "template" handler. Result is
+	// still honoured — it is applied as a template output handler when the
+	// config sets no Output — but new configs should carry an Output instead, so
+	// every run shape describes its output the same way.
 	Result string `json:"result" yaml:"result"`
 	Start  string `json:"start" yaml:"start"`
 }

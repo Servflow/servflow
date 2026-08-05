@@ -15,6 +15,7 @@ import (
 
 	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/actions"
+	"github.com/Servflow/servflow/pkg/engine/outputs"
 	plan2 "github.com/Servflow/servflow/pkg/engine/plan"
 	requestctx2 "github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
@@ -437,6 +438,66 @@ func TestNewClient(t *testing.T) {
 			Start:       apiconfig.ActionConfigPrefix + "some_action",
 		}))
 		assert.ErrorContains(t, err, "invalid workflow tool type: invalid")
+	})
+
+	// A sub-agent exposed as a tool returns what it said, with no returnValue
+	// expression: the output handler reads the run's shared conversation thread.
+	t.Run("workflow tool with an output handler", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		mockExec := plan2.NewMockActionExecutable(ctrl)
+		mockExec.EXPECT().Config().Return("").AnyTimes()
+		mockExec.EXPECT().SupportsReplica().Return(false).AnyTimes()
+		mockExec.EXPECT().Type().Return("mock").AnyTimes()
+		mockExec.EXPECT().Execute(gomock.Any(), gomock.Any()).
+			Return(map[string]interface{}{"result": "ignored"}, nil, nil)
+
+		customRegistry := actions.NewRegistry()
+		customRegistry.ReplaceActionType("sub_agent", func(json.RawMessage) (actions.ActionExecutable, error) {
+			return mockExec, nil
+		})
+
+		planner := plan2.NewPlannerV2(plan2.PlannerConfig{
+			Actions: map[string]apiconfig.Action{
+				"sub_agent": {Name: "sub_agent", Type: "sub_agent"},
+			},
+			CustomRegistry: customRegistry,
+		}, logging.GetNewLogger())
+		testPlan, err := planner.Plan()
+		require.NoError(t, err)
+
+		manager, err := NewManager(WithWorkflowToolConfig(WorkflowToolConfig{
+			Name:        "sub-agent-tool",
+			Description: "Delegate to a sub-agent",
+			Start:       apiconfig.ActionConfigPrefix + "sub_agent",
+			Output: apiconfig.OutputConfig{
+				Handler: outputs.HandlerConversation,
+			},
+		}))
+		require.NoError(t, err)
+
+		ctx, rc := requestctx2.Start(context.Background(), requestctx2.Options{})
+		defer rc.Done()
+		rc.Conversation().Append(requestctx2.MessageTypeContent{
+			Message: requestctx2.Message{Type: requestctx2.MessageTypeText},
+			Role:    requestctx2.RoleTypeAssistant,
+			Content: "the sub-agent's answer",
+		})
+		ctx = context.WithValue(ctx, plan2.ContextKey, testPlan)
+
+		resp, err := manager.CallTool(ctx, "sub-agent-tool", nil)
+		require.NoError(t, err)
+		assert.Equal(t, []mcp.Content{mcp.NewTextContent("the sub-agent's answer")}, resp)
+	})
+
+	t.Run("workflow tool with an unknown output handler fails at config time", func(t *testing.T) {
+		_, err := NewManager(WithWorkflowToolConfig(WorkflowToolConfig{
+			Name:   "bad-output-tool",
+			Start:  apiconfig.ActionConfigPrefix + "some_action",
+			Output: apiconfig.OutputConfig{Handler: "nope"},
+		}))
+		assert.ErrorContains(t, err, "nope")
 	})
 }
 

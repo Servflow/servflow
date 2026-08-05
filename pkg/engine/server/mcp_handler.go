@@ -8,6 +8,8 @@ import (
 	"time"
 
 	apiconfig "github.com/Servflow/servflow/pkg/apiconfig"
+	"github.com/Servflow/servflow/pkg/engine/outputs"
+	"github.com/Servflow/servflow/pkg/engine/outputs/mcpcontent"
 	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
@@ -35,6 +37,14 @@ func (e *Engine) createMCPHandler(config *apiconfig.APIConfig) error {
 	p, err := planner.Plan()
 	if err != nil {
 		return fmt.Errorf("could not generate plan: %v", err)
+	}
+
+	// The tool's output comes from the config's output handler; a config still
+	// carrying the deprecated mcpTool.result expression gets the equivalent
+	// template handler, so it behaves exactly as before.
+	extractor, err := resolveOutput(config)
+	if err != nil {
+		return fmt.Errorf("could not resolve output handler: %v", err)
 	}
 
 	if e.mcpServer == nil {
@@ -86,28 +96,27 @@ func (e *Engine) createMCPHandler(config *apiconfig.APIConfig) error {
 
 		ctx, _ = tracing.StartMCPTool(ctx, config.McpTool.Name) // lifecycle-owned; no manual End
 
-		if _, err := p.Execute(ctx, config.McpTool.Start); err != nil {
+		result, err := p.Execute(ctx, config.McpTool.Start)
+		if err != nil {
 			logger.Error("error executing planner", zap.Error(err))
 			return nil, errors.New("error executing request")
 		}
 
-		// The MCP tool renders its own result from the request context once the
-		// workflow has run, rather than terminating in a response step.
-		body, err := requestctx.ExecuteTemplateString(ctx, config.McpTool.Result)
+		// The tool's output is whatever the output handler extracts from the
+		// finished request context, unless the workflow terminated in a response
+		// step and produced a result itself.
+		result, err = outputs.Finalize(ctx, result, extractor)
+		if err != nil {
+			logger.Error("error extracting result", zap.Error(err))
+			return nil, errors.New("error executing request")
+		}
+
+		content, err := mcpcontent.Render(result)
 		if err != nil {
 			logger.Error("error rendering result", zap.Error(err))
 			return nil, errors.New("error executing request")
 		}
-
-		// TODO support other types
-		response := mcp.CallToolResult{
-			Content: []mcp.Content{
-				mcp.TextContent{
-					Text: body,
-					Type: "text",
-				},
-			},
-		}
+		response := mcp.CallToolResult{Content: content}
 		timeTaken := time.Since(start)
 		logger.Debug("finished handling tool call", zap.Duration("time_taken", timeTaken))
 

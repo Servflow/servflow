@@ -219,7 +219,13 @@ func TestParallelExec_Execute(t *testing.T) {
 		error2 := errors.New("action2 failed")
 		error3 := errors.New("action3 failed")
 
-		mockAction1.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil, error1)
+		// Every step fails here, so the first error to arrive cancels the group and
+		// the remaining goroutines can return before they ever reach their action.
+		// Which one wins is down to scheduling, so no individual action may be
+		// required to run — asserting on a specific mock makes this flaky under
+		// different core counts and load. The contract under test is the shape of
+		// the returned error, checked below.
+		mockAction1.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil, error1).AnyTimes()
 		mockAction2.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil, error2).AnyTimes()
 		mockAction3.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil, error3).AnyTimes()
 

@@ -111,7 +111,16 @@ func (a *ActionV2) execute(ctx context.Context) (*stepWrapper, error) {
 		}
 		reqCtx.AddActionFile(a.id, fileValue)
 		logger.Debug("stored action output as file", zap.String("action_output", a.id))
-	} else {
+	} else if resp != nil {
+		// A nil response means the action produces no output, so it publishes no
+		// request variable — an agent, for instance, contributes to the request
+		// conversation instead of handing a value to later steps. Templates cannot
+		// tell an absent key from a nil one (they are parsed with missingkey=zero),
+		// so this only removes the entry, it does not change how a template that
+		// still references the id renders.
+		//
+		// Only an untyped nil counts: an action returning a typed nil pointer is
+		// non-nil as an interface and still publishes.
 		if err = requestctx.AddRequestVariables(ctx, map[string]interface{}{a.id: resp}, ""); err != nil {
 			return nil, err
 		}

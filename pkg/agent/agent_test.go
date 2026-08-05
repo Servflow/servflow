@@ -345,35 +345,36 @@ func TestSession_AgentsInSameRequestShareConversation(t *testing.T) {
 	secondLLM := NewMockLLmProvider(ctrl)
 	secondTools := NewMockToolManager(ctrl)
 	secondTools.EXPECT().ToolList(gomock.Any()).Return(nil).AnyTimes()
+	// The mock only records what it was handed; the checking happens on the test
+	// goroutine once Query has returned. Query only returns after the session
+	// closes its response channel, which happens-after this write, so the read is
+	// ordered without extra synchronisation.
+	var sentToProvider LLMRequest
 	secondLLM.EXPECT().ProvideResponse(gomock.Any(), gomock.Any()).
-		Do(func(_ context.Context, req LLMRequest) {
-			// assert, never require: this runs on the session's internal goroutine,
-			// where require's FailNow would kill the goroutine without closing the
-			// response channel — hanging the test instead of failing it.
-			if !assert.Len(t, req.Messages, 3) {
-				return
-			}
-			// agent 1's user turn + agent 1's answer + agent 2's own new query.
-			if seeded, ok := req.Messages[0].(MessageTypeContent); assert.True(t, ok,
-				"seeded message lost its concrete type: %T", req.Messages[0]) {
-				assert.Equal(t, RoleTypeUser, seeded.Role)
-				assert.Equal(t, "what did you find?", seeded.Content)
-			}
-			if answer, ok := req.Messages[1].(MessageTypeContent); assert.True(t, ok) {
-				assert.Equal(t, RoleTypeAssistant, answer.Role)
-				assert.Equal(t, "agent one reporting", answer.Content)
-			}
-		}).
+		Do(func(_ context.Context, req LLMRequest) { sentToProvider = req }).
 		Return(LLMResponse{Content: []ContentResponse{{Text: "agent two building on that"}}}, nil)
 
 	agentTwo, err := NewSession("second agent", secondLLM,
 		WithToolManager(secondTools),
 		WithConversation(rc.Conversation()))
 	require.NoError(t, err)
-	assert.Len(t, agentTwo.messages, 2, "agent two should be seeded with agent one's exchange")
+	require.Len(t, agentTwo.messages, 2, "agent two should be seeded with agent one's exchange")
 
 	_, err = agentTwo.Query(ctx, "anything to add?", nil)
 	require.NoError(t, err)
+
+	// Agent 1's turn and answer reached the provider ahead of agent 2's own query,
+	// with the concrete types intact through the []any boundary — if boxing lost
+	// them, the integrations' type switches would silently drop the history.
+	require.Len(t, sentToProvider.Messages, 3)
+	seeded, ok := sentToProvider.Messages[0].(MessageTypeContent)
+	require.True(t, ok, "seeded message lost its concrete type: %T", sentToProvider.Messages[0])
+	assert.Equal(t, RoleTypeUser, seeded.Role)
+	assert.Equal(t, "what did you find?", seeded.Content)
+	answer, ok := sentToProvider.Messages[1].(MessageTypeContent)
+	require.True(t, ok, "seeded message lost its concrete type: %T", sentToProvider.Messages[1])
+	assert.Equal(t, RoleTypeAssistant, answer.Role)
+	assert.Equal(t, "agent one reporting", answer.Content)
 
 	// Both agents' turns land on the one shared thread, in order.
 	got := conv.Messages()
@@ -620,101 +621,6 @@ func TestSession_ConversationThreadSharing(t *testing.T) {
 		assert.Nil(t, session.conversation)
 		assert.Empty(t, session.messages)
 	})
-}
-
-func TestSession_WithReturnOnlyLastMessage(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	systemPrompt := "You are a helpful assistant"
-	testQuery := "Tell me about the weather"
-
-	// First LLM response with tool call
-	firstResponse := LLMResponse{
-		Content: []ContentResponse{
-			{
-				Text: "I'll check the weather for you",
-			},
-		},
-		Tools: []ToolResponseObject{
-			{
-				Name: "get_weather",
-				Input: map[string]any{
-					"location": "default",
-				},
-				ToolID: "test",
-			},
-		},
-	}
-
-	// Final LLM response without tool call
-	finalResponse := LLMResponse{
-		Content: []ContentResponse{
-			{
-				Text: "The weather is sunny today",
-			},
-		},
-	}
-
-	mockToolManager := NewMockToolManager(ctrl)
-	mockLLmHandler := NewMockLLmProvider(ctrl)
-
-	// Setup expectations
-	var toolInfoList []ToolInfo
-	if err := json.Unmarshal([]byte(toolList), &toolInfoList); err != nil {
-		t.Fatal(err)
-	}
-	mockToolManager.EXPECT().ToolList(gomock.Any()).Return(toolInfoList)
-	mockToolManager.EXPECT().
-		CallTool(gomock.Any(), "get_weather", map[string]any{"location": "default"}).
-		Return([]mcp.Content{mcp.TextContent{Type: "text", Text: "Weather: Sunny, 25°C"}}, nil)
-
-	// We expect two LLM calls - one that returns a tool call, and one that gives the final response
-	gomock.InOrder(
-		mockLLmHandler.EXPECT().
-			ProvideResponse(gomock.Any(), gomock.Any()).
-			Return(firstResponse, nil),
-		mockLLmHandler.EXPECT().
-			ProvideResponse(gomock.Any(), gomock.Any()).
-			Return(finalResponse, nil),
-	)
-
-	// Test with returnOnlyLastMessage enabled
-
-	agent, err := NewSession(systemPrompt, mockLLmHandler, WithToolManager(mockToolManager), WithReturnOnlyLastMessage(), WithInstructions(testInstructions))
-	require.NoError(t, err)
-
-	response, err := agent.Query(context.Background(), testQuery, nil)
-	require.NoError(t, err)
-
-	// Should only contain the final response, not the first one
-	assert.Equal(t, "The weather is sunny today", response)
-	assert.NotContains(t, response, "I'll check the weather for you")
-
-	// Test without returnOnlyLastMessage (default behavior)
-	session2, err := NewSession(systemPrompt, mockLLmHandler, WithToolManager(mockToolManager), WithInstructions(testInstructions))
-	require.NoError(t, err)
-
-	mockToolManager.EXPECT().ToolList(gomock.Any()).Return(toolInfoList)
-	mockToolManager.EXPECT().
-		CallTool(gomock.Any(), "get_weather", map[string]any{"location": "default"}).
-		Return([]mcp.Content{mcp.TextContent{Type: "text", Text: "Weather: Sunny, 25°C"}}, nil)
-
-	gomock.InOrder(
-		mockLLmHandler.EXPECT().
-			ProvideResponse(gomock.Any(), gomock.Any()).
-			Return(firstResponse, nil),
-		mockLLmHandler.EXPECT().
-			ProvideResponse(gomock.Any(), gomock.Any()).
-			Return(finalResponse, nil),
-	)
-
-	response2, err := session2.Query(context.Background(), testQuery, nil)
-	require.NoError(t, err)
-
-	// Should contain both responses concatenated with newlines
-	assert.Contains(t, response2, "I'll check the weather for you")
-	assert.Contains(t, response2, "The weather is sunny today")
 }
 
 func TestCreateToolResponseFromMCPContent(t *testing.T) {

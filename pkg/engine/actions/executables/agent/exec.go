@@ -18,12 +18,11 @@ import (
 )
 
 type Config struct {
-	ToolConfigs       []ToolConfig        `json:"toolConfigs" yaml:"toolConfigs"`
-	SystemPrompt      string              `json:"systemPrompt" yaml:"systemPrompt"`
-	UserPrompt        string              `json:"userPrompt" yaml:"userPrompt"`
-	IntegrationID     string              `json:"integrationID" yaml:"integrationID"`
-	ReturnLastMessage bool                `json:"returnLastMessage" yaml:"returnLastMessage"`
-	FileUpload        apiconfig.FileInput `json:"fileUpload" yaml:"fileUpload"`
+	ToolConfigs   []ToolConfig        `json:"toolConfigs" yaml:"toolConfigs"`
+	SystemPrompt  string              `json:"systemPrompt" yaml:"systemPrompt"`
+	UserPrompt    string              `json:"userPrompt" yaml:"userPrompt"`
+	IntegrationID string              `json:"integrationID" yaml:"integrationID"`
+	FileUpload    apiconfig.FileInput `json:"fileUpload" yaml:"fileUpload"`
 }
 type MCPServerConfig struct {
 	Endpoint string   `json:"endpoint" yaml:"endpoint"`
@@ -63,6 +62,12 @@ type Agent struct {
 // The conversation is no longer per-action: every agent action reads from and
 // appends to the request's shared conversation thread (owned by the request
 // context, selected once at plan start via the conversation id).
+//
+// The action deliberately returns NO output. An agent's result is the messages
+// it contributed to the conversation — the session appends each one as it is
+// produced — so there is nothing to hand to later steps and no
+// {{ .variable_actions_<id> }} for them to read. Run output is extracted from
+// the thread instead.
 func (a *Agent) Execute(ctx context.Context) (interface{}, map[string]string, error) {
 	rc, err := requestctx.FromContextOrError(ctx)
 	if err != nil {
@@ -85,9 +90,6 @@ func (a *Agent) Execute(ctx context.Context) (interface{}, map[string]string, er
 		agent.WithToolManager(a.toolManager),
 		agent.WithConversation(rc.Conversation()),
 	}
-	if a.config.ReturnLastMessage {
-		options = append(options, agent.WithReturnOnlyLastMessage())
-	}
 	session, err := agent.NewSession(
 		systemPrompt,
 		a.integration,
@@ -104,8 +106,10 @@ func (a *Agent) Execute(ctx context.Context) (interface{}, map[string]string, er
 	if err != nil && !errors.Is(err, requestctx.ErrFileNotFound) {
 		return nil, nil, fmt.Errorf("%w: %v", actions.ErrorFatal, err)
 	}
-	resp, err := session.Query(ctx, userPrompt, fileInput)
-	if err != nil {
+	// The reply is discarded on purpose: Query has already appended every message
+	// it produced to the shared conversation, which is where an agent's output
+	// lives now.
+	if _, err := session.Query(ctx, userPrompt, fileInput); err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 		return nil, nil, err
@@ -122,7 +126,7 @@ func (a *Agent) Execute(ctx context.Context) (interface{}, map[string]string, er
 		attribute.Int64(tracing.AttrUsageTotal, metadata.TotalUsage.InputTokens+metadata.TotalUsage.OutputTokens),
 	)
 
-	return resp, nil, nil
+	return nil, nil, nil
 }
 
 func (a *Agent) Type() string {
@@ -200,13 +204,6 @@ func init() {
 			Label:       "Integration ID",
 			Placeholder: "AI integration identifier",
 			Required:    true,
-		},
-		"returnLastMessage": {
-			Type:        actions.FieldTypeBoolean,
-			Label:       "Return Last Message",
-			Placeholder: "Whether to return only the last message",
-			Required:    false,
-			Default:     false,
 		},
 	}
 

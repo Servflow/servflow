@@ -54,8 +54,13 @@ responses:
     code: 200
     responseObject:
       fields:
+        # An agent action produces no output variable: everything it says goes to
+        # the request conversation instead, so there is no
+        # {{ .variable_actions_agent }} to read here. Returning the agent's answer
+        # to the caller is the job of an output handler, which reads the thread —
+        # until that lands this endpoint responds with an empty body.
         response:
-          value: "{{ .variable_actions_agent }}"
+          value: ""
 
   "400":
     code: 400

@@ -37,13 +37,12 @@ var (
 )
 
 type Session struct {
-	toolManager           ToolManager
-	llm                   LLmProvider
-	messages              []any
-	conversation          *requestctx.Conversation
-	returnOnlyLastMessage bool
-	customInstructions    string
-	llmResponses          []LLMResponse
+	toolManager        ToolManager
+	llm                LLmProvider
+	messages           []any
+	conversation       *requestctx.Conversation
+	customInstructions string
+	llmResponses       []LLMResponse
 }
 
 type Option func(*Session) error
@@ -69,13 +68,6 @@ func WithConversation(conv *requestctx.Conversation) Option {
 		for _, m := range conv.Messages() {
 			a.messages = append(a.messages, m)
 		}
-		return nil
-	}
-}
-
-func WithReturnOnlyLastMessage() Option {
-	return func(a *Session) error {
-		a.returnOnlyLastMessage = true
 		return nil
 	}
 }
@@ -109,6 +101,10 @@ type agentOutput struct {
 	response string
 }
 
+// Query runs the agent loop for a turn. Every message produced along the way is
+// appended to the session's conversation, which is where an agent's output is
+// consumed from; the returned string is the concatenated assistant text, kept
+// for callers that want the reply inline (the agent action discards it).
 func (a *Session) Query(ctx context.Context, query string, file *requestctx.FileValue) (string, error) {
 	logger := logging.WithContextEnriched(ctx).With(zap.String("module", "agent"))
 	if query != "" || file != nil {
@@ -120,27 +116,16 @@ func (a *Session) Query(ctx context.Context, query string, file *requestctx.File
 		}, nil)
 	}
 
-	var (
-		strBuilder  strings.Builder
-		lastMessage string
-	)
+	var strBuilder strings.Builder
 	respChan := a.startLoop(ctx)
 	for r := range respChan {
 		if r.err != nil {
 			return "", r.err
 		}
-		if a.returnOnlyLastMessage {
-			lastMessage = r.response
-		} else {
-			strBuilder.WriteString(r.response)
-			strBuilder.WriteString("\n")
-		}
+		strBuilder.WriteString(r.response)
+		strBuilder.WriteString("\n")
 	}
-	if a.returnOnlyLastMessage {
-		return lastMessage, nil
-	} else {
-		return strBuilder.String(), nil
-	}
+	return strBuilder.String(), nil
 }
 
 // GetMetadata returns the metadata collected during the session

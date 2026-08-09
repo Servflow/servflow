@@ -9,7 +9,11 @@ import (
 	"time"
 
 	"github.com/Servflow/servflow/pkg/apiconfig"
-	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/agent"
+	// NOTE: the "agent" action is deliberately NOT registered here. An agent
+	// needs an LLM, and LLM providers belong to the host (servflow-pro), not to
+	// this engine — so the host registers its own agent action. Re-adding a
+	// blank import here would collide with it: RegisterAction rejects a
+	// duplicate type.
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/authenticate"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/delete_action"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/email"

@@ -27,10 +27,6 @@ func (h *Http) Type() string {
 	return "http"
 }
 
-func (h *Http) SupportsReplica() bool {
-	return true
-}
-
 // unwrapBody returns the body template to resolve. The raw-string body form
 // stores the body as a JSON string wrapping the real text, so it is unwrapped
 // once; every other shape (object/array, or a non-JSON body) is used as-is. The

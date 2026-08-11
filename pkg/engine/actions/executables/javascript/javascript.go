@@ -51,10 +51,6 @@ func (e *Executable) Type() string {
 	return "javascript"
 }
 
-func (e *Executable) SupportsReplica() bool {
-	return true
-}
-
 // TODO save config in action not executable
 
 func (e *Executable) Config() string {

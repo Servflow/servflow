@@ -39,10 +39,6 @@ func (s *Save) Type() string {
 	return "save"
 }
 
-func (s *Save) SupportsReplica() bool {
-	return true
-}
-
 func New(config Config) (*Save, error) {
 	if config.IntegrationID == "" {
 		return nil, errors.New("integrationID is required")

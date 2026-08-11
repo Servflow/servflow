@@ -31,10 +31,6 @@ func (s *StoreKey) Type() string {
 	return "store_key"
 }
 
-func (s *StoreKey) SupportsReplica() bool {
-	return true
-}
-
 func (s *StoreKey) Config() string {
 	cfg := Config{
 		Key:   s.key,

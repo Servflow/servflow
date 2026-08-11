@@ -44,10 +44,6 @@ func (a *JWT) Config() string {
 	return a.config.Field
 }
 
-func (a *JWT) SupportsReplica() bool {
-	return true
-}
-
 func (a *JWT) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
 	logger := logging.FromContext(ctx).With(zap.String("execution_type", a.Type()))
 	ctx = logging.WithLogger(ctx, logger)

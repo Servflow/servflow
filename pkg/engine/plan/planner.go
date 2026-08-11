@@ -241,7 +241,6 @@ func (p *PlannerV2) generateActionStepV1(id string, a apiconfig.Action, configJs
 		fail:       failStep,
 		out:        out,
 		exec:       exec,
-		useReplica: a.UseReplica,
 		dispatch:   a.Dispatch,
 	}, nil
 }
@@ -286,7 +285,6 @@ func (p *PlannerV2) generateActionStepV2(id string, a apiconfig.Action, configJs
 		next:       nextStep,
 		fail:       failStep,
 		exec:       exec,
-		useReplica: a.UseReplica,
 		dispatch:   a.Dispatch,
 	}, nil
 }

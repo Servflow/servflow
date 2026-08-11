@@ -215,5 +215,4 @@ func TestSave_Type(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "save", save.Type())
-	assert.True(t, save.SupportsReplica())
 }

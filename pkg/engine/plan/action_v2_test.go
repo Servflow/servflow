@@ -22,7 +22,6 @@ func TestActionV2_OutputPublishing(t *testing.T) {
 		ctx := requestctx.NewTestContext()
 		exec := NewMockActionExecutableV2(ctrl)
 		exec.EXPECT().Type().Return("agent").AnyTimes()
-		exec.EXPECT().SupportsReplica().Return(false).AnyTimes()
 		exec.EXPECT().Execute(gomock.Any()).Return(nil, nil, nil)
 
 		action := &ActionV2{id: "silentaction", exec: exec}
@@ -42,7 +41,6 @@ func TestActionV2_OutputPublishing(t *testing.T) {
 		ctx := requestctx.NewTestContext()
 		exec := NewMockActionExecutableV2(ctrl)
 		exec.EXPECT().Type().Return("http").AnyTimes()
-		exec.EXPECT().SupportsReplica().Return(false).AnyTimes()
 		exec.EXPECT().Execute(gomock.Any()).Return("a result", nil, nil)
 
 		action := &ActionV2{id: "loudaction", exec: exec}

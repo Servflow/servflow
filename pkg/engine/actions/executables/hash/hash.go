@@ -27,10 +27,6 @@ func (h *HashV2) Type() string {
 	return "hash"
 }
 
-func (h *HashV2) SupportsReplica() bool {
-	return true
-}
-
 func NewV2(value, algorithm string) (*HashV2, error) {
 	hash := &HashV2{value: value}
 	switch algorithm {

@@ -14,7 +14,6 @@ type ActionExecutable interface {
 	Config() string
 	Execute(ctx context.Context, modifiedConfig string) (resp interface{}, fields map[string]string, err error)
 	Type() string
-	SupportsReplica() bool
 }
 
 // ActionExecutableV2 is the v2 action interface.
@@ -23,5 +22,4 @@ type ActionExecutable interface {
 type ActionExecutableV2 interface {
 	Type() string
 	Execute(ctx context.Context) (resp interface{}, fields map[string]string, err error)
-	SupportsReplica() bool
 }

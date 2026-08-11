@@ -89,11 +89,6 @@ func TestStoreKey_Type(t *testing.T) {
 	assert.Equal(t, "store_key", exec.Type())
 }
 
-func TestStoreKey_SupportsReplica(t *testing.T) {
-	exec := NewExecutable(Config{})
-	assert.True(t, exec.SupportsReplica())
-}
-
 func TestStoreKey_Config(t *testing.T) {
 	cfg := Config{
 		Key:   "my-key",

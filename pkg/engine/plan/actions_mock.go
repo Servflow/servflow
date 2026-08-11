@@ -69,20 +69,6 @@ func (mr *MockActionExecutableMockRecorder) Execute(ctx, modifiedConfig any) *go
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockActionExecutable)(nil).Execute), ctx, modifiedConfig)
 }
 
-// SupportsReplica mocks base method.
-func (m *MockActionExecutable) SupportsReplica() bool {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SupportsReplica")
-	ret0, _ := ret[0].(bool)
-	return ret0
-}
-
-// SupportsReplica indicates an expected call of SupportsReplica.
-func (mr *MockActionExecutableMockRecorder) SupportsReplica() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SupportsReplica", reflect.TypeOf((*MockActionExecutable)(nil).SupportsReplica))
-}
-
 // Type mocks base method.
 func (m *MockActionExecutable) Type() string {
 	m.ctrl.T.Helper()
@@ -134,20 +120,6 @@ func (m *MockActionExecutableV2) Execute(ctx context.Context) (any, map[string]s
 func (mr *MockActionExecutableV2MockRecorder) Execute(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockActionExecutableV2)(nil).Execute), ctx)
-}
-
-// SupportsReplica mocks base method.
-func (m *MockActionExecutableV2) SupportsReplica() bool {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SupportsReplica")
-	ret0, _ := ret[0].(bool)
-	return ret0
-}
-
-// SupportsReplica indicates an expected call of SupportsReplica.
-func (mr *MockActionExecutableV2MockRecorder) SupportsReplica() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SupportsReplica", reflect.TypeOf((*MockActionExecutableV2)(nil).SupportsReplica))
 }
 
 // Type mocks base method.

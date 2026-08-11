@@ -54,10 +54,11 @@ type Options struct {
 	// TemplateFuncsExclusive is the overwrite flag passed to
 	// AddRequestTemplateFunctions for the seeded funcs.
 	TemplateFuncsExclusive bool
-	// Parent links a sub-workflow to its caller: secrets are shared, and this
-	// request registers as a child flow of the parent, so the parent's total
-	// time transitively covers this request's entire lifetime. A child with no
-	// explicit ConversationID also joins the parent's conversation thread.
+	// Parent links a sub-workflow to its caller: secrets are shared, the
+	// parent's workspace is inherited, and this request registers as a child
+	// flow of the parent, so the parent's total time transitively covers this
+	// request's entire lifetime. A child with no explicit ConversationID also
+	// joins the parent's conversation thread.
 	Parent *RequestContext
 	// ConversationID selects the run's conversation thread. When set, the thread
 	// is resumed from the log store (empty if new) so a later request with the
@@ -85,6 +86,14 @@ func Start(ctx context.Context, opts Options) (context.Context, *RequestContext)
 		opts.Parent.ShareSecretsWith(rc)
 		end := opts.Parent.BeginFlow("workflow:" + id)
 		rc.RegisterOnCompleteHook(end)
+		// A sub-workflow runs inside its caller's workspace. The callee is
+		// compiled without one of its own — only an agent owns a workspace — so
+		// inheriting here is what lets an agent hand file work to a workflow. A
+		// callee that does carry its own workspace still wins: plan.Execute
+		// stamps it over this on entry.
+		if ws := opts.Parent.GetWorkspace(); ws != nil {
+			rc.SetWorkspace(ws)
+		}
 	}
 	conv, owned := resolveConversation(opts)
 	rc.setConversation(conv)

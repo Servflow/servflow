@@ -235,13 +235,13 @@ func (p *PlannerV2) generateActionStepV1(id string, a apiconfig.Action, configJs
 	}
 
 	return &Action{
-		id:         id,
-		name:       name,
-		next:       nextStep,
-		fail:       failStep,
-		out:        out,
-		exec:       exec,
-		dispatch:   a.Dispatch,
+		id:       id,
+		name:     name,
+		next:     nextStep,
+		fail:     failStep,
+		out:      out,
+		exec:     exec,
+		dispatch: a.Dispatch,
 	}, nil
 }
 
@@ -280,12 +280,12 @@ func (p *PlannerV2) generateActionStepV2(id string, a apiconfig.Action, configJs
 	}
 
 	return &ActionV2{
-		id:         id,
-		name:       name,
-		next:       nextStep,
-		fail:       failStep,
-		exec:       exec,
-		dispatch:   a.Dispatch,
+		id:       id,
+		name:     name,
+		next:     nextStep,
+		fail:     failStep,
+		exec:     exec,
+		dispatch: a.Dispatch,
 	}, nil
 }
 

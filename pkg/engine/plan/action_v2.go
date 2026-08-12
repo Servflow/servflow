@@ -21,12 +21,12 @@ import (
 // Unlike v1, template resolution is handled by the action itself,
 // and the action's id is used directly as the output variable name.
 type ActionV2 struct {
-	next       *stepWrapper
-	fail       *stepWrapper
-	exec       actions.ActionExecutableV2
-	id         string // Also used as output variable name (no separate 'out')
-	name       string
-	dispatch   []string
+	next     *stepWrapper
+	fail     *stepWrapper
+	exec     actions.ActionExecutableV2
+	id       string // Also used as output variable name (no separate 'out')
+	name     string
+	dispatch []string
 }
 
 func (a *ActionV2) ID() string {
@@ -47,7 +47,6 @@ func (a *ActionV2) execute(ctx context.Context) (*stepWrapper, error) {
 
 	logger := logging.FromContext(ctx).With(zap.String("action_id", a.id), zap.String("action_name", a.DisplayName()))
 	ctx = logging.WithLogger(ctx, logger)
-
 
 	var (
 		resp   interface{}

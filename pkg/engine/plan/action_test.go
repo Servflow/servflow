@@ -255,7 +255,6 @@ func TestAction_Execute(t *testing.T) {
 	})
 }
 
-
 func TestAction_ExecuteWithDispatch(t *testing.T) {
 	t.Run("triggers background chains", func(t *testing.T) {
 		ctrl := gomock.NewController(t)

@@ -22,13 +22,13 @@ import (
 // TODO swap id for logger with id
 
 type Action struct {
-	next       *stepWrapper
-	fail       *stepWrapper
-	exec       actions.ActionExecutable
-	out        string
-	id         string
-	name       string
-	dispatch   []string
+	next     *stepWrapper
+	fail     *stepWrapper
+	exec     actions.ActionExecutable
+	out      string
+	id       string
+	name     string
+	dispatch []string
 }
 
 var (

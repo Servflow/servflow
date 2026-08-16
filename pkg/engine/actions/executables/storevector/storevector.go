@@ -31,10 +31,6 @@ func (s StoreVectors) Type() string {
 	return "storevector"
 }
 
-func (s StoreVectors) SupportsReplica() bool {
-	return true
-}
-
 func (s StoreVectors) Config() string {
 	cfg := *s.cfg
 	cfg.Options = nil

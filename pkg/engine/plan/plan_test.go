@@ -77,7 +77,6 @@ func TestPlan_Execute(t *testing.T) {
 			contextSetup: func(ctx context.Context) {},
 			mockAssertions: func(exec1, exec2, exec3 *MockActionExecutable) {
 				exec1.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil, nil)
-				exec1.EXPECT().SupportsReplica().Return(false).AnyTimes()
 			},
 			expectedBody: `{"status": "success"}`,
 			expectedJSON: true,
@@ -88,7 +87,6 @@ func TestPlan_Execute(t *testing.T) {
 			contextSetup: func(ctx context.Context) {},
 			mockAssertions: func(exec1, exec2, exec3 *MockActionExecutable) {
 				exec2.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil, nil)
-				exec2.EXPECT().SupportsReplica().Return(false).AnyTimes()
 			},
 			expectedNilResp: true,
 		},
@@ -118,9 +116,7 @@ func TestPlan_Execute(t *testing.T) {
 						assert.Nil(t, resp)
 						return "test value", nil, nil
 					})
-				exec3.EXPECT().SupportsReplica().Return(false).AnyTimes()
 				exec2.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(nil, nil, nil)
-				exec2.EXPECT().SupportsReplica().Return(false).AnyTimes()
 			},
 			expectedBody: `{"data": "test value"}`,
 			expectedJSON: true,
@@ -323,7 +319,6 @@ func TestPlan_WorkspacePassedToActions(t *testing.T) {
 			mockExec := NewMockActionExecutable(ctrl)
 			mockExec.EXPECT().Config().Return("").AnyTimes()
 			mockExec.EXPECT().Type().Return("mock").AnyTimes()
-			mockExec.EXPECT().SupportsReplica().Return(false).AnyTimes()
 			mockExec.EXPECT().Execute(gomock.Any(), gomock.Any()).
 				DoAndReturn(func(ctx context.Context, _ string) (interface{}, map[string]string, error) {
 					captured, capturedErr = requestctx2.WorkspaceFromContext(ctx)
@@ -390,7 +385,6 @@ func TestPlan_WorkspaceTemplateFunction(t *testing.T) {
 	mockExec := NewMockActionExecutable(ctrl)
 	mockExec.EXPECT().Config().Return(`{"content": "{{ file \"hello.txt\" }}"}`).AnyTimes()
 	mockExec.EXPECT().Type().Return("mock").AnyTimes()
-	mockExec.EXPECT().SupportsReplica().Return(false).AnyTimes()
 	mockExec.EXPECT().Execute(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(ctx context.Context, config string) (interface{}, map[string]string, error) {
 			// The {{ file }} template function reads from the workspace capability.

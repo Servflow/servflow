@@ -29,10 +29,6 @@ func (d *Download) Type() string {
 	return "download"
 }
 
-func (d *Download) SupportsReplica() bool {
-	return true
-}
-
 func (d *Download) Config() string {
 	configBytes, err := json.Marshal(d.cfg)
 	if err != nil {

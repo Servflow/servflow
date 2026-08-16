@@ -293,7 +293,6 @@ func TestNewClient(t *testing.T) {
 
 		// Setup mocks
 		mockExec.EXPECT().Config().Return("").AnyTimes()
-		mockExec.EXPECT().SupportsReplica().Return(false).AnyTimes()
 		mockExec.EXPECT().Type().Return("mock").AnyTimes()
 		mockExec.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(map[string]interface{}{"result": "workflow result:"}, nil, nil)
 
@@ -386,7 +385,6 @@ func TestNewClient(t *testing.T) {
 		})
 
 		mockExec.EXPECT().Config().Return("").AnyTimes()
-		mockExec.EXPECT().SupportsReplica().Return(false).AnyTimes()
 		mockExec.EXPECT().Type().Return("mock").AnyTimes()
 		mockExec.EXPECT().Execute(gomock.Any(), gomock.Any()).Return(fileReader, nil, nil)
 

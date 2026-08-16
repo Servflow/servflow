@@ -29,10 +29,6 @@ func (d *Delete) Type() string {
 	return "delete"
 }
 
-func (d *Delete) SupportsReplica() bool {
-	return true
-}
-
 type Config struct {
 	IntegrationID     string            `json:"integrationID"`
 	Filters           []filters.Filter  `json:"filters"`

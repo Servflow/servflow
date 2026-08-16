@@ -35,10 +35,6 @@ func (s *Write) Type() string {
 	return "write"
 }
 
-func (s *Write) SupportsReplica() bool {
-	return true
-}
-
 func New(config Config) (*Write, error) {
 	if config.IntegrationID == "" {
 		return nil, errors.New("datasource is required")

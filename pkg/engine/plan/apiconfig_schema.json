@@ -136,9 +136,6 @@
     "Action": {
       "type": "object",
       "properties": {
-        "useReplica": {
-          "type": "boolean"
-        },
         "name": {
           "type": "string"
         },

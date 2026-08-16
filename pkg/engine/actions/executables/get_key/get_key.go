@@ -31,10 +31,6 @@ func (g *GetKey) Type() string {
 	return "get_key"
 }
 
-func (g *GetKey) SupportsReplica() bool {
-	return true
-}
-
 func (g *GetKey) Config() string {
 	cfg := Config{
 		Key:         g.key,

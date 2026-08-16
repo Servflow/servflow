@@ -90,11 +90,6 @@ func TestGetKey_Type(t *testing.T) {
 	assert.Equal(t, "get_key", executable.Type())
 }
 
-func TestGetKey_SupportsReplica(t *testing.T) {
-	executable := NewExecutable(Config{Key: "test"})
-	assert.True(t, executable.SupportsReplica())
-}
-
 func TestGetKey_Config(t *testing.T) {
 	key := "test-key"
 	executable := NewExecutable(Config{Key: key, FailIfEmpty: true})

@@ -23,8 +23,6 @@ type ActionRegistrationInfo struct {
 
 type FieldType string
 
-// TODO fix support for passing config over replica
-
 const (
 	FieldTypeString      FieldType = "string"
 	FieldTypeIntegration FieldType = "integration"
@@ -33,6 +31,11 @@ const (
 	FieldTypeFile        FieldType = "file"
 	FieldTypeTextArea    FieldType = "text_area"
 	FieldTypeArray       FieldType = "array"
+	// FieldTypeLLMProvider is a reference to a stored LLM provider instance,
+	// held as its numeric id. Like FieldTypeIntegration it names a stored
+	// record rather than a literal, so the dashboard resolves it to a picker
+	// instead of asking the user to type an id.
+	FieldTypeLLMProvider FieldType = "llm_provider"
 )
 
 type FieldInfo struct {

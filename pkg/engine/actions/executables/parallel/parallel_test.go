@@ -38,7 +38,6 @@ func TestParallelExec_Execute(t *testing.T) {
 			})
 
 			mockExec.EXPECT().Config().Return("").AnyTimes()
-			mockExec.EXPECT().SupportsReplica().Return(false).AnyTimes()
 			mockExec.EXPECT().Type().Return("mock").AnyTimes()
 		}
 

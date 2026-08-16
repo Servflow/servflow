@@ -21,13 +21,12 @@ import (
 // Unlike v1, template resolution is handled by the action itself,
 // and the action's id is used directly as the output variable name.
 type ActionV2 struct {
-	next       *stepWrapper
-	fail       *stepWrapper
-	exec       actions.ActionExecutableV2
-	id         string // Also used as output variable name (no separate 'out')
-	name       string
-	useReplica bool
-	dispatch   []string
+	next     *stepWrapper
+	fail     *stepWrapper
+	exec     actions.ActionExecutableV2
+	id       string // Also used as output variable name (no separate 'out')
+	name     string
+	dispatch []string
 }
 
 func (a *ActionV2) ID() string {
@@ -49,8 +48,6 @@ func (a *ActionV2) execute(ctx context.Context) (*stepWrapper, error) {
 	logger := logging.FromContext(ctx).With(zap.String("action_id", a.id), zap.String("action_name", a.DisplayName()))
 	ctx = logging.WithLogger(ctx, logger)
 
-	logger.Debug("executing v2 action", zap.String("action_id", a.id), zap.Bool("use_replica", a.useReplica), zap.Bool("supports_replica", a.exec.SupportsReplica()))
-
 	var (
 		resp   interface{}
 		fields map[string]string
@@ -58,16 +55,7 @@ func (a *ActionV2) execute(ctx context.Context) (*stepWrapper, error) {
 	)
 
 	// V2 actions handle their own template resolution
-	if a.useReplica && a.exec.SupportsReplica() {
-		logger.Debug("executing replica action")
-		// Note: Replica execution for V2 would need a different mechanism
-		// since the action handles its own template resolution.
-		// For now, fall back to direct execution.
-		logger.Warn("replica execution not yet supported for V2 actions, falling back to direct execution")
-		resp, fields, err = a.exec.Execute(ctx)
-	} else {
-		resp, fields, err = a.exec.Execute(ctx)
-	}
+	resp, fields, err = a.exec.Execute(ctx)
 
 	// V2 actions resolve secrets to real values internally; scrub anything
 	// they hand back before it reaches spans, logs or variables.

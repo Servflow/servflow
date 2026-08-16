@@ -174,6 +174,27 @@ func TestLifecycle_ParentChildNesting(t *testing.T) {
 		"parent EndTime >= child EndTime")
 }
 
+// Case 7b: Parent — a sub-workflow runs in its caller's workspace.
+func TestLifecycle_ParentWorkspaceInherited(t *testing.T) {
+	ws := &mockWorkspace{files: map[string][]byte{"notes.txt": []byte("hi")}}
+
+	_, parent := Start(context.Background(), Options{ID: "parent"})
+	parent.SetWorkspace(ws)
+
+	_, child := Start(context.Background(), Options{ID: "child", Parent: parent})
+	assert.Same(t, ws, child.GetWorkspace(), "child must run in the parent's workspace")
+
+	// A parent with no workspace leaves the child with none, so file actions
+	// still fail with ErrNoWorkspace rather than silently reaching somewhere.
+	_, bare := Start(context.Background(), Options{ID: "bare"})
+	_, orphan := Start(context.Background(), Options{ID: "orphan", Parent: bare})
+	assert.Nil(t, orphan.GetWorkspace())
+
+	// No parent at all: unchanged.
+	_, solo := Start(context.Background(), Options{ID: "solo"})
+	assert.Nil(t, solo.GetWorkspace())
+}
+
 // Case 8: beforeEnd hooks observe the span before End.
 func TestLifecycle_BeforeEndHook(t *testing.T) {
 	sr, tr := newRecorder()

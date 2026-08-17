@@ -74,7 +74,8 @@ func NewPlannerV2(config PlannerConfig, logger *zap.Logger) *PlannerV2 {
 func (p *PlannerV2) Plan() (*Plan, error) {
 	for id := range p.config.Integrations {
 		integ := p.config.Integrations[id]
-		if err := integration.InitializeIntegration(integ.Type, id, integ.Config, integ.LazyLoad); err != nil {
+		integ.ID = id
+		if err := integration.InitializeFromConfig(integ); err != nil {
 			return nil, err
 		}
 	}

@@ -1,23 +1,32 @@
 # Integration Configuration for User Registration Example
 # This file shows how to configure database and JWT integrations
 # required for the user registration API endpoint.
+#
+# Each config field is an object: {value: <literal>} for a plain value, or
+# {secret: <key>} to reference a stored secret by key.
 
 integrations:
   # MongoDB Integration
   my_database:
     type: mongo
     config:
-      connectionString: '{{ secret "MONGODB_STRING" }}'
-      dbName: myapp
+      connectionString:
+        secret: MONGODB_STRING
+      dbName:
+        value: myapp
 
   # JWT Integration (if using separate JWT service)
   # Note: JWT can also be handled directly in actions without a separate integration
   jwt_service:
     type: jwt
     config:
-      secret: '{{ secret "JWT_SECRET" }}'
-      algorithm: HS256
-      expiration: 24h
+      # The field is named "secret"; its value references the JWT_SECRET secret.
+      secret:
+        secret: JWT_SECRET
+      algorithm:
+        value: HS256
+      expiration:
+        value: 24h
 # Example secrets that need to be configured:
 # MONGODB_STRING: mongodb://username:password@localhost:27017
 # JWT_SECRET: your-super-secure-jwt-secret-key-here

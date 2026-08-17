@@ -1,23 +1,32 @@
 # Integration Configuration for Database Agent Example
 # This file shows how to configure MongoDB and OpenAI integrations
 # required for the AI-powered database agent endpoint.
+#
+# Each config field is an object: {value: <literal>} for a plain value, or
+# {secret: <key>} to reference a stored secret by key.
 
 integrations:
   # MongoDB Integration
   my_database:
     type: mongo
     config:
-      connectionString: '{{ secret "MONGODB_STRING" }}'
-      dbName: myapp
+      connectionString:
+        secret: MONGODB_STRING
+      dbName:
+        value: myapp
 
   # OpenAI Integration for AI capabilities
   my_openai_service:
     type: openai
     config:
-      api_key: '{{ secret "OPENAI_API_KEY" }}'
-      model: gpt-3.5-turbo
-      temperature: 0.7
-      max_tokens: 1500
+      api_key:
+        secret: OPENAI_API_KEY
+      model:
+        value: gpt-3.5-turbo
+      temperature:
+        value: 0.7
+      max_tokens:
+        value: 1500
 # Example secrets that need to be configured:
 # MONGODB_STRING: mongodb://username:password@localhost:27017
 # OPENAI_API_KEY: sk-your-openai-api-key-here
@@ -33,12 +42,16 @@ integrations:
 # my_database:
 #   type: sql
 #   config:
-#     connectionString: '{{ secret "POSTGRES_CONNECTION_STRING" }}'
-#     driver: postgres
+#     connectionString:
+#       secret: POSTGRES_CONNECTION_STRING
+#     driver:
+#       value: postgres
 #
 # MySQL Integration:
 # my_database:
 #   type: sql
 #   config:
-#     connectionString: '{{ secret "MYSQL_CONNECTION_STRING" }}'
-#     driver: mysql
+#     connectionString:
+#       secret: MYSQL_CONNECTION_STRING
+#     driver:
+#       value: mysql

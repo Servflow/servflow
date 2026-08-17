@@ -129,13 +129,17 @@ integrations:
   db1:
     type: mongo
     config:
-      connectionString: "mongodb://localhost:27017"
-      database: "testdb"
+      connectionString:
+        value: "mongodb://localhost:27017"
+      database:
+        value: "testdb"
   db2:
     type: sql
     config:
-      driver: "postgres"
-      connectionString: "postgres://user:pass@localhost/db"
+      driver:
+        value: "postgres"
+      connectionString:
+        secret: db2_connection_string
 `
 		err := os.WriteFile(tempFile, []byte(engineYAML), 0644)
 		require.NoError(t, err)

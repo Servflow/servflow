@@ -137,30 +137,17 @@ func (o *ResponseObject) ToProto() *proto.ResponseObject {
 }
 
 type IntegrationConfig struct {
-	ID       string                 `json:"id" yaml:"id"`
-	Config   map[string]interface{} `json:"config,omitempty" yaml:"config,omitempty"`
-	Type     string                 `json:"type" yaml:"type"`
-	LazyLoad bool                   `json:"lazyLoad" yaml:"lazyLoad"`
+	ID     string                 `json:"id" yaml:"id"`
+	Config map[string]ConfigValue `json:"config,omitempty" yaml:"config,omitempty"`
+	Type   string                 `json:"type" yaml:"type"`
 }
 
-//	func (d *IntegrationConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
-//		var tmp struct {
-//			Type      string                 `yaml:"type"`
-//			NewConfig map[string]interface{} `yaml:"config"`
-//			ID        string                 `yaml:"id"`
-//		}
-//		if err := unmarshal(&tmp); err != nil {
-//			return err
-//		}
-//
-//		data, err := json.Marshal(tmp.NewConfig)
-//		if err != nil {
-//			return err
-//		}
-//
-//		d.Type = tmp.Type
-//		d.Config = data
-//		d.ID = tmp.ID
-//		d.NewConfig = tmp.NewConfig
-//		return nil
-//	}
+// ConfigValue is one integration config field. It is either a literal (Value)
+// or a reference to a stored secret (Secret). Secret wins when both are set;
+// an unset Secret means the field is used as written. The engine resolves these
+// to a plain map[string]any before handing the config to an integration
+// constructor — see pkg/engine/integration.
+type ConfigValue struct {
+	Value  any    `json:"value,omitempty" yaml:"value,omitempty"`
+	Secret string `json:"secret,omitempty" yaml:"secret,omitempty"`
+}

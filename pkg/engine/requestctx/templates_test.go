@@ -113,7 +113,7 @@ func TestTemplateFunctions(t *testing.T) {
 		},
 		{
 			name:          "string escape direct usage",
-			templateInput: `Escaped: {{stringescape .input}}`,
+			templateInput: `Escaped: {{escape .input}}`,
 			values: map[string]interface{}{
 				"input": "hello \"world\"\nwith\tspecial chars\\",
 			},
@@ -122,7 +122,7 @@ func TestTemplateFunctions(t *testing.T) {
 		},
 		{
 			name:          "string escape with empty string",
-			templateInput: `Escaped: {{stringescape .input}}`,
+			templateInput: `Escaped: {{escape .input}}`,
 			values: map[string]interface{}{
 				"input": "",
 			},

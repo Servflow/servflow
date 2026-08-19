@@ -45,8 +45,8 @@ actions:
     type: mongoquery
     config:
       collection: users
-      filter: '{{ tool_param "filter" | stringescape }}'
-      projection: '{{ tool_param "projection" | stringescape }}'
+      filter: '{{ tool_param "filter" | escape }}'
+      projection: '{{ tool_param "projection" | escape }}'
       integrationID: "my_database"
 
 responses:

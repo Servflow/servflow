@@ -72,12 +72,11 @@ func collectGraphErrors(a *apiconfig.APIConfig, ve *ValidationErrors, extraRoots
 			ve.Add(&InvalidReferenceError{From: from, To: ref, Reason: err.Error()})
 			return "", false
 		}
-		canonical := apiconfig.CanonicalStepID(ref)
-		if _, ok := nodes[canonical]; !ok {
+		if _, ok := nodes[ref]; !ok {
 			ve.Add(&InvalidReferenceError{From: from, To: ref, Reason: fmt.Sprintf("no %s named %q", kind, bare)})
 			return "", false
 		}
-		return canonical, true
+		return ref, true
 	}
 
 	// flow edges (next/fail/onTrue/onFalse) used for cycle detection + reachability

@@ -72,7 +72,9 @@ func (r *Registry) RegisterAction(actionType string, registration ActionRegistra
 	return nil
 }
 
-// GetFieldsForAction kept for backward compatibility
+// GetFieldsForAction returns the field metadata registered for an action type:
+// what the dashboard renders as a form, and what config validation checks a
+// step's config against. It errors when the type is not registered.
 func GetFieldsForAction(actionType string) (map[string]FieldInfo, error) {
 	f, ok := actionManager.availableConstructors[actionType]
 	if !ok {

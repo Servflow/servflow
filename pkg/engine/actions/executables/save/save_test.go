@@ -32,7 +32,7 @@ func TestSave_Insert(t *testing.T) {
 			return mockIntegration, nil
 		})
 
-		err := integration.InitializeIntegration("mock", "mockds", nil, false)
+		err := integration.InitializeIntegration("mock", "mockds", nil)
 		require.NoError(t, err)
 
 		save, err := New(Config{
@@ -60,7 +60,7 @@ func TestSave_Insert(t *testing.T) {
 			return mockIntegration, nil
 		})
 
-		err := integration.InitializeIntegration("mock", "mockds", nil, false)
+		err := integration.InitializeIntegration("mock", "mockds", nil)
 		require.NoError(t, err)
 
 		save, err := New(Config{
@@ -91,7 +91,7 @@ func TestSave_Insert(t *testing.T) {
 		integration.ReplaceIntegrationType("mock", func(m map[string]any) (integration.Integration, error) {
 			return mockIntegration, nil
 		})
-		integration.InitializeIntegration("mock", "mockds", nil, false)
+		integration.InitializeIntegration("mock", "mockds", nil)
 
 		save, err := New(Config{
 			IntegrationID: "mockds",
@@ -129,7 +129,7 @@ func TestSave_Update(t *testing.T) {
 			return mockIntegration, nil
 		})
 
-		err := integration.InitializeIntegration("mock", "mockds", nil, false)
+		err := integration.InitializeIntegration("mock", "mockds", nil)
 		require.NoError(t, err)
 
 		save, err := New(Config{
@@ -161,7 +161,7 @@ func TestSave_Update(t *testing.T) {
 		integration.ReplaceIntegrationType("mock", func(m map[string]any) (integration.Integration, error) {
 			return mockIntegration, nil
 		})
-		integration.InitializeIntegration("mock", "mockds", nil, false)
+		integration.InitializeIntegration("mock", "mockds", nil)
 
 		save, err := New(Config{
 			IntegrationID: "mockds",
@@ -205,7 +205,7 @@ func TestSave_Type(t *testing.T) {
 	integration.ReplaceIntegrationType("mock", func(m map[string]any) (integration.Integration, error) {
 		return mockIntegration, nil
 	})
-	integration.InitializeIntegration("mock", "mockds", nil, false)
+	integration.InitializeIntegration("mock", "mockds", nil)
 
 	save, err := New(Config{
 		IntegrationID: "mockds",

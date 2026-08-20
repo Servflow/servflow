@@ -452,7 +452,7 @@ func TestPlannerV2_IntegrationsLazyLoaded(t *testing.T) {
 			integrationID: {
 				ID:     integrationID,
 				Type:   "mock-planner-test",
-				Config: map[string]interface{}{"key": "value"},
+				Config: map[string]apiconfig.ConfigValue{"key": {Value: "value"}},
 			},
 		}
 
@@ -478,12 +478,12 @@ func TestPlannerV2_IntegrationsLazyLoaded(t *testing.T) {
 			"multi-integration-1": {
 				ID:     "multi-integration-1",
 				Type:   "mock-planner-test",
-				Config: map[string]interface{}{"setting": "one"},
+				Config: map[string]apiconfig.ConfigValue{"setting": {Value: "one"}},
 			},
 			"multi-integration-2": {
 				ID:     "multi-integration-2",
 				Type:   "mock-planner-test",
-				Config: map[string]interface{}{"setting": "two"},
+				Config: map[string]apiconfig.ConfigValue{"setting": {Value: "two"}},
 			},
 		}
 
@@ -511,7 +511,7 @@ func TestPlannerV2_IntegrationsLazyLoaded(t *testing.T) {
 			"unknown-integration": {
 				ID:     "unknown-integration",
 				Type:   "unknown-type-xyz",
-				Config: map[string]interface{}{"key": "value"},
+				Config: map[string]apiconfig.ConfigValue{"key": {Value: "value"}},
 			},
 		}
 

@@ -7,8 +7,10 @@ integrations:
   my_database:
     type: mongo
     config:
-      connectionString: '{{ secret "MONGODB_STRING" }}'
-      dbName: myapp
+      connectionString:
+        secret: MONGODB_STRING
+      dbName:
+        value: myapp
 
 # API Endpoint Configuration
 id: user_registration

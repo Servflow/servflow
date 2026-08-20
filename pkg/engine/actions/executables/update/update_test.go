@@ -32,7 +32,7 @@ func TestUpdate_Execute(t *testing.T) {
 			return mockIntegration, nil
 		})
 
-		err := integration.InitializeIntegration("mock", "mockds", nil, false)
+		err := integration.InitializeIntegration("mock", "mockds", nil)
 		require.NoError(t, err)
 
 		update, err := New(Config{
@@ -67,7 +67,7 @@ func TestUpdate_Execute(t *testing.T) {
 		integration.ReplaceIntegrationType("mock", func(m map[string]any) (integration.Integration, error) {
 			return mockIntegration, nil
 		})
-		integration.InitializeIntegration("mock", "mockds", nil, false)
+		integration.InitializeIntegration("mock", "mockds", nil)
 
 		update, err := New(Config{
 			IntegrationID:     "mockds",

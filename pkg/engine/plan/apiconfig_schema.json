@@ -289,13 +289,19 @@
           "type": "string"
         },
         "config": {
-          "type": ["object", "null"]
+          "type": ["object", "null"],
+          "description": "Map of field name to a value object: {\"value\": <literal>} or {\"secret\": \"<key>\"}.",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "value": {},
+              "secret": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
         },
         "type": {
           "type": "string"
-        },
-        "lazyLoad": {
-          "type": "boolean"
         }
       },
       "additionalProperties": false

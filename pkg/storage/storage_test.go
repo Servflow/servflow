@@ -2,6 +2,7 @@ package storage
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"sync"
 	"testing"
@@ -49,14 +50,10 @@ func TestWriteAndGetEntries(t *testing.T) {
 			&jsonSerializable{Topic: "topic2", Message: "message3"},
 		}
 
-		err := WriteToLog("conversations", entries)
-		require.NoError(t, err)
+		AppendToLog("conversations", entries...)
+		require.NoError(t, SyncLog())
 
-		gotten, err := GetLogEntriesByPrefix("conversations", func(data []byte) (any, error) {
-			var m jsonSerializable
-			err := m.Deserialize(data)
-			return &m, err
-		})
+		gotten, err := GetLogEntriesByPrefix("conversations", 10, decodeJSONSerializable)
 		require.NoError(t, err)
 
 		expected := []any{
@@ -67,14 +64,108 @@ func TestWriteAndGetEntries(t *testing.T) {
 		assert.Equal(t, expected, gotten)
 	})
 
+	t.Run("a limit smaller than the log returns its most recent entries, oldest first", func(t *testing.T) {
+		entries := make([]Serializable, 0, 6)
+		for i := 1; i <= 6; i++ {
+			entries = append(entries, &jsonSerializable{Topic: "windowed", Message: fmt.Sprintf("message%d", i)})
+		}
+		AppendToLog("windowed", entries...)
+		require.NoError(t, SyncLog())
+
+		gotten, err := GetLogEntriesByPrefix("windowed", 2, decodeJSONSerializable)
+		require.NoError(t, err)
+
+		assert.Equal(t, []any{
+			&jsonSerializable{Topic: "windowed", Message: "message5"},
+			&jsonSerializable{Topic: "windowed", Message: "message6"},
+		}, gotten)
+	})
+
 	t.Run("empty prefix returns no entries", func(t *testing.T) {
-		_, err := GetLogEntriesByPrefix("", func(data []byte) (any, error) {
-			var m jsonSerializable
-			err := m.Deserialize(data)
-			return &m, err
-		})
+		_, err := GetLogEntriesByPrefix("", 10, decodeJSONSerializable)
 		require.Error(t, err)
 	})
+
+	t.Run("a non-positive limit is refused", func(t *testing.T) {
+		_, err := GetLogEntriesByPrefix("conversations", 0, decodeJSONSerializable)
+		require.Error(t, err)
+	})
+}
+
+func decodeJSONSerializable(data []byte) (any, error) {
+	var m jsonSerializable
+	err := m.Deserialize(data)
+	return &m, err
+}
+
+// TestAppendToLog_KeepsEveryEntryWrittenInTheSameInstant is the regression for
+// keys built from the clock alone: appends made inside one nanosecond tick
+// produced the same key, and each silently replaced the last.
+func TestAppendToLog_KeepsEveryEntryWrittenInTheSameInstant(t *testing.T) {
+	const entries = 500
+
+	for i := range entries {
+		AppendToLog("tightloop", &jsonSerializable{Topic: "tightloop", Message: fmt.Sprintf("message%d", i)})
+	}
+	require.NoError(t, SyncLog())
+
+	gotten, err := GetLogEntriesByPrefix("tightloop", entries*2, decodeJSONSerializable)
+	require.NoError(t, err)
+	require.Len(t, gotten, entries)
+
+	for i, entry := range gotten {
+		got := entry.(*jsonSerializable)
+		assert.Equal(t, fmt.Sprintf("message%d", i), got.Message, "entry %d is out of order", i)
+	}
+}
+
+// TestAppendToLog_ConcurrentProducers verifies what several requests appending
+// to their own threads at once rely on: nothing is lost, and each thread reads
+// back in the order that thread was written.
+func TestAppendToLog_ConcurrentProducers(t *testing.T) {
+	const producers, each = 8, 50
+
+	var wg sync.WaitGroup
+	for p := range producers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			prefix := fmt.Sprintf("producer%d", p)
+			for i := range each {
+				AppendToLog(prefix, &jsonSerializable{Topic: prefix, Message: fmt.Sprintf("message%d", i)})
+			}
+		}()
+	}
+	wg.Wait()
+	require.NoError(t, SyncLog())
+
+	for p := range producers {
+		prefix := fmt.Sprintf("producer%d", p)
+		gotten, err := GetLogEntriesByPrefix(prefix, each*2, decodeJSONSerializable)
+		require.NoError(t, err)
+		require.Len(t, gotten, each, "%s lost entries", prefix)
+
+		for i, entry := range gotten {
+			got := entry.(*jsonSerializable)
+			assert.Equal(t, fmt.Sprintf("message%d", i), got.Message, "%s entry %d is out of order", prefix, i)
+		}
+	}
+}
+
+// TestSyncLog_MakesAppendsReadable is the guarantee a handler leans on when it
+// hands one turn's thread over to the next: what SyncLog has returned for, a
+// reader can see.
+func TestSyncLog_MakesAppendsReadable(t *testing.T) {
+	AppendToLog("handover", &jsonSerializable{Topic: "handover", Message: "first turn"})
+	require.NoError(t, SyncLog())
+
+	gotten, err := GetLogEntriesByPrefix("handover", 10, decodeJSONSerializable)
+	require.NoError(t, err)
+	require.Len(t, gotten, 1)
+	assert.Equal(t, "first turn", gotten[0].(*jsonSerializable).Message)
+
+	// A sync with nothing queued is a no-op, not a hang.
+	require.NoError(t, SyncLog())
 }
 
 func TestSetAndGet(t *testing.T) {
@@ -193,9 +284,9 @@ func BenchmarkWriteAndGetEntriesJSON(b *testing.B) {
 		}
 
 		for n := 0; n < b.N; n++ {
-			err := WriteToLog("benchmarkwritejson", entries)
-			require.NoError(b, err)
+			AppendToLog("benchmarkwritejson", entries...)
 		}
+		require.NoError(b, SyncLog())
 	})
 
 	var once sync.Once
@@ -207,12 +298,12 @@ func BenchmarkWriteAndGetEntriesJSON(b *testing.B) {
 				&jsonSerializable{Topic: "topic1", Message: "message2"},
 				&jsonSerializable{Topic: "topic2", Message: "message3"},
 			}
-			err := WriteToLog("benchmarkreadjson", entries)
-			require.NoError(b, err)
+			AppendToLog("benchmarkreadjson", entries...)
+			require.NoError(b, SyncLog())
 		})
 
 		for n := 0; n < b.N; n++ {
-			gotten, err := GetLogEntriesByPrefix("benchmarkreadjson", func(data []byte) (any, error) {
+			gotten, err := GetLogEntriesByPrefix("benchmarkreadjson", 50, func(data []byte) (any, error) {
 				var m jsonSerializable
 				err := json.Unmarshal(data, &m)
 				return &m, err
@@ -289,9 +380,9 @@ func BenchmarkWriteAndGetEntriesFLB(b *testing.B) {
 		}
 
 		for n := 0; n < b.N; n++ {
-			err := WriteToLog("benchmarkwriteflb", entries)
-			require.NoError(b, err)
+			AppendToLog("benchmarkwriteflb", entries...)
 		}
+		require.NoError(b, SyncLog())
 	})
 
 	var once sync.Once
@@ -303,12 +394,12 @@ func BenchmarkWriteAndGetEntriesFLB(b *testing.B) {
 				&flatBufferMessage{Topic: "topic1", Message: "message2"},
 				&flatBufferMessage{Topic: "topic2", Message: "message3"},
 			}
-			err := WriteToLog("benchmarkreadflb", entries)
-			require.NoError(b, err)
+			AppendToLog("benchmarkreadflb", entries...)
+			require.NoError(b, SyncLog())
 		})
 
 		for n := 0; n < b.N; n++ {
-			gotten, err := GetLogEntriesByPrefix("benchmarkreadflb", func(data []byte) (any, error) {
+			gotten, err := GetLogEntriesByPrefix("benchmarkreadflb", 50, func(data []byte) (any, error) {
 				fb := flatBufferMessage{}
 				return &fb, fb.Deserialize(data)
 			})

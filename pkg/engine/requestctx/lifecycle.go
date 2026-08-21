@@ -55,16 +55,17 @@ type Options struct {
 	// AddRequestTemplateFunctions for the seeded funcs.
 	TemplateFuncsExclusive bool
 	// Parent links a sub-workflow to its caller: secrets are shared, the
-	// parent's workspace is inherited, and this request registers as a child
-	// flow of the parent, so the parent's total time transitively covers this
-	// request's entire lifetime. A child with no explicit ConversationID also
-	// joins the parent's conversation thread.
+	// parent's workspace is inherited, the request id is derived from the
+	// parent's, and this request registers as a child flow of the parent, so the
+	// parent's total time transitively covers this request's entire lifetime. A
+	// child with no explicit ConversationID gets its own thread, named under its
+	// parent's — threads are never shared between requests.
 	Parent *RequestContext
-	// ConversationID selects the run's conversation thread. When set, the thread
-	// is resumed from the log store (empty if new) so a later request with the
-	// same id continues it. When empty, a fresh thread with a generated id is
-	// created. Either way the thread is synced to the log store in the background;
-	// agents read and append in memory.
+	// ConversationID selects the request's conversation thread. When set, the
+	// thread is resumed from the log store (empty if new) so a later request with
+	// the same id continues it. When empty, a fresh thread with a generated id is
+	// created. Either way, what agents append is written through to the log store
+	// in the background.
 	ConversationID string
 }
 
@@ -75,6 +76,11 @@ func Start(ctx context.Context, opts Options) (context.Context, *RequestContext)
 	id := opts.ID
 	if id == "" {
 		id = fmt.Sprintf("request_%d", time.Now().UnixNano())
+	}
+	if opts.Parent != nil {
+		// A child's id carries its caller's, so a sub-workflow's request and its
+		// thread are both traceable to the run that started them.
+		id = opts.Parent.ID() + "/" + id
 	}
 	rc := NewRequestContext(id)
 	rc.spanAttrs = append(append([]attribute.KeyValue{}, opts.SpanAttributes...),
@@ -95,22 +101,7 @@ func Start(ctx context.Context, opts Options) (context.Context, *RequestContext)
 			rc.SetWorkspace(ws)
 		}
 	}
-	conv, owned := resolveConversation(opts)
-	rc.setConversation(conv)
-	if owned {
-		// The conversation lives in memory for the request and is written once, at
-		// completion — which is after the response is sent AND after child flows
-		// drain, so a sub-workflow's messages are included and the client waits on
-		// nothing. Only the owning request flushes; adopted threads are persisted
-		// by the request that created them.
-		flushLogger := opts.Logger
-		rc.RegisterOnCompleteHook(func() {
-			if err := conv.Flush(); err != nil && flushLogger != nil {
-				flushLogger.Warn("failed to persist conversation",
-					zap.String("conversation_id", conv.ID()), zap.Error(err))
-			}
-		})
-	}
+	rc.setConversation(resolveConversation(opts))
 	ctx = WithAggregationContext(ctx, rc)
 	if opts.Logger != nil {
 		l := WrapWithScrubber(opts.Logger.With(zap.String("request_id", id)), rc)

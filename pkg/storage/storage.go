@@ -4,9 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 	"sync"
-	"time"
 
 	"github.com/dgraph-io/badger/v4"
 )
@@ -98,6 +96,13 @@ type Serializable interface {
 }
 
 func (c *Client) Close() error {
+	// Queued appends are still in memory and are written by another goroutine,
+	// which would find the store shut under it. Drain before closing — taken
+	// before the lock, because the writer needs the client to commit.
+	if err := SyncLog(); err != nil {
+		return err
+	}
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -110,46 +115,41 @@ func (c *Client) Close() error {
 	return err
 }
 
-func WriteToLog(key string, value []Serializable) error {
-	for _, v := range value {
-		b, err := v.Serialize()
-		if err != nil {
-			return err
-		}
-
-		ts := time.Now().UnixNano()
-		k := []byte(fmt.Sprintf("%s:%s:%d", servflowPrefix, strings.Trim(key, ":"), ts))
-
-		_, err = withRetryOnClose(func(db *badger.DB) (struct{}, error) {
-			err := db.Update(func(txn *badger.Txn) error {
-				return txn.Set(k, b)
-			})
-			return struct{}{}, err
-		})
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-const maxSIze = 50
-
-func GetLogEntriesByPrefix(prefix string, deserializeFunc func([]byte) (any, error)) ([]any, error) {
+// GetLogEntriesByPrefix returns the most recent limit entries written under
+// prefix, oldest first.
+//
+// Entries are keyed by write time, so "most recent" is the tail of the range:
+// the scan runs backwards from the end of the prefix and stops once it has
+// limit of them, then reverses what it collected so callers read a log in the
+// order it happened. A thread far longer than limit therefore costs the same
+// as a short one, and what a caller sees is its latest state rather than its
+// first — which is what a conversation resuming after months of use needs.
+//
+// limit is the caller's window and must be positive: an unbounded read of a
+// log that only grows is never what a caller wants.
+func GetLogEntriesByPrefix(prefix string, limit int, deserializeFunc func([]byte) (any, error)) ([]any, error) {
 	if prefix == "" {
 		return nil, errors.New("prefix cannot be empty")
+	}
+	if limit <= 0 {
+		return nil, errors.New("limit must be positive")
 	}
 	bPrefix := []byte(fmt.Sprintf("%s:%s:", servflowPrefix, prefix))
 
 	return withRetryOnClose(func(db *badger.DB) ([]any, error) {
-		result := make([]any, 0)
+		result := make([]any, 0, limit)
 		err := db.View(func(txn *badger.Txn) error {
 			opts := badger.DefaultIteratorOptions
 			opts.PrefetchSize = 10
+			opts.Reverse = true
 			it := txn.NewIterator(opts)
 			defer it.Close()
-			for it.Seek(bPrefix); it.ValidForPrefix(bPrefix); it.Next() {
-				if len(result) >= maxSIze {
+
+			// A reverse seek lands on the largest key at or below its argument,
+			// so it has to start above every key in the range: 0xFF sorts after
+			// any byte a timestamp suffix can hold.
+			for it.Seek(append(bPrefix, 0xFF)); it.ValidForPrefix(bPrefix); it.Next() {
+				if len(result) >= limit {
 					return nil
 				}
 
@@ -165,7 +165,13 @@ func GetLogEntriesByPrefix(prefix string, deserializeFunc func([]byte) (any, err
 			}
 			return nil
 		})
-		return result, err
+		if err != nil {
+			return nil, err
+		}
+		for i, j := 0, len(result)-1; i < j; i, j = i+1, j-1 {
+			result[i], result[j] = result[j], result[i]
+		}
+		return result, nil
 	})
 }
 

@@ -34,7 +34,7 @@ steps:
       - until redis-cli -h cache ping; do sleep 1; done
 
   - name: code-quality
-    image: golang
+    image: golang:1.25
     volumes:
       - name: deps
         path: /go
@@ -45,7 +45,7 @@ steps:
       - staticcheck ./...
 
   - name: test
-    image: golang
+    image: golang:1.25
     privileged: true
     depends_on:
       - wait-for-redis

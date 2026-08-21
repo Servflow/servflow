@@ -4,9 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 	"sync"
-	"time"
 
 	"github.com/dgraph-io/badger/v4"
 )
@@ -98,6 +96,13 @@ type Serializable interface {
 }
 
 func (c *Client) Close() error {
+	// Queued appends are still in memory and are written by another goroutine,
+	// which would find the store shut under it. Drain before closing — taken
+	// before the lock, because the writer needs the client to commit.
+	if err := SyncLog(); err != nil {
+		return err
+	}
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -108,29 +113,6 @@ func (c *Client) Close() error {
 	err := c.db.Close()
 	c.db = nil
 	return err
-}
-
-func WriteToLog(key string, value []Serializable) error {
-	for _, v := range value {
-		b, err := v.Serialize()
-		if err != nil {
-			return err
-		}
-
-		ts := time.Now().UnixNano()
-		k := []byte(fmt.Sprintf("%s:%s:%d", servflowPrefix, strings.Trim(key, ":"), ts))
-
-		_, err = withRetryOnClose(func(db *badger.DB) (struct{}, error) {
-			err := db.Update(func(txn *badger.Txn) error {
-				return txn.Set(k, b)
-			})
-			return struct{}{}, err
-		})
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // GetLogEntriesByPrefix returns the most recent limit entries written under

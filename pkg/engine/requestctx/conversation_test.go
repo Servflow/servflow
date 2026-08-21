@@ -38,34 +38,22 @@ func contents(msgs []ConversationMessage) []string {
 	return out
 }
 
-// TestConversation_IncrementalFlushAndResume verifies that (a) flush only writes
-// the tail appended since the previous flush, and (b) resuming an id loads the
-// full thread exactly once — the load-time high-water mark prevents the resumed
-// history from being re-persisted on the next flush.
-func TestConversation_IncrementalFlushAndResume(t *testing.T) {
-	const id = "test-sync-incremental"
+// TestConversation_WritesThroughAndResumes verifies the thread's whole
+// persistence contract: what is appended is written as it is said, a resume
+// loads it once and in order, and a resumed thread that speaks again does not
+// write its loaded history back.
+func TestConversation_WritesThroughAndResumes(t *testing.T) {
+	const id = "test-write-through"
 
 	conv := NewConversation(id)
 	conv.Append(textMsg("one"), textMsg("two"))
-	if err := conv.flush(); err != nil {
-		t.Fatalf("first flush: %v", err)
-	}
-	if conv.flushed != 2 {
-		t.Fatalf("flushed = %d, want 2", conv.flushed)
+	if err := conv.Sync(); err != nil {
+		t.Fatalf("sync: %v", err)
 	}
 
-	// Second flush writes only the new tail; the first two are not re-written.
 	conv.Append(textMsg("three"))
-	if err := conv.flush(); err != nil {
-		t.Fatalf("second flush: %v", err)
-	}
-	if conv.flushed != 3 {
-		t.Fatalf("flushed = %d, want 3", conv.flushed)
-	}
-
-	// A no-op flush (nothing pending) must not error or advance.
-	if err := conv.flush(); err != nil {
-		t.Fatalf("noop flush: %v", err)
+	if err := conv.Sync(); err != nil {
+		t.Fatalf("second sync: %v", err)
 	}
 
 	// Resume: a fresh conversation loads the whole thread, once, in order.
@@ -83,52 +71,102 @@ func TestConversation_IncrementalFlushAndResume(t *testing.T) {
 			t.Fatalf("resumed[%d] = %q, want %q (full: %v)", i, got[i], want[i], got)
 		}
 	}
-	// Loaded history is already persisted: flushed must equal the loaded count so
-	// the next flush is a no-op, not a duplicate write.
-	if resumed.flushed != len(want) {
-		t.Fatalf("resumed.flushed = %d, want %d", resumed.flushed, len(want))
-	}
-	if err := resumed.flush(); err != nil {
-		t.Fatalf("post-resume flush: %v", err)
-	}
 
-	// Loading again must still see exactly three (no duplication introduced).
+	// The resumed thread speaks: only the new message is added to the store.
+	resumed.Append(textMsg("four"))
+	if err := resumed.Sync(); err != nil {
+		t.Fatalf("post-resume sync: %v", err)
+	}
 	check := NewConversation(id)
 	if err := check.load(); err != nil {
 		t.Fatalf("reload: %v", err)
 	}
-	if n := len(check.Messages()); n != 3 {
-		t.Fatalf("reload count = %d, want 3", n)
+	if got := contents(check.Messages()); len(got) != 4 {
+		t.Fatalf("reload contents = %v, want four messages with no duplicated history", got)
 	}
 }
 
-// TestConversation_FlushAtRequestCompletion verifies the wiring Start relies on:
-// a conversation accumulates in memory and is persisted by the completion hook,
-// with nothing written before it fires.
-func TestConversation_FlushAtRequestCompletion(t *testing.T) {
-	const id = "test-flush-on-complete"
+// TestConversation_ReadableBeforeTheRequestCompletes is what a chat handing one
+// turn to the next depends on: a message is durable once it has been said and
+// synced, not at the end of the request that said it.
+func TestConversation_ReadableBeforeTheRequestCompletes(t *testing.T) {
+	const id = "test-readable-mid-request"
 
 	ctx, rc := Start(context.Background(), Options{ConversationID: id})
 	conv := FromContextConversation(t, ctx)
 	conv.Append(textMsg("during the request"))
-
-	// Nothing is persisted until the request completes.
-	before := NewConversation(id)
-	if err := before.load(); err != nil {
-		t.Fatalf("pre-completion load: %v", err)
-	}
-	if n := len(before.Messages()); n != 0 {
-		t.Fatalf("persisted %d messages before completion, want 0", n)
+	if err := conv.Sync(); err != nil {
+		t.Fatalf("sync: %v", err)
 	}
 
-	rc.Done() // main flow finished; no child flows → completes immediately
+	during := NewConversation(id)
+	if err := during.load(); err != nil {
+		t.Fatalf("mid-request load: %v", err)
+	}
+	if got := contents(during.Messages()); len(got) != 1 || got[0] != "during the request" {
+		t.Fatalf("mid-request contents = %v, want [during the request]", got)
+	}
+
+	// Completing the request adds nothing: the thread was already written.
+	rc.Done()
 
 	after := NewConversation(id)
 	if err := after.load(); err != nil {
 		t.Fatalf("post-completion load: %v", err)
 	}
-	if got := contents(after.Messages()); len(got) != 1 || got[0] != "during the request" {
-		t.Fatalf("persisted contents = %v, want [during the request]", got)
+	if got := contents(after.Messages()); len(got) != 1 {
+		t.Fatalf("post-completion contents = %v, want the one message, written once", got)
+	}
+}
+
+// TestConversation_SubRunKeepsItsOwnThread verifies the isolation a workflow
+// tool relies on: a child request speaks into its own thread, named under its
+// caller's, and the caller's thread is untouched by it.
+func TestConversation_SubRunKeepsItsOwnThread(t *testing.T) {
+	const id = "test-parent-thread"
+
+	parentCtx, parent := Start(context.Background(), Options{ConversationID: id})
+	FromContextConversation(t, parentCtx).Append(textMsg("caller asked"))
+
+	_, child := Start(parentCtx, Options{ID: "child", Parent: parent})
+	childConv := child.Conversation()
+	if childConv == nil {
+		t.Fatal("child request has no conversation")
+	}
+	if childConv == parent.Conversation() {
+		t.Fatal("child request shares its caller's thread")
+	}
+	if !strings.HasPrefix(childConv.ID(), id+"/") {
+		t.Fatalf("child thread id = %q, want it named under %q", childConv.ID(), id)
+	}
+	if !strings.HasPrefix(child.ID(), parent.ID()+"/") {
+		t.Fatalf("child request id = %q, want it named under %q", child.ID(), parent.ID())
+	}
+
+	childConv.Append(textMsg("sub-run worked"))
+	if err := childConv.Sync(); err != nil {
+		t.Fatalf("child sync: %v", err)
+	}
+	child.Done()
+	parent.Done()
+
+	// The caller's thread holds only what the caller said. What the sub-run said
+	// reaches the caller as the result of the call, not as a share of its thread.
+	after := NewConversation(id)
+	if err := after.load(); err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if got := contents(after.Messages()); len(got) != 1 || got[0] != "caller asked" {
+		t.Fatalf("caller's thread = %v, want [caller asked]", got)
+	}
+
+	// The child's own thread is in the store, under the caller's id.
+	sub := NewConversation(childConv.ID())
+	if err := sub.load(); err != nil {
+		t.Fatalf("sub load: %v", err)
+	}
+	if got := contents(sub.Messages()); len(got) != 1 || got[0] != "sub-run worked" {
+		t.Fatalf("sub-run thread = %v, want [sub-run worked]", got)
 	}
 }
 
@@ -149,8 +187,8 @@ func TestConversation_ImageNotPersisted(t *testing.T) {
 
 	conv := NewConversation(id)
 	conv.Append(img)
-	if err := conv.flush(); err != nil {
-		t.Fatalf("flush: %v", err)
+	if err := conv.Sync(); err != nil {
+		t.Fatalf("sync: %v", err)
 	}
 
 	// The live message is untouched — the model still gets the real image.
@@ -198,15 +236,15 @@ func TestConversation_ImageNotPersisted(t *testing.T) {
 
 // TestBindConversation_PutsTheRequestOnAnotherThread verifies what an entry
 // handler binding to a sender-named thread relies on: the bound thread's stored
-// history is loaded, and it is the bound thread — not the one Start created —
-// that the completion hook persists.
+// history is loaded, and what the request goes on to say lands on that thread
+// rather than the one Start created.
 func TestBindConversation_PutsTheRequestOnAnotherThread(t *testing.T) {
 	const bound = "test-bind-target"
 
 	// A thread with a past, as a previous request would have left it.
 	previous := NewConversation(bound)
 	previous.Append(textMsg("said before"))
-	if err := previous.flush(); err != nil {
+	if err := previous.Sync(); err != nil {
 		t.Fatalf("seeding the thread: %v", err)
 	}
 
@@ -228,6 +266,9 @@ func TestBindConversation_PutsTheRequestOnAnotherThread(t *testing.T) {
 	}
 
 	conv.Append(textMsg("said now"))
+	if err := conv.Sync(); err != nil {
+		t.Fatalf("sync: %v", err)
+	}
 	rc.Done()
 
 	after := NewConversation(bound)

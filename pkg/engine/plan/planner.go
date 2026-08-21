@@ -26,13 +26,6 @@ type ActionProvider interface {
 
 // PlannerConfig holds config values for the plan generation
 type PlannerConfig struct {
-	// ResultTag is the key that holds the value copied from EndLookupKey
-	ResultTag string
-	// EndLookupKey is the key that should be looked up to get the value copied to
-	// the ResultTag, without the "."
-	// Deprecated: use EndValue instead
-	EndLookupKey string
-
 	// EndValue is the value to be used as the ending of this plan, it can be
 	// raw string or go template
 	EndValue string
@@ -147,9 +140,7 @@ func (p *PlannerV2) generateStep(id string) (*stepWrapper, error) {
 		return nil, nil
 	}
 
-	// canonical id (with any leading "$" stripped) is the step map key
-	canonical := apiconfig.CanonicalStepID(id)
-	if st, ok := p.finalSteps[canonical]; ok {
+	if st, ok := p.finalSteps[id]; ok {
 		return &st, nil
 	}
 
@@ -167,10 +158,10 @@ func (p *PlannerV2) generateStep(id string) (*stepWrapper, error) {
 	}
 
 	stepWr := stepWrapper{
-		id:   canonical,
+		id:   id,
 		step: step,
 	}
-	p.finalSteps[canonical] = stepWr
+	p.finalSteps[id] = stepWr
 	return &stepWr, nil
 }
 

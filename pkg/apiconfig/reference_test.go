@@ -12,11 +12,9 @@ func TestParseStepRef(t *testing.T) {
 		wantErr  bool
 	}{
 		{"empty is terminal", "", StepKindUnknown, "", true, false},
-		{"dollar empty is terminal", "$", StepKindUnknown, "", true, false},
 		{"action ref", "action.createUser", StepKindAction, "createUser", false, false},
 		{"conditional ref", "conditional.isValid", StepKindConditional, "isValid", false, false},
 		{"response ref", "response.ok", StepKindResponse, "ok", false, false},
-		{"dollar prefix stripped", "$action.foo", StepKindAction, "foo", false, false},
 		{"bare word is error", "end", StepKindUnknown, "end", false, true},
 		{"unknown prefix is error", "step.foo", StepKindUnknown, "step.foo", false, true},
 	}

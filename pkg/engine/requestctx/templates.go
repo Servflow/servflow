@@ -90,22 +90,21 @@ func (rc *RequestContext) executeTemplate(tmpl *template.Template) (string, erro
 func (rc *RequestContext) getFuncMap(funcMap template.FuncMap) template.FuncMap {
 	m := template.FuncMap{
 		// Base functions
-		"strip":        tmplStripText,
-		"jsonout":      jsonOut,
-		"pluck":        tmplPluck,
-		"escape":       stringEscape,
-		"stringescape": stringEscape, // backward compatibility
-		"jsonraw":      jsonRaw,
-		"join":         tmplJoin,
-		"hash":         tmplHash,
-		"now":          now,
-		"secret":       rc.tmplFuncSecret,
-		"tostring":     tostring,
-		"email":        rc.tmplFuncEmail,
-		"empty":        rc.tmplFuncEmpty,
-		"notempty":     rc.tmplFuncNotEmpty,
-		"bcrypt":       rc.tmplFuncBcrypt,
-		"file":         rc.tmplFuncFile,
+		"strip":    tmplStripText,
+		"jsonout":  jsonOut,
+		"pluck":    tmplPluck,
+		"escape":   stringEscape,
+		"jsonraw":  jsonRaw,
+		"join":     tmplJoin,
+		"hash":     tmplHash,
+		"now":      now,
+		"secret":   rc.tmplFuncSecret,
+		"tostring": tostring,
+		"email":    rc.tmplFuncEmail,
+		"empty":    rc.tmplFuncEmpty,
+		"notempty": rc.tmplFuncNotEmpty,
+		"bcrypt":   rc.tmplFuncBcrypt,
+		"file":     rc.tmplFuncFile,
 	}
 	// Add request-scoped functions (param, header, body, urlparam, etc.)
 	for k, v := range rc.requestFuncs {

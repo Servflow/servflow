@@ -47,6 +47,6 @@ responses:
     code: 401
     type: template
   success:
-    template: '{ "token" : "{{ stringescape .variable_actions_gentoken }}" }'
+    template: '{ "token" : "{{ escape .variable_actions_gentoken }}" }'
     code: 200
     type: template

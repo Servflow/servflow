@@ -40,7 +40,7 @@ ServFlow Engine is part of the ServFlow platform. Use it standalone (free foreve
 http:
   listenPath: /users
   method: GET
-  next: $action.fetch_users
+  next: action.fetch_users
 
 actions:
   fetch_users:
@@ -48,7 +48,7 @@ actions:
     config:
       collection: users
       integrationID: mongo
-    next: $response.success
+    next: response.success
 
 responses:
   success:
@@ -160,7 +160,7 @@ name: Users API
 http:
   listenPath: /users
   method: GET
-  next: $action.fetch_users
+  next: action.fetch_users
 # ... rest of configuration
 ```
 

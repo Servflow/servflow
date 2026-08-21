@@ -10,8 +10,7 @@ import (
 )
 
 // conversationStoragePrefix namespaces persisted conversation messages in the
-// log store. Kept identical to the historic per-session prefix so threads
-// written before centralisation remain loadable.
+// log store; the conversation id follows it to key one thread.
 const conversationStoragePrefix = "agent_conversation_"
 
 // Conversation is the run-scoped message thread owned by a RequestContext.
@@ -121,8 +120,7 @@ func (c *Conversation) Flush() error {
 // load prepends the stored thread for this conversation id, so a resumed run
 // starts with the existing history in front of anything it appends. It is called
 // by resolveConversation at construction — before any agent can append — so the
-// loaded messages are necessarily the leading ones. Unknown message types are
-// skipped (requestctx cannot depend on pkg/logging to warn — that would cycle).
+// loaded messages are necessarily the leading ones.
 func (c *Conversation) load() error {
 	entries, err := storage.GetLogEntriesByPrefix(conversationStoragePrefix+c.id, decodeConversationMessage)
 	if err != nil {
@@ -131,9 +129,11 @@ func (c *Conversation) load() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for _, e := range entries {
-		if msg, ok := e.(ConversationMessage); ok {
-			c.messages = append(c.messages, msg)
+		msg, ok := e.(ConversationMessage)
+		if !ok {
+			return fmt.Errorf("conversation %s: stored entry is a %T, not a message", c.id, e)
 		}
+		c.messages = append(c.messages, msg)
 	}
 	// Resumed messages are already in the store; the sync must only write
 	// messages appended after this point, never re-persist the loaded history.
@@ -142,8 +142,10 @@ func (c *Conversation) load() error {
 }
 
 // decodeConversationMessage deserialises a stored message back into its concrete
-// type. Returns (nil, nil) for unrecognised types so a single bad/legacy entry
-// does not abort the whole load.
+// type. A type it does not recognise is a corrupt entry and fails the read:
+// resuming a thread with a message missing from the middle of it would hand the
+// model a conversation that never happened. resolveConversation treats a failed
+// load as an empty thread, so the request still starts.
 func decodeConversationMessage(data []byte) (any, error) {
 	var header Message
 	if err := json.Unmarshal(data, &header); err != nil {
@@ -160,7 +162,7 @@ func decodeConversationMessage(data []byte) (any, error) {
 		var m MessageToolCall
 		return m, json.Unmarshal(data, &m)
 	default:
-		return nil, nil
+		return nil, fmt.Errorf("unknown conversation message type %q", header.Type)
 	}
 }
 

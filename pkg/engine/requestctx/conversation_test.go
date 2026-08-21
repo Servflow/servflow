@@ -195,3 +195,70 @@ func TestConversation_ImageNotPersisted(t *testing.T) {
 		t.Fatalf("resumed message renders as %v/%q, want text/%q", outputType, content, got.Text)
 	}
 }
+
+// TestBindConversation_PutsTheRequestOnAnotherThread verifies what an entry
+// handler binding to a sender-named thread relies on: the bound thread's stored
+// history is loaded, and it is the bound thread — not the one Start created —
+// that the completion hook persists.
+func TestBindConversation_PutsTheRequestOnAnotherThread(t *testing.T) {
+	const bound = "test-bind-target"
+
+	// A thread with a past, as a previous request would have left it.
+	previous := NewConversation(bound)
+	previous.Append(textMsg("said before"))
+	if err := previous.flush(); err != nil {
+		t.Fatalf("seeding the thread: %v", err)
+	}
+
+	// A request that starts with no id of its own, as a delivery carrying no
+	// conversation header does.
+	ctx, rc := Start(context.Background(), Options{})
+	started := FromContextConversation(t, ctx)
+
+	if err := rc.BindConversation(bound); err != nil {
+		t.Fatalf("bind: %v", err)
+	}
+
+	conv := rc.Conversation()
+	if conv.ID() != bound {
+		t.Fatalf("conversation id = %q, want %q", conv.ID(), bound)
+	}
+	if got := contents(conv.Messages()); len(got) != 1 || got[0] != "said before" {
+		t.Fatalf("bound thread contents = %v, want [said before]", got)
+	}
+
+	conv.Append(textMsg("said now"))
+	rc.Done()
+
+	after := NewConversation(bound)
+	if err := after.load(); err != nil {
+		t.Fatalf("post-completion load: %v", err)
+	}
+	if got := contents(after.Messages()); len(got) != 2 || got[1] != "said now" {
+		t.Fatalf("persisted contents = %v, want [said before said now]", got)
+	}
+
+	// The thread the request started on was never appended to, so it left
+	// nothing behind.
+	orphan := NewConversation(started.ID())
+	if err := orphan.load(); err != nil {
+		t.Fatalf("orphan load: %v", err)
+	}
+	if n := len(orphan.Messages()); n != 0 {
+		t.Fatalf("the dropped thread persisted %d messages, want 0", n)
+	}
+}
+
+// TestBindConversation_RefusesAfterAnAppend verifies the guard that keeps
+// binding from discarding messages: they live only in memory until completion.
+func TestBindConversation_RefusesAfterAnAppend(t *testing.T) {
+	ctx, rc := Start(context.Background(), Options{})
+	FromContextConversation(t, ctx).Append(textMsg("already said"))
+
+	if err := rc.BindConversation("test-bind-too-late"); err == nil {
+		t.Fatal("bind after an append succeeded, want an error")
+	}
+	if err := rc.BindConversation(""); err == nil {
+		t.Fatal("bind to an empty id succeeded, want an error")
+	}
+}

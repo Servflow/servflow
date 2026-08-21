@@ -96,21 +96,28 @@ func Start(ctx context.Context, opts Options) (context.Context, *RequestContext)
 		}
 	}
 	conv, owned := resolveConversation(opts)
-	rc.setConversation(conv)
-	if owned {
-		// The conversation lives in memory for the request and is written once, at
-		// completion — which is after the response is sent AND after child flows
-		// drain, so a sub-workflow's messages are included and the client waits on
-		// nothing. Only the owning request flushes; adopted threads are persisted
-		// by the request that created them.
-		flushLogger := opts.Logger
-		rc.RegisterOnCompleteHook(func() {
-			if err := conv.Flush(); err != nil && flushLogger != nil {
-				flushLogger.Warn("failed to persist conversation",
-					zap.String("conversation_id", conv.ID()), zap.Error(err))
-			}
-		})
-	}
+	rc.setConversation(conv, owned)
+	// The conversation lives in memory for the request and is written once, at
+	// completion — which is after the response is sent AND after child flows
+	// drain, so a sub-workflow's messages are included and the client waits on
+	// nothing. Only the owning request flushes; adopted threads are persisted by
+	// the request that created them.
+	//
+	// The thread is read at completion rather than captured here, because it is
+	// not necessarily the one Start created: an entry handler may bind the
+	// request to a thread named by its sender (see BindConversation), and it is
+	// whatever the request ended up on that has to be written.
+	flushLogger := opts.Logger
+	rc.RegisterOnCompleteHook(func() {
+		conv, persist := rc.conversationToPersist()
+		if !persist {
+			return
+		}
+		if err := conv.Flush(); err != nil && flushLogger != nil {
+			flushLogger.Warn("failed to persist conversation",
+				zap.String("conversation_id", conv.ID()), zap.Error(err))
+		}
+	})
 	ctx = WithAggregationContext(ctx, rc)
 	if opts.Logger != nil {
 		l := WrapWithScrubber(opts.Logger.With(zap.String("request_id", id)), rc)

@@ -26,6 +26,10 @@ type RequestContext struct {
 	availableFiles   map[string]*FileValue
 	workspace        Workspace
 	conversation     *Conversation
+	// ownsConversation records whether this request is the one that persists
+	// the thread at completion: true for a thread it created or bound, false
+	// for a caller's thread it merely joined.
+	ownsConversation bool
 
 	// tokenInput/tokenOutput accumulate LLM token usage across every model call
 	// in this request. Observability-only — not exposed to workflow templates.

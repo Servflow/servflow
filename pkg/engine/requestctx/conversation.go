@@ -2,6 +2,7 @@ package requestctx
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -12,6 +13,13 @@ import (
 // conversationStoragePrefix namespaces persisted conversation messages in the
 // log store; the conversation id follows it to key one thread.
 const conversationStoragePrefix = "agent_conversation_"
+
+// conversationHistoryWindow is how much of a thread a resumed request starts
+// with: its most recent messages, oldest first. It is a window rather than the
+// whole thread because a thread is fed to the model on every turn — a chat
+// that has run for months would otherwise put its entire past into each
+// prompt — and because loading a log that only grows is unbounded work.
+const conversationHistoryWindow = 200
 
 // Conversation is the run-scoped message thread owned by a RequestContext.
 // Every agent action in a plan reads and appends to the SAME Conversation, so
@@ -81,6 +89,19 @@ func (c *Conversation) Append(msgs ...ConversationMessage) {
 	c.mu.Unlock()
 }
 
+// appended reports whether this request has added messages that are not yet in
+// the store. It is what makes rebinding a request to another thread safe to
+// refuse: those messages exist only in memory, and swapping the thread out from
+// under them would drop them.
+func (c *Conversation) appended() bool {
+	if c == nil {
+		return false
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.messages) > c.flushed
+}
+
 // flush writes the messages appended since the last flush to the log store and
 // advances the high-water mark, so a resumed thread only ever persists what the
 // current request added.
@@ -117,12 +138,13 @@ func (c *Conversation) Flush() error {
 	return c.flush()
 }
 
-// load prepends the stored thread for this conversation id, so a resumed run
-// starts with the existing history in front of anything it appends. It is called
-// by resolveConversation at construction — before any agent can append — so the
-// loaded messages are necessarily the leading ones.
+// load prepends the stored thread for this conversation id — its most recent
+// conversationHistoryWindow messages — so a resumed run starts with the
+// existing history in front of anything it appends. It is called before any
+// agent can append, so the loaded messages are necessarily the leading ones.
 func (c *Conversation) load() error {
-	entries, err := storage.GetLogEntriesByPrefix(conversationStoragePrefix+c.id, decodeConversationMessage)
+	entries, err := storage.GetLogEntriesByPrefix(
+		conversationStoragePrefix+c.id, conversationHistoryWindow, decodeConversationMessage)
 	if err != nil {
 		return err
 	}
@@ -200,9 +222,55 @@ func (rc *RequestContext) Conversation() *Conversation {
 	return rc.conversation
 }
 
-// setConversation installs the thread for this request. Used by Start.
-func (rc *RequestContext) setConversation(c *Conversation) {
+// setConversation installs the thread for this request and records whether this
+// request is the one that persists it. Used by Start and BindConversation.
+func (rc *RequestContext) setConversation(c *Conversation, owned bool) {
 	rc.Lock()
 	defer rc.Unlock()
 	rc.conversation = c
+	rc.ownsConversation = owned
+}
+
+// conversationToPersist returns the thread this request must write at
+// completion, and whether there is one: a request that joined its caller's
+// thread contributes to it but does not persist it — the caller, which
+// completes last, does.
+func (rc *RequestContext) conversationToPersist() (*Conversation, bool) {
+	rc.Lock()
+	defer rc.Unlock()
+	return rc.conversation, rc.ownsConversation && rc.conversation != nil
+}
+
+// BindConversation puts this request on the thread named by id, loaded from the
+// store, and makes the request responsible for persisting it.
+//
+// It exists for senders that carry their own notion of a thread and no way to
+// state it as a request header: a Telegram chat is a conversation, but a
+// delivery from Telegram says so only in its body, and only once the delivery
+// has been authenticated. So an entry handler binds after it knows what it is
+// talking to, and the thread the request started on — created by Start, empty,
+// never appended to, never flushed — is dropped without a trace.
+//
+// It must be called before anything appends to the current thread: those
+// messages live only in memory until completion, and binding would discard
+// them. That is an error, not a silent loss.
+func (rc *RequestContext) BindConversation(id string) error {
+	if id == "" {
+		return errors.New("conversation id cannot be empty")
+	}
+	current, _ := rc.conversationToPersist()
+	if current.appended() {
+		return fmt.Errorf("cannot bind conversation %q: this request has already appended to %q",
+			id, current.ID())
+	}
+	if current != nil && current.ID() == id {
+		return nil
+	}
+
+	conv := NewConversation(id)
+	if err := conv.load(); err != nil {
+		return fmt.Errorf("loading conversation %q: %w", id, err)
+	}
+	rc.setConversation(conv, true)
+	return nil
 }

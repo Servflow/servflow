@@ -2,6 +2,7 @@ package storage
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"sync"
 	"testing"
@@ -52,11 +53,7 @@ func TestWriteAndGetEntries(t *testing.T) {
 		err := WriteToLog("conversations", entries)
 		require.NoError(t, err)
 
-		gotten, err := GetLogEntriesByPrefix("conversations", func(data []byte) (any, error) {
-			var m jsonSerializable
-			err := m.Deserialize(data)
-			return &m, err
-		})
+		gotten, err := GetLogEntriesByPrefix("conversations", 10, decodeJSONSerializable)
 		require.NoError(t, err)
 
 		expected := []any{
@@ -67,14 +64,37 @@ func TestWriteAndGetEntries(t *testing.T) {
 		assert.Equal(t, expected, gotten)
 	})
 
+	t.Run("a limit smaller than the log returns its most recent entries, oldest first", func(t *testing.T) {
+		entries := make([]Serializable, 0, 6)
+		for i := 1; i <= 6; i++ {
+			entries = append(entries, &jsonSerializable{Topic: "windowed", Message: fmt.Sprintf("message%d", i)})
+		}
+		require.NoError(t, WriteToLog("windowed", entries))
+
+		gotten, err := GetLogEntriesByPrefix("windowed", 2, decodeJSONSerializable)
+		require.NoError(t, err)
+
+		assert.Equal(t, []any{
+			&jsonSerializable{Topic: "windowed", Message: "message5"},
+			&jsonSerializable{Topic: "windowed", Message: "message6"},
+		}, gotten)
+	})
+
 	t.Run("empty prefix returns no entries", func(t *testing.T) {
-		_, err := GetLogEntriesByPrefix("", func(data []byte) (any, error) {
-			var m jsonSerializable
-			err := m.Deserialize(data)
-			return &m, err
-		})
+		_, err := GetLogEntriesByPrefix("", 10, decodeJSONSerializable)
 		require.Error(t, err)
 	})
+
+	t.Run("a non-positive limit is refused", func(t *testing.T) {
+		_, err := GetLogEntriesByPrefix("conversations", 0, decodeJSONSerializable)
+		require.Error(t, err)
+	})
+}
+
+func decodeJSONSerializable(data []byte) (any, error) {
+	var m jsonSerializable
+	err := m.Deserialize(data)
+	return &m, err
 }
 
 func TestSetAndGet(t *testing.T) {
@@ -212,7 +232,7 @@ func BenchmarkWriteAndGetEntriesJSON(b *testing.B) {
 		})
 
 		for n := 0; n < b.N; n++ {
-			gotten, err := GetLogEntriesByPrefix("benchmarkreadjson", func(data []byte) (any, error) {
+			gotten, err := GetLogEntriesByPrefix("benchmarkreadjson", 50, func(data []byte) (any, error) {
 				var m jsonSerializable
 				err := json.Unmarshal(data, &m)
 				return &m, err
@@ -308,7 +328,7 @@ func BenchmarkWriteAndGetEntriesFLB(b *testing.B) {
 		})
 
 		for n := 0; n < b.N; n++ {
-			gotten, err := GetLogEntriesByPrefix("benchmarkreadflb", func(data []byte) (any, error) {
+			gotten, err := GetLogEntriesByPrefix("benchmarkreadflb", 50, func(data []byte) (any, error) {
 				fb := flatBufferMessage{}
 				return &fb, fb.Deserialize(data)
 			})

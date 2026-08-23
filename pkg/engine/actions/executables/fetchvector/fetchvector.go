@@ -108,6 +108,10 @@ func init() {
 		Name:        "Fetch Vectors",
 		Description: "Retrieves vector embeddings from vector databases for similarity search",
 		Fields:      fields,
+		Output: actions.OutputInfo{
+			Kind:        actions.OutputDynamic,
+			Description: "A list of the nearest stored vectors, each carrying the fields it was saved with.",
+		},
 		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {

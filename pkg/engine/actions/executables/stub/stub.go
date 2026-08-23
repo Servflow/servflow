@@ -46,6 +46,10 @@ func init() {
 		Name:        "Stub Action",
 		Description: "A placeholder action that accepts any configuration for testing purposes",
 		Fields:      fields,
+		Output: actions.OutputInfo{
+			Kind:        actions.OutputDynamic,
+			Description: "The configured response, echoed back as it was written.",
+		},
 		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
 			var fields map[string]interface{}
 			if err := json.Unmarshal(config, &fields); err != nil {

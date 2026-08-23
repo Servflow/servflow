@@ -121,6 +121,13 @@ func init() {
 		Name:        "Write Data",
 		Description: "Stores data records into database tables with field mapping",
 		Fields:      fields,
+		Output: actions.OutputInfo{
+			Kind:        actions.OutputObject,
+			Description: "The record that was written, holding the fields it was given.",
+			Fields: []actions.OutputField{
+				{Path: "id", Type: "string", Description: "The record's id, generated when the fields did not carry one."},
+			},
+		},
 		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {

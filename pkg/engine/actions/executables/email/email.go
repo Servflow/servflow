@@ -129,6 +129,10 @@ func init() {
 		Name:        "Send Email",
 		Description: "Sends email messages via SMTP server",
 		Fields:      fields,
+		Output: actions.OutputInfo{
+			Kind:        actions.OutputNone,
+			Description: "Sending mail reports success by continuing; it publishes nothing.",
+		},
 		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {

@@ -131,6 +131,10 @@ func init() {
 		Name:        "Download File",
 		Description: "Saves a file from the request or action output to a specified path",
 		Fields:      fields,
+		Output: actions.OutputInfo{
+			Kind:        actions.OutputValue,
+			Description: "The path the file was written to, relative to the workspace.",
+		},
 		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {

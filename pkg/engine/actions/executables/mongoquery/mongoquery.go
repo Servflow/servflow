@@ -123,6 +123,10 @@ func init() {
 		Name:        "MongoDB Query",
 		Description: "Executes queries against MongoDB collections with filtering and projection",
 		Fields:      fields,
+		Output: actions.OutputInfo{
+			Kind:        actions.OutputDynamic,
+			Description: "A list of the matching documents, with the collection's own field names.",
+		},
 		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {

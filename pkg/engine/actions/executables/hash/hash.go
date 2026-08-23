@@ -86,7 +86,11 @@ func init() {
 		Name:        "Hash Value",
 		Description: "Generates cryptographic hashes using various algorithms like bcrypt",
 		Fields:      fields,
-		UseV2:       true,
+		Output: actions.OutputInfo{
+			Kind:        actions.OutputValue,
+			Description: "The hash of the value.",
+		},
+		UseV2: true,
 		ConstructorV2: func(config json.RawMessage) (actions.ActionExecutableV2, error) {
 			var cfg map[string]interface{}
 			if err := json.Unmarshal(config, &cfg); err != nil {

@@ -149,6 +149,10 @@ func init() {
 		Name:        "Fetch Data",
 		Description: "Retrieves data from database tables using filters and conditions",
 		Fields:      fields,
+		Output: actions.OutputInfo{
+			Kind:        actions.OutputDynamic,
+			Description: "The rows the query matched, with the table's own column names. One row when single is set, otherwise a list.",
+		},
 		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {

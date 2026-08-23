@@ -112,6 +112,10 @@ func init() {
 		Name:        "Delete Data",
 		Description: "Deletes records from database tables based on specified filters",
 		Fields:      fields,
+		Output: actions.OutputInfo{
+			Kind:        actions.OutputNone,
+			Description: "Deleting reports success by continuing; it publishes nothing.",
+		},
 		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {

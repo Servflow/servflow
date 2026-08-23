@@ -81,6 +81,10 @@ func init() {
 		Name:        "Store Key",
 		Description: "Stores a key-value pair in persistent storage",
 		Fields:      fields,
+		Output: actions.OutputInfo{
+			Kind:        actions.OutputValue,
+			Description: "The value that was stored.",
+		},
 		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {

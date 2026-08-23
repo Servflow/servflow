@@ -254,6 +254,10 @@ func init() {
 		Name:        "JWT Token",
 		Description: "Creates and validates JSON Web Tokens for authentication",
 		Fields:      fields,
+		Output: actions.OutputInfo{
+			Kind:        actions.OutputValue,
+			Description: "The signed token when encoding, and the token's sub claim when decoding.",
+		},
 		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {

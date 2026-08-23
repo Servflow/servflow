@@ -90,6 +90,10 @@ func init() {
 		Name:        "Get Key",
 		Description: "Retrieves a value from persistent storage by key",
 		Fields:      fields,
+		Output: actions.OutputInfo{
+			Kind:        actions.OutputValue,
+			Description: "The stored value, or empty when the key is not set.",
+		},
 		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {

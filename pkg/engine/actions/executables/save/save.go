@@ -213,7 +213,13 @@ func init() {
 		Name:        "Save Data",
 		Description: "Inserts new records or updates existing records in database tables. When filters are provided, updates matching records; otherwise inserts a new record.",
 		Fields:      fields,
-		UseV2:       true,
+		Output: actions.OutputInfo{
+			Kind: actions.OutputObject,
+			Fields: []actions.OutputField{
+				{Path: "id", Type: "string", Description: "The id of the saved record."},
+			},
+		},
+		UseV2: true,
 		ConstructorV2: func(config json.RawMessage) (actions.ActionExecutableV2, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {

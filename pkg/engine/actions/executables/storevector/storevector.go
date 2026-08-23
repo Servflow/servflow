@@ -115,6 +115,10 @@ func init() {
 		Name:        "Store Vectors",
 		Description: "Stores vector embeddings into vector databases for similarity search",
 		Fields:      fields,
+		Output: actions.OutputInfo{
+			Kind:        actions.OutputNone,
+			Description: "Storing vectors reports success by continuing; it publishes nothing.",
+		},
 		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {

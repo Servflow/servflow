@@ -99,7 +99,7 @@ func CreateTextTemplate(reqCtx context.Context, config string, funcMap template.
 		funcMap[k] = v
 	}
 	// Use RequestContext's createTemplate which includes all functions (base + request-scoped)
-	return rCtx.createTemplate(config, funcMap)
+	return rCtx.createTemplate(reqCtx, config, funcMap)
 }
 
 func ExecuteTemplateFromContext(ctx context.Context, tmpl *template.Template) (string, error) {

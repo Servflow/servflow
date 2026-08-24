@@ -156,6 +156,10 @@ func init() {
 		Name:        "Run In Parallel",
 		Description: "Runs a series of specified steps and their respective next steps in parallel. If it is set to stop on failure, the step fails after the first failure",
 		Fields:      fields,
+		Output: actions.OutputInfo{
+			Kind:        actions.OutputNone,
+			Description: "Read the outputs of the steps it ran, not of this step.",
+		},
 		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {

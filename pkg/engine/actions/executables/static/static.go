@@ -72,7 +72,11 @@ func init() {
 		Name:        "Static Value",
 		Description: "Returns a static value configured at setup time",
 		Fields:      fields,
-		UseV2:       true,
+		Output: actions.OutputInfo{
+			Kind:        actions.OutputValue,
+			Description: "The text of the return template, with its variables filled in.",
+		},
+		UseV2: true,
 		ConstructorV2: func(config json.RawMessage) (actions.ActionExecutableV2, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {

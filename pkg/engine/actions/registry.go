@@ -13,12 +13,17 @@ type Registry struct {
 }
 
 type ActionRegistrationInfo struct {
-	Name          string               `json:"name"`
-	Description   string               `json:"description"`
-	Fields        map[string]FieldInfo `json:"fields"`
-	Constructor   factoryFunc          `json:"-"`
-	ConstructorV2 factoryFuncV2        `json:"-"` // V2 constructor (used when UseV2 is true)
-	UseV2         bool                 `json:"-"` // If true, use V2 interface (action handles own template resolution)
+	Name        string               `json:"name"`
+	Description string               `json:"description"`
+	Fields      map[string]FieldInfo `json:"fields"`
+	// Output describes what the action publishes as a request variable, so the
+	// dashboard can offer the paths a later step may read. The zero value means
+	// OutputDynamic: an action that has not been described yet keeps working and
+	// is offered whole.
+	Output        OutputInfo    `json:"output"`
+	Constructor   factoryFunc   `json:"-"`
+	ConstructorV2 factoryFuncV2 `json:"-"` // V2 constructor (used when UseV2 is true)
+	UseV2         bool          `json:"-"` // If true, use V2 interface (action handles own template resolution)
 }
 
 type FieldType string
@@ -68,6 +73,9 @@ func (r *Registry) RegisterAction(actionType string, registration ActionRegistra
 	if ok {
 		return fmt.Errorf("action type %s already registered", actionType)
 	}
+	if err := registration.Output.validate(registration.Fields); err != nil {
+		return fmt.Errorf("action type %s: %w", actionType, err)
+	}
 	r.availableConstructors[actionType] = registration
 	return nil
 }
@@ -97,6 +105,7 @@ func (r *Registry) ReplaceActionType(actionType string, constructor factoryFunc)
 		Name:        existing.Name,
 		Description: existing.Description,
 		Fields:      existing.Fields,
+		Output:      existing.Output,
 	}
 }
 

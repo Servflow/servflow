@@ -162,6 +162,10 @@ func init() {
 		Name:        "Authenticate",
 		Description: "Validates JWT tokens and authenticates users against database records",
 		Fields:      fields,
+		Output: actions.OutputInfo{
+			Kind:        actions.OutputValue,
+			Description: "The authenticated subject, taken from the token's sub claim.",
+		},
 		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {

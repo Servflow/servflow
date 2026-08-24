@@ -231,7 +231,11 @@ func init() {
 		Name:        "HTTP Request",
 		Description: "Makes HTTP requests to external APIs and returns the response",
 		Fields:      fields,
-		UseV2:       true,
+		Output: actions.OutputInfo{
+			Kind:        actions.OutputDynamic,
+			Description: "The response body parsed as JSON, or the text of the body when it is not JSON. Setting responsePath narrows this to the value at that path.",
+		},
+		UseV2: true,
 		ConstructorV2: func(config json.RawMessage) (actions.ActionExecutableV2, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {

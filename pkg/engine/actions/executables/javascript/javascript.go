@@ -165,6 +165,10 @@ func init() {
 		Name:        "JavaScript",
 		Description: "Executes JavaScript code using a servflowRun function with access to request variables",
 		Fields:      fields,
+		Output: actions.OutputInfo{
+			Kind:        actions.OutputDynamic,
+			Description: "Whatever the script's servflowRun function returns.",
+		},
 		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {

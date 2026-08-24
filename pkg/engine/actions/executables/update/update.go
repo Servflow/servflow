@@ -118,6 +118,12 @@ func init() {
 		Name:        "Update Data",
 		Description: "Updates existing records in database tables using filters and field mappings",
 		Fields:      fields,
+		Output: actions.OutputInfo{
+			Kind: actions.OutputObject,
+			Fields: []actions.OutputField{
+				{Path: "id", Type: "string", Description: "The id of the updated record."},
+			},
+		},
 		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {

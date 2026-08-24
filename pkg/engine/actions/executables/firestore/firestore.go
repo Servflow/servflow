@@ -95,6 +95,10 @@ func init() {
 		Name:        "Firestore",
 		Description: "Stores documents in Google Cloud Firestore database",
 		Fields:      fields,
+		Output: actions.OutputInfo{
+			Kind:        actions.OutputValue,
+			Description: "The document that was written, as the JSON text it was sent as.",
+		},
 		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {

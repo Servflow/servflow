@@ -31,9 +31,6 @@ import (
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/static"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/store_key"
 	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/storevector"
-	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/stub"
-	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/update"
-	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/write"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 
 	"github.com/Servflow/servflow/pkg/engine/integration"

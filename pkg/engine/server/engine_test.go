@@ -7,6 +7,10 @@ import (
 	"time"
 
 	"github.com/Servflow/servflow/pkg/apiconfig"
+	// The stub action is a test fixture, so it is registered here rather than
+	// by the server itself: a placeholder that accepts any config has no place
+	// in the catalog a served dashboard offers.
+	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/stub"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

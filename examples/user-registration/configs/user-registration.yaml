@@ -59,7 +59,7 @@ actions:
     fail: response.serverError
 
   createUser:
-    type: store
+    type: save
     config:
       integrationID: my_database
       table: users
@@ -69,7 +69,6 @@ actions:
         password: "{{ .variable_actions_hashPassword }}"
         created_at: "{{ now }}"
         status: active
-      mode: insert
     next: action.generateToken
     fail: response.serverError
 

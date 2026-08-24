@@ -21,7 +21,7 @@ const batchSeparator = "\x00\x1F\x00" // Null + Unit Separator + Null
 
 // Resolve resolves a single template string using the request context
 func (rc *RequestContext) Resolve(ctx context.Context, templateStr string) (string, error) {
-	tmpl, err := rc.createTemplate(templateStr, nil)
+	tmpl, err := rc.createTemplate(ctx, templateStr, nil)
 	if err != nil {
 		return "", fmt.Errorf("creating template: %w", err)
 	}
@@ -61,8 +61,22 @@ func (rc *RequestContext) ResolveBatch(ctx context.Context, templates ...string)
 	return results, nil
 }
 
-// createTemplate creates a template with all functions available
-func (rc *RequestContext) createTemplate(in string, funcMap template.FuncMap) (*template.Template, error) {
+// createTemplate creates a template with all functions available.
+//
+// ctx supplies the per-call function overlay (see WithTemplateFuncs), which
+// sits between the request-scoped functions and an explicit caller funcMap:
+// base -> request-scoped -> ctx overlay -> caller.
+func (rc *RequestContext) createTemplate(ctx context.Context, in string, funcMap template.FuncMap) (*template.Template, error) {
+	if overlay := templateFuncsFromContext(ctx); len(overlay) > 0 {
+		merged := make(template.FuncMap, len(overlay)+len(funcMap))
+		for name, fn := range overlay {
+			merged[name] = fn
+		}
+		for name, fn := range funcMap {
+			merged[name] = fn
+		}
+		funcMap = merged
+	}
 	funcMap = rc.getFuncMap(funcMap)
 	replaced := replaceEscapedQuotes(in)
 	replaced = normalizeActionVariables(replaced)

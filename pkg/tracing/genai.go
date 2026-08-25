@@ -2,7 +2,6 @@ package tracing
 
 import (
 	"context"
-	"os"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -26,28 +25,7 @@ const (
 	AttrGenAIToolName      = "gen_ai.tool.name"
 	AttrGenAIToolType      = "gen_ai.tool.type" // mcp | workflow
 	AttrGenAIAgentName     = "gen_ai.agent.name"
-
-	// Message-content keys, recorded only when content capture is enabled.
-	AttrGenAISystemInstr    = "gen_ai.system_instructions"
-	AttrGenAIInputMessages  = "gen_ai.input.messages"
-	AttrGenAIOutputMessages = "gen_ai.output.messages"
 )
-
-// captureContent gates recording of prompt/response CONTENT onto chat spans.
-// Off by default (content may hold PII/secrets and is large); enable per the
-// OTel-standard env var. Read once at init; tests may set it directly.
-var captureContent = os.Getenv("OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT") == "true"
-
-// maxContentBytes caps each captured content attribute so a large context
-// window cannot bloat every span.
-const maxContentBytes = 8 * 1024
-
-func truncateContent(s string) string {
-	if len(s) <= maxContentBytes {
-		return s
-	}
-	return s[:maxContentBytes] + "…[truncated]"
-}
 
 const (
 	opChat        = "chat"
@@ -83,6 +61,10 @@ func initGenAIInstruments(mp metric.MeterProvider) {
 // timing for the operation-duration metric. Create one at the integration
 // boundary via StartInference, then SetResponseModel/RecordUsage on success and
 // End (always, via defer) to close the span and emit the duration metric.
+//
+// A chat span carries no message content. Prompts and replies are the caller's
+// to record: the agent owns that decision and does it on its own spans, so a
+// provider never has to know whether content capture is wanted.
 type Inference struct {
 	span     trace.Span
 	provider string
@@ -107,33 +89,6 @@ func (i *Inference) SetResponseModel(model string) {
 	if model != "" {
 		i.span.SetAttributes(attribute.String(AttrGenAIResponseModel, model))
 	}
-}
-
-// SetInput records the system instructions and input messages on the chat span.
-// No-op unless content capture is enabled; each field is size-capped.
-func (i *Inference) SetInput(system, messages string) {
-	if !captureContent {
-		return
-	}
-	attrs := make([]attribute.KeyValue, 0, 2)
-	if system != "" {
-		attrs = append(attrs, attribute.String(AttrGenAISystemInstr, truncateContent(system)))
-	}
-	if messages != "" {
-		attrs = append(attrs, attribute.String(AttrGenAIInputMessages, truncateContent(messages)))
-	}
-	if len(attrs) > 0 {
-		i.span.SetAttributes(attrs...)
-	}
-}
-
-// SetCompletion records the model's response content on the chat span. No-op
-// unless content capture is enabled; size-capped.
-func (i *Inference) SetCompletion(output string) {
-	if !captureContent || output == "" {
-		return
-	}
-	i.span.SetAttributes(attribute.String(AttrGenAIOutputMessages, truncateContent(output)))
 }
 
 // RecordUsage sets the token-usage span attributes and emits the token-usage

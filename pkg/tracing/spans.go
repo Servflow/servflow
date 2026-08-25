@@ -3,6 +3,7 @@ package tracing
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
@@ -67,6 +68,10 @@ const (
 	AttrToolName     = "sf.tool_name"
 	AttrToolType     = "sf.tool_type"   // mcp | workflow
 	AttrToolParams   = "sf.tool_params" // JSON of model-supplied tool-call arguments (sensitive keys redacted, size-capped)
+
+	AttrAgentTurn          = "sf.agent.turn"           // 1-based iteration of the agent's tool-calling loop
+	AttrAgentTurnTools     = "sf.agent.turn_tools"     // tool names the model asked for on this turn
+	AttrAgentToolsWithheld = "sf.agent.tools_withheld" // tools were withheld to force a final answer
 
 	AttrRequestID = requestctx.AttrRequestID // stamped on the root span via the rc
 )
@@ -205,6 +210,22 @@ func StartAgentInvoke(ctx context.Context, name string) (context.Context, trace.
 		attrs = append(attrs, attribute.String(AttrGenAIAgentName, name))
 	}
 	return start(ctx, "invoke_agent", display, attrs...)
+}
+
+// StartAgentTurn spans one iteration of the agent's tool-calling loop: a single
+// model call plus the tools that call asked for. It groups them, so a trace
+// shows which tool runs belonged to which model call instead of leaving both
+// flat under invoke_agent.
+//
+// It carries no gen_ai.operation.name. A turn is wider than an inference and
+// narrower than the run, so it matches no GenAI operation, and claiming one
+// would misfile it for any backend that reads the conventions.
+//
+// The turn number labels the span; its child chat span carries the model and
+// the tokens, so those are deliberately not repeated here.
+func StartAgentTurn(ctx context.Context, turn int) (context.Context, trace.Span) {
+	return start(ctx, "Agent Turn", fmt.Sprintf("turn %d", turn),
+		attribute.Int(AttrAgentTurn, turn))
 }
 
 // StartMCPTool spans the invocation of an MCP tool. Carries both the sf.* tool

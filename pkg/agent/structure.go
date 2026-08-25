@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"encoding/json"
 	"strings"
 
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
@@ -59,34 +58,6 @@ type LLMRequest struct {
 	Instruction   string
 	Messages      []any
 	Tools         []ToolInfo `json:"tools"`
-}
-
-// TraceMessages renders the request messages as a compact JSON array for
-// tracing (role + textual content only; no image bytes). Best-effort — returns
-// "" if it cannot marshal.
-func TraceMessages(messages []any) string {
-	type traced struct {
-		Role    string `json:"role,omitempty"`
-		Content string `json:"content,omitempty"`
-		Tool    string `json:"tool,omitempty"`
-	}
-	out := make([]traced, 0, len(messages))
-	for _, msg := range messages {
-		switch v := msg.(type) {
-		case MessageTypeContent:
-			out = append(out, traced{Role: v.Role.String(), Content: v.Content})
-		case MessageToolCall:
-			args, _ := json.Marshal(v.Arguments)
-			out = append(out, traced{Role: "assistant", Tool: v.Name, Content: string(args)})
-		case MessageToolCallResponse:
-			out = append(out, traced{Role: "tool", Tool: v.ID, Content: v.Text})
-		}
-	}
-	b, err := json.Marshal(out)
-	if err != nil {
-		return ""
-	}
-	return string(b)
 }
 
 type ToolInfo struct {

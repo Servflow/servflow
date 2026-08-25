@@ -1,12 +1,12 @@
 #!/bin/bash
 set -e
 
-# Installs the ServFlow product binary (`servflow`), released from the
-# Servflow/servflow-pro repository. The standalone engine published from this
+# Installs the ServflowAI product binary (`servflowai`), released from the
+# Servflow/servflowai repository. The standalone engine published from this
 # repository is available as `servflow-engine` on GitHub Releases and Docker
 # Hub (servflow/servflow-engine); it has no install script.
-REPO="Servflow/servflow-pro"
-BINARY_NAME="servflow"
+REPO="Servflow/servflowai"
+BINARY_NAME="servflowai"
 INSTALL_DIR="/usr/local/bin"
 TEMP_DIR=$(mktemp -d)
 
@@ -83,7 +83,7 @@ download_and_extract() {
     local platform="$2"
 
     # Archive naming must stay in sync with the `archives` name_template in
-    # servflow-pro's .goreleaser.yaml: servflow_{Title Os}_{x86_64|arm64}.tar.gz
+    # servflowai's .goreleaser.yaml: servflowai_{Title Os}_{x86_64|arm64}.tar.gz
     local filename="${BINARY_NAME}_${platform}.tar.gz"
     local download_url="https://github.com/${REPO}/releases/download/${version}/${filename}"
     local temp_archive="${TEMP_DIR}/${filename}"
@@ -157,7 +157,7 @@ verify_installation() {
     if command -v "$BINARY_NAME" >/dev/null 2>&1; then
         local version
         version=$("$BINARY_NAME" --version 2>/dev/null || echo "unknown")
-        print_success "ServFlow installed successfully! Version: $version"
+        print_success "ServflowAI installed successfully! Version: $version"
     else
         print_warning "Binary installed but not found in PATH"
         print_warning "You may need to restart your terminal or add ${INSTALL_DIR} to PATH"
@@ -171,7 +171,7 @@ cleanup() {
 }
 
 main() {
-    print_status "Starting ServFlow installation..."
+    print_status "Starting ServflowAI installation..."
 
     trap cleanup EXIT
 
@@ -185,7 +185,7 @@ main() {
         version=$(get_latest_version)
     fi
 
-    print_status "Installing ServFlow version: $version"
+    print_status "Installing ServflowAI version: $version"
 
     local platform
     platform=$(detect_platform)
@@ -204,8 +204,8 @@ main() {
     print_success "Installation completed successfully!"
     echo
     print_status "Next steps:"
-    echo "  1. Run 'servflow --help' to see available commands"
-    echo "  2. Run 'servflow start --config config.toml --dashboard' to start the server"
+    echo "  1. Run 'servflowai --help' to see available commands"
+    echo "  2. Run 'servflowai start --config config.toml --dashboard' to start the server"
     echo "  3. Visit http://localhost:8080 to access the web interface"
     echo
     print_status "Documentation: https://docs.servflow.io"

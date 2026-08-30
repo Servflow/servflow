@@ -22,7 +22,7 @@ actions:
   agent:
     type: agent
     config:
-      integrationID: my_openai_service
+      integration: my_openai_service
       userPrompt: '{{ param "query" }}'
       systemPrompt: |
         You are a helpful agent to assist the user interact and query data from a mongodb database.
@@ -47,7 +47,7 @@ actions:
       collection: users
       filter: '{{ tool_param "filter" | escape }}'
       projection: '{{ tool_param "projection" | escape }}'
-      integrationID: "my_database"
+      integration: "my_database"
 
 responses:
   "200":

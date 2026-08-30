@@ -18,9 +18,9 @@ type fetchVectorIntegration interface {
 // TODO unify fields accross all integration actions
 
 type Config struct {
-	IntegrationID string         `json:"integrationID,omitempty"`
-	Vector        string         `json:"vector,omitempty"`
-	Options       map[string]any `json:"options,omitempty"`
+	Integration string         `json:"integration,omitempty"`
+	Vector      string         `json:"vector,omitempty"`
+	Options     map[string]any `json:"options,omitempty"`
 }
 
 type FetchVector struct {
@@ -63,10 +63,10 @@ func (f FetchVector) Execute(ctx context.Context, modifiedConfig string) (interf
 }
 
 func New(config Config) (*FetchVector, error) {
-	if config.IntegrationID == "" {
+	if config.Integration == "" {
 		return nil, fmt.Errorf("no integration ID provided")
 	}
-	i, err := integration.GetIntegration(context.Background(), config.IntegrationID)
+	i, err := integration.GetIntegration(context.Background(), config.Integration)
 	if err != nil {
 		return nil, err
 	}
@@ -84,11 +84,11 @@ func New(config Config) (*FetchVector, error) {
 
 func init() {
 	fields := map[string]actions.FieldInfo{
-		"integrationID": {
+		"integration": {
 			Type:        actions.FieldTypeIntegration,
-			Label:       "Integration ID",
-			Placeholder: "Vector database integration identifier",
-			Required:    false,
+			Label:       "Vector Database",
+			Placeholder: "The vector store to search",
+			Required:    true,
 		},
 		"vector": {
 			Type:        actions.FieldTypeString,

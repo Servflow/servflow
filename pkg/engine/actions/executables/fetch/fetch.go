@@ -29,21 +29,21 @@ type fetchImplementation interface {
 }
 
 type Config struct {
-	IntegrationID string           `json:"integrationID" yaml:"integrationID"`
-	Filters       []filters.Filter `json:"filters" yaml:"filters"`
-	Table         string           `json:"table" yaml:"table"`
-	Single        bool             `json:"single" yaml:"single"`
-	FailIfEmpty   bool             `json:"failIfEmpty" yaml:"failIfEmpty"`
+	Integration string           `json:"integration" yaml:"integration"`
+	Filters     []filters.Filter `json:"filters" yaml:"filters"`
+	Table       string           `json:"table" yaml:"table"`
+	Single      bool             `json:"single" yaml:"single"`
+	FailIfEmpty bool             `json:"failIfEmpty" yaml:"failIfEmpty"`
 }
 
 func New(config Config) (*Fetch, error) {
-	if config.IntegrationID == "" {
+	if config.Integration == "" {
 		return nil, errors.New("datasource is required")
 	}
 	if config.Table == "" {
 		return nil, errors.New("table is required")
 	}
-	i, err := integration.GetIntegration(context.Background(), config.IntegrationID)
+	i, err := integration.GetIntegration(context.Background(), config.Integration)
 	if err != nil {
 		return nil, err
 	}
@@ -95,10 +95,10 @@ func (f *Fetch) Execute(ctx context.Context, modifiedConfig string) (interface{}
 
 func init() {
 	fields := map[string]actions.FieldInfo{
-		"integrationID": {
+		"integration": {
 			Type:        actions.FieldTypeIntegration,
-			Label:       "Integration ID",
-			Placeholder: "Database integration identifier",
+			Label:       "Database Integration",
+			Placeholder: "The SQL or MongoDB integration to read from",
 			Required:    true,
 		},
 		"filters": {

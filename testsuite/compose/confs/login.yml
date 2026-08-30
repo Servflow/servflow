@@ -24,7 +24,7 @@ actions:
     config:
       single: true
       failIfEmpty: true
-      integrationID: mongo
+      integration: mongo
       table: users
       filters:
         - field: email

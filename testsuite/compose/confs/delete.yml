@@ -15,7 +15,7 @@ actions:
   authenticate:
     type: authenticate
     config:
-      integrationID: mongo
+      integration: mongo
       databaseField: email
       jwtKey: "test"
       token: '{{ header "Authorization" }}'
@@ -26,7 +26,7 @@ actions:
   deleteItem:
     type: delete
     config:
-      integrationID: mongo
+      integration: mongo
       table: notes
       filters:
         - field: id

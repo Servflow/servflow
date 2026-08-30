@@ -14,7 +14,7 @@ import (
 )
 
 type Config struct {
-	IntegrationID   string `json:"integrationID" yaml:"integrationID"`
+	Integration     string `json:"integration" yaml:"integration"`
 	DatabaseField   string `json:"databaseField" yaml:"databaseField"`
 	JWTKey          string `json:"jwtKey" yaml:"jwtKey"`
 	Token           string `json:"token" yaml:"token"`
@@ -33,21 +33,21 @@ type Action struct {
 }
 
 func New(config Config) (*Action, error) {
-	integrationID := config.IntegrationID
+	integrationRef := config.Integration
 	databaseField := config.DatabaseField
 
-	if integrationID == "" {
-		return nil, errors.New("integration ID required")
+	if integrationRef == "" {
+		return nil, errors.New("integration is required")
 	}
 	if databaseField == "" {
 		return nil, errors.New("database field required")
 	}
 
-	i, err := integration.GetIntegration(context.Background(), config.IntegrationID)
+	i, err := integration.GetIntegration(context.Background(), config.Integration)
 	if err != nil {
 		return nil, err
 	}
-	config.IntegrationID = ""
+	config.Integration = ""
 
 	u, ok := i.(fetchImplementation)
 	if !ok {
@@ -119,10 +119,10 @@ func (a *Action) Type() string {
 
 func init() {
 	fields := map[string]actions.FieldInfo{
-		"integrationID": {
+		"integration": {
 			Type:        actions.FieldTypeIntegration,
-			Label:       "Integration ID",
-			Placeholder: "Database integration identifier",
+			Label:       "User Database",
+			Placeholder: "The SQL or MongoDB integration holding the user records",
 			Required:    true,
 		},
 		"databaseField": {

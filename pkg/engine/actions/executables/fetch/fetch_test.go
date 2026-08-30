@@ -32,8 +32,8 @@ func TestFetch_Execute(t *testing.T) {
 		require.NoError(t, err)
 
 		fetch, err := New(Config{
-			Table:         "mock",
-			IntegrationID: "mockds",
+			Table:       "mock",
+			Integration: "mockds",
 			Filters: []filters.Filter{
 				{
 					Field:      "id",
@@ -61,8 +61,8 @@ func TestFetch_Execute(t *testing.T) {
 		integration.InitializeIntegration("mock", "mockds", nil)
 
 		fetch, err := New(Config{
-			Table:         "mock",
-			IntegrationID: "mockds",
+			Table:       "mock",
+			Integration: "mockds",
 			Filters: []filters.Filter{
 				{
 					Field:      "id",
@@ -89,9 +89,9 @@ func TestFetch_Execute(t *testing.T) {
 		integration.InitializeIntegration("mock", "mockds", nil)
 
 		fetch, err := New(Config{
-			Table:         "mock",
-			IntegrationID: "mockds",
-			FailIfEmpty:   true,
+			Table:       "mock",
+			Integration: "mockds",
+			FailIfEmpty: true,
 			Filters: []filters.Filter{
 				{
 					Field:      "id",

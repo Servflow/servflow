@@ -25,7 +25,7 @@ func TestNewDeleteAction(t *testing.T) {
 	require.NoError(t, err)
 
 	del, err := New(Config{
-		IntegrationID:     "testID",
+		Integration:       "testID",
 		Table:             "mock_table",
 		DatasourceOptions: map[string]string{"optiontest": "test"},
 		Filters: []filters.Filter{
@@ -67,7 +67,7 @@ func TestDelete_Execute(t *testing.T) {
 		require.NoError(t, err)
 
 		d, err := New(Config{
-			IntegrationID:     "mockds",
+			Integration:       "mockds",
 			Table:             "mock_table",
 			DatasourceOptions: map[string]string{"optiontest": "test"},
 			Filters: []filters.Filter{
@@ -104,7 +104,7 @@ func TestDelete_Execute(t *testing.T) {
 		integration.InitializeIntegration("mock", "mockds", nil)
 
 		d, err := New(Config{
-			IntegrationID:     "mockds",
+			Integration:       "mockds",
 			Table:             "mock_table",
 			DatasourceOptions: map[string]string{"optiontest": "test"},
 			Filters: []filters.Filter{
@@ -135,7 +135,7 @@ func TestDelete_Execute(t *testing.T) {
 		integration.InitializeIntegration("mock", "mockds", nil)
 
 		d, err := New(Config{
-			IntegrationID:     "mockds",
+			Integration:       "mockds",
 			Table:             "mock_table",
 			DatasourceOptions: map[string]string{"optiontest": "test"},
 			Filters: []filters.Filter{
@@ -171,7 +171,7 @@ func TestDelete_Execute(t *testing.T) {
 
 	t.Run("missing table", func(t *testing.T) {
 		_, err := New(Config{
-			IntegrationID:     "mockds",
+			Integration:       "mockds",
 			DatasourceOptions: map[string]string{"optiontest": "test"},
 			Filters: []filters.Filter{
 				{

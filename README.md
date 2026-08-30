@@ -47,7 +47,7 @@ actions:
     type: mongoquery
     config:
       collection: users
-      integrationID: mongo
+      integration: mongo
     next: response.success
 
 responses:

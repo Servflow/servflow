@@ -12,11 +12,11 @@ import (
 )
 
 type Config struct {
-	Collection    string `json:"collection" yaml:"collection"`
-	FilterQuery   string `json:"filterQuery" yaml:"filterQuery"`
-	Projection    string `json:"projection" yaml:"projection"`
-	IntegrationID string `json:"integrationID" yaml:"integrationID"`
-	FailIfEmpty   bool   `json:"failIfEmpty" yaml:"failIfEmpty"`
+	Collection  string `json:"collection" yaml:"collection"`
+	FilterQuery string `json:"filterQuery" yaml:"filterQuery"`
+	Projection  string `json:"projection" yaml:"projection"`
+	Integration string `json:"integration" yaml:"integration"`
+	FailIfEmpty bool   `json:"failIfEmpty" yaml:"failIfEmpty"`
 }
 
 type mongoDBIntegration interface {
@@ -37,14 +37,14 @@ func (m *MGOQuery) Config() string {
 }
 
 func New(config Config) (*MGOQuery, error) {
-	if config.IntegrationID == "" {
-		return nil, errors.New("IntegrationID is required")
+	if config.Integration == "" {
+		return nil, errors.New("integration is required")
 	}
 	if config.Collection == "" {
 		return nil, errors.New("collection is required")
 	}
 
-	i, err := integration.GetIntegration(context.Background(), config.IntegrationID)
+	i, err := integration.GetIntegration(context.Background(), config.Integration)
 	if err != nil {
 		return nil, err
 	}
@@ -104,10 +104,10 @@ func init() {
 			Placeholder: "MongoDB projection query",
 			Required:    false,
 		},
-		"integrationID": {
+		"integration": {
 			Type:        actions.FieldTypeIntegration,
-			Label:       "Integration ID",
-			Placeholder: "MongoDB integration identifier",
+			Label:       "MongoDB Integration",
+			Placeholder: "The MongoDB integration to query",
 			Required:    true,
 		},
 		"failIfEmpty": {

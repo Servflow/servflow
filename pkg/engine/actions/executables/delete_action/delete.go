@@ -30,7 +30,7 @@ func (d *Delete) Type() string {
 }
 
 type Config struct {
-	IntegrationID     string            `json:"integrationID"`
+	Integration       string            `json:"integration"`
 	Filters           []filters.Filter  `json:"filters"`
 	Table             string            `json:"table"`
 	DatasourceOptions map[string]string `json:"datasourceOptions"`
@@ -42,13 +42,13 @@ type deleteImplementation interface {
 }
 
 func New(config Config) (*Delete, error) {
-	if config.IntegrationID == "" {
+	if config.Integration == "" {
 		return nil, errors.New("datasource is required")
 	}
 	if config.Table == "" {
 		return nil, errors.New("table is required")
 	}
-	i, err := integration.GetIntegration(context.Background(), config.IntegrationID)
+	i, err := integration.GetIntegration(context.Background(), config.Integration)
 	if err != nil {
 		return nil, err
 	}
@@ -79,10 +79,10 @@ func (d *Delete) Execute(ctx context.Context, modifiedConfig string) (interface{
 
 func init() {
 	fields := map[string]actions.FieldInfo{
-		"integrationID": {
+		"integration": {
 			Type:        actions.FieldTypeIntegration,
-			Label:       "Integration ID",
-			Placeholder: "Database integration identifier",
+			Label:       "Database Integration",
+			Placeholder: "The SQL or MongoDB integration to delete from",
 			Required:    true,
 		},
 		"filters": {

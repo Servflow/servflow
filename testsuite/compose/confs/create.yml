@@ -16,7 +16,7 @@ actions:
   authenticate:
     type: authenticate
     config:
-      integrationID: mongo
+      integration: mongo
       databaseField: email
       jwtKey: "test"
       token: '{{ header "Authorization" }}'
@@ -27,7 +27,7 @@ actions:
   saveItem:
     type: store
     config:
-      integrationID: mongo
+      integration: mongo
       table: notes
       fields:
         title: '{{ param "title" }}'

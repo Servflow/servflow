@@ -41,7 +41,7 @@ actions:
   checkExistingUser:
     type: fetch
     config:
-      integrationID: my_database
+      integration: my_database
       table: users
       filters:
         - field: email
@@ -61,7 +61,7 @@ actions:
   createUser:
     type: save
     config:
-      integrationID: my_database
+      integration: my_database
       table: users
       fields:
         email: '{{ param "email" }}'

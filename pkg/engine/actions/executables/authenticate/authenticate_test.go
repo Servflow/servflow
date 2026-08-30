@@ -19,12 +19,12 @@ func TestAuthenticate_New(t *testing.T) {
 			DatabaseField: "email",
 		})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "integration ID required")
+		assert.Contains(t, err.Error(), "integration is required")
 	})
 
 	t.Run("missing database field", func(t *testing.T) {
 		_, err := New(Config{
-			IntegrationID: "testintegration",
+			Integration: "testintegration",
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "database field required")
@@ -35,7 +35,7 @@ func TestAuthenticate_New(t *testing.T) {
 		defer ctr.Finish()
 
 		_, err := New(Config{
-			IntegrationID: "nonexistent",
+			Integration:   "nonexistent",
 			DatabaseField: "email",
 		})
 		require.Error(t, err)
@@ -55,7 +55,7 @@ func TestAuthenticate_New(t *testing.T) {
 		require.NoError(t, err)
 
 		_, err = New(Config{
-			IntegrationID: "invalidds",
+			Integration:   "invalidds",
 			DatabaseField: "email",
 		})
 		require.Error(t, err)
@@ -76,7 +76,7 @@ func TestAuthenticate_New(t *testing.T) {
 		require.NoError(t, err)
 
 		auth, err := New(Config{
-			IntegrationID: "mockds",
+			Integration:   "mockds",
 			DatabaseField: "email",
 			JWTKey:        "secret",
 			Token:         "",
@@ -127,7 +127,7 @@ func TestAuthenticate_Execute(t *testing.T) {
 		require.NoError(t, err)
 
 		auth, err := New(Config{
-			IntegrationID: "mockds",
+			Integration:   "mockds",
 			DatabaseField: dbField,
 			JWTKey:        jwtKey,
 			Collection:    collection,
@@ -163,7 +163,7 @@ func TestAuthenticate_Execute(t *testing.T) {
 		require.NoError(t, err)
 
 		auth, err := New(Config{
-			IntegrationID: "mockds",
+			Integration:   "mockds",
 			DatabaseField: "email",
 			JWTKey:        "secret",
 			Collection:    "users",
@@ -197,7 +197,7 @@ func TestAuthenticate_Execute(t *testing.T) {
 		require.NoError(t, err)
 
 		auth, err := New(Config{
-			IntegrationID: "mockds",
+			Integration:   "mockds",
 			DatabaseField: "email",
 			JWTKey:        "correct-secret",
 			Collection:    "users",
@@ -242,7 +242,7 @@ func TestAuthenticate_Execute(t *testing.T) {
 		require.NoError(t, err)
 
 		auth, err := New(Config{
-			IntegrationID: "mockds",
+			Integration:   "mockds",
 			DatabaseField: "email",
 			JWTKey:        string(jwtKeyBytes),
 			Collection:    "users",
@@ -286,7 +286,7 @@ func TestAuthenticate_Execute(t *testing.T) {
 		require.NoError(t, err)
 
 		auth, err := New(Config{
-			IntegrationID: "mockds",
+			Integration:   "mockds",
 			DatabaseField: dbField,
 			JWTKey:        jwtKey,
 			Collection:    collection,
@@ -318,7 +318,7 @@ func TestAuthenticate_Type(t *testing.T) {
 
 func TestAuthenticate_Config(t *testing.T) {
 	config := Config{
-		IntegrationID: "testid",
+		Integration:   "testid",
 		DatabaseField: "email",
 		JWTKey:        "secret",
 		Token:         "token",

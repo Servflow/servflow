@@ -8,7 +8,7 @@ actions:
   authenticate:
     type: authenticate
     config:
-      integrationID: mongo
+      integration: mongo
       databaseField: email
       failOnAuthError: true
       jwtKey: "test"
@@ -19,7 +19,7 @@ actions:
   fetchItem:
     type: fetch
     config:
-      integrationID: mongo
+      integration: mongo
       table: notes
       failIfEmpty: true
       filters:

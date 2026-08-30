@@ -38,8 +38,8 @@ func TestFetchVector_Execute(t *testing.T) {
 
 		fetchVectorObj := FetchVector{
 			cfg: &Config{
-				IntegrationID: "mockid",
-				Vector:        string(jsonVectors),
+				Integration: "mockid",
+				Vector:      string(jsonVectors),
 			},
 			fetchIntegration: mockIntegration,
 		}
@@ -74,9 +74,9 @@ func TestFetchVector_Execute(t *testing.T) {
 
 		fetchVectorObj := FetchVector{
 			cfg: &Config{
-				IntegrationID: "mockid",
-				Vector:        string(jsonVectors),
-				Options:       options,
+				Integration: "mockid",
+				Vector:      string(jsonVectors),
+				Options:     options,
 			},
 			fetchIntegration: mockIntegration,
 		}

@@ -18,11 +18,11 @@ import (
 )
 
 type Config struct {
-	ToolConfigs   []ToolConfig        `json:"toolConfigs" yaml:"toolConfigs"`
-	SystemPrompt  string              `json:"systemPrompt" yaml:"systemPrompt"`
-	UserPrompt    string              `json:"userPrompt" yaml:"userPrompt"`
-	IntegrationID string              `json:"integrationID" yaml:"integrationID"`
-	FileUpload    apiconfig.FileInput `json:"fileUpload" yaml:"fileUpload"`
+	ToolConfigs  []ToolConfig        `json:"toolConfigs" yaml:"toolConfigs"`
+	SystemPrompt string              `json:"systemPrompt" yaml:"systemPrompt"`
+	UserPrompt   string              `json:"userPrompt" yaml:"userPrompt"`
+	Integration  string              `json:"integration" yaml:"integration"`
+	FileUpload   apiconfig.FileInput `json:"fileUpload" yaml:"fileUpload"`
 }
 type MCPServerConfig struct {
 	Endpoint string   `json:"endpoint" yaml:"endpoint"`
@@ -99,7 +99,7 @@ func (a *Agent) Execute(ctx context.Context) (interface{}, map[string]string, er
 		return nil, nil, err
 	}
 
-	ctx, span := tracing.StartAgentInvoke(ctx, a.config.IntegrationID)
+	ctx, span := tracing.StartAgentInvoke(ctx, a.config.Integration)
 	defer span.End()
 
 	fileInput, err := requestctx.GetFileFromContext(ctx, fileUpload)
@@ -134,11 +134,11 @@ func (a *Agent) Type() string {
 }
 
 func New(config Config) (*Agent, error) {
-	if config.IntegrationID == "" {
-		return nil, errors.New("IntegrationID is required")
+	if config.Integration == "" {
+		return nil, errors.New("integration is required")
 	}
 
-	i, err := integration.GetIntegration(context.Background(), config.IntegrationID)
+	i, err := integration.GetIntegration(context.Background(), config.Integration)
 	if err != nil {
 		return nil, err
 	}
@@ -195,10 +195,10 @@ func init() {
 			Placeholder: "User message or query",
 			Required:    false,
 		},
-		"integrationID": {
+		"integration": {
 			Type:        actions.FieldTypeIntegration,
-			Label:       "Integration ID",
-			Placeholder: "AI integration identifier",
+			Label:       "AI Integration",
+			Placeholder: "The AI provider integration to call",
 			Required:    true,
 		},
 	}

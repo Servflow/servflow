@@ -23,7 +23,7 @@ type saveIntegration interface {
 }
 
 type Config struct {
-	IntegrationID     string                 `json:"integrationID"`
+	Integration       string                 `json:"integration"`
 	Table             string                 `json:"table"`
 	DatasourceOptions map[string]string      `json:"datasourceOptions"`
 	Fields            map[string]interface{} `json:"fields"`
@@ -40,14 +40,14 @@ func (s *Save) Type() string {
 }
 
 func New(config Config) (*Save, error) {
-	if config.IntegrationID == "" {
-		return nil, errors.New("integrationID is required")
+	if config.Integration == "" {
+		return nil, errors.New("integration is required")
 	}
 	if config.Table == "" {
 		return nil, errors.New("table is required")
 	}
 
-	i, err := integration.GetIntegration(context.Background(), config.IntegrationID)
+	i, err := integration.GetIntegration(context.Background(), config.Integration)
 	if err != nil {
 		return nil, err
 	}
@@ -174,10 +174,10 @@ func (s *Save) resolveFilters(ctx context.Context, rc *requestctx.RequestContext
 
 func init() {
 	fields := map[string]actions.FieldInfo{
-		"integrationID": {
+		"integration": {
 			Type:        actions.FieldTypeIntegration,
-			Label:       "Integration ID",
-			Placeholder: "Database integration identifier",
+			Label:       "Database Integration",
+			Placeholder: "The SQL or MongoDB integration to write to",
 			Required:    true,
 		},
 		"table": {

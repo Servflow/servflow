@@ -36,9 +36,9 @@ func TestSave_Insert(t *testing.T) {
 		require.NoError(t, err)
 
 		save, err := New(Config{
-			IntegrationID: "mockds",
-			Table:         "mock_table",
-			Fields:        map[string]interface{}{"id": "test-id", "name": "test"},
+			Integration: "mockds",
+			Table:       "mock_table",
+			Fields:      map[string]interface{}{"id": "test-id", "name": "test"},
 		})
 		require.NoError(t, err)
 
@@ -64,9 +64,9 @@ func TestSave_Insert(t *testing.T) {
 		require.NoError(t, err)
 
 		save, err := New(Config{
-			IntegrationID: "mockds",
-			Table:         "mock_table",
-			Fields:        map[string]interface{}{"name": "test"},
+			Integration: "mockds",
+			Table:       "mock_table",
+			Fields:      map[string]interface{}{"name": "test"},
 		})
 		require.NoError(t, err)
 
@@ -94,9 +94,9 @@ func TestSave_Insert(t *testing.T) {
 		integration.InitializeIntegration("mock", "mockds", nil)
 
 		save, err := New(Config{
-			IntegrationID: "mockds",
-			Table:         "mock_table",
-			Fields:        map[string]interface{}{"name": "test"},
+			Integration: "mockds",
+			Table:       "mock_table",
+			Fields:      map[string]interface{}{"name": "test"},
 		})
 		require.NoError(t, err)
 
@@ -133,10 +133,10 @@ func TestSave_Update(t *testing.T) {
 		require.NoError(t, err)
 
 		save, err := New(Config{
-			IntegrationID: "mockds",
-			Table:         "mock_table",
-			Fields:        map[string]interface{}{"name": "updated"},
-			Filters:       filtersList,
+			Integration: "mockds",
+			Table:       "mock_table",
+			Fields:      map[string]interface{}{"name": "updated"},
+			Filters:     filtersList,
 		})
 		require.NoError(t, err)
 
@@ -164,10 +164,10 @@ func TestSave_Update(t *testing.T) {
 		integration.InitializeIntegration("mock", "mockds", nil)
 
 		save, err := New(Config{
-			IntegrationID: "mockds",
-			Table:         "mock_table",
-			Fields:        map[string]interface{}{"name": "updated"},
-			Filters:       filtersList,
+			Integration: "mockds",
+			Table:       "mock_table",
+			Fields:      map[string]interface{}{"name": "updated"},
+			Filters:     filtersList,
 		})
 		require.NoError(t, err)
 
@@ -178,19 +178,19 @@ func TestSave_Update(t *testing.T) {
 }
 
 func TestSave_Validation(t *testing.T) {
-	t.Run("missing integrationID", func(t *testing.T) {
+	t.Run("missing integration", func(t *testing.T) {
 		_, err := New(Config{
 			Table:  "mock_table",
 			Fields: map[string]interface{}{"name": "test"},
 		})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "integrationID is required")
+		assert.Contains(t, err.Error(), "integration is required")
 	})
 
 	t.Run("missing table", func(t *testing.T) {
 		_, err := New(Config{
-			IntegrationID: "mockds",
-			Fields:        map[string]interface{}{"name": "test"},
+			Integration: "mockds",
+			Fields:      map[string]interface{}{"name": "test"},
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "table is required")
@@ -208,9 +208,9 @@ func TestSave_Type(t *testing.T) {
 	integration.InitializeIntegration("mock", "mockds", nil)
 
 	save, err := New(Config{
-		IntegrationID: "mockds",
-		Table:         "mock_table",
-		Fields:        map[string]interface{}{"name": "test"},
+		Integration: "mockds",
+		Table:       "mock_table",
+		Fields:      map[string]interface{}{"name": "test"},
 	})
 	require.NoError(t, err)
 

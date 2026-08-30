@@ -23,7 +23,7 @@ actions:
   fetchemail:
     type: fetch
     config:
-      integrationID: mongo
+      integration: mongo
       table: users
       filters:
         - field: email
@@ -41,7 +41,7 @@ actions:
   storedb:
     type: store
     config:
-      integrationID: mongo
+      integration: mongo
       table: users
       fields:
         email: '{{ param "email" }}'

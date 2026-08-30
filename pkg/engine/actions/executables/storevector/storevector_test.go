@@ -34,10 +34,10 @@ func TestStoreVectors_Execute(t *testing.T) {
 		require.NoError(t, err)
 
 		storeVectors, err := New(Config{
-			IntegrationID: "mockid",
-			Fields:        fields,
-			Options:       map[string]string{"optiontest": "test"},
-			Vectors:       string(jsonVectors),
+			Integration: "mockid",
+			Fields:      fields,
+			Options:     map[string]string{"optiontest": "test"},
+			Vectors:     string(jsonVectors),
 		})
 		require.NoError(t, err)
 
@@ -63,10 +63,10 @@ func TestStoreVectors_Execute(t *testing.T) {
 		integration.InitializeIntegration("mock", "mockid", nil)
 
 		storeVectors, err := New(Config{
-			IntegrationID: "mockid",
-			Fields:        fields,
-			Options:       map[string]string{"optiontest": "test"},
-			Vectors:       string(jsonVectors),
+			Integration: "mockid",
+			Fields:      fields,
+			Options:     map[string]string{"optiontest": "test"},
+			Vectors:     string(jsonVectors),
 		})
 		require.NoError(t, err)
 

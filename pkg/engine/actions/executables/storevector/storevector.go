@@ -16,10 +16,10 @@ type storeVectorIntegration interface {
 }
 
 type Config struct {
-	IntegrationID string            `json:"integrationID,omitempty"`
-	Fields        map[string]any    `json:"fields"`
-	Options       map[string]string `json:"options,omitempty"`
-	Vectors       string            `json:"vectors"`
+	Integration string            `json:"integration,omitempty"`
+	Fields      map[string]any    `json:"fields"`
+	Options     map[string]string `json:"options,omitempty"`
+	Vectors     string            `json:"vectors"`
 }
 
 type StoreVectors struct {
@@ -34,7 +34,7 @@ func (s StoreVectors) Type() string {
 func (s StoreVectors) Config() string {
 	cfg := *s.cfg
 	cfg.Options = nil
-	cfg.IntegrationID = ""
+	cfg.Integration = ""
 	dat, err := json.Marshal(cfg)
 	if err != nil {
 		return ""
@@ -64,10 +64,10 @@ func (s StoreVectors) Execute(ctx context.Context, modifiedConfig string) (inter
 }
 
 func New(config Config) (*StoreVectors, error) {
-	if config.IntegrationID == "" {
+	if config.Integration == "" {
 		return nil, fmt.Errorf("no integration ID provided")
 	}
-	i, err := integration.GetIntegration(context.Background(), config.IntegrationID)
+	i, err := integration.GetIntegration(context.Background(), config.Integration)
 	if err != nil {
 		return nil, err
 	}
@@ -85,11 +85,11 @@ func New(config Config) (*StoreVectors, error) {
 
 func init() {
 	fields := map[string]actions.FieldInfo{
-		"integrationID": {
+		"integration": {
 			Type:        actions.FieldTypeIntegration,
-			Label:       "Integration ID",
-			Placeholder: "Vector database integration identifier",
-			Required:    false,
+			Label:       "Vector Database",
+			Placeholder: "The vector store to write to",
+			Required:    true,
 		},
 		"fields": {
 			Type:        actions.FieldTypeMap,

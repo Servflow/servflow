@@ -3,12 +3,14 @@ package tracing
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -24,18 +26,37 @@ const (
 	OrgIDKey = attribute.Key("org.id")
 )
 
+// Protocol selects the OTLP transport used to export spans.
+type Protocol string
+
+const (
+	// ProtocolHTTP exports over OTLP/HTTP. CollectorEndpoint is a base URL; the
+	// /v1/traces signal path is appended unless the URL already carries a path.
+	ProtocolHTTP Protocol = "http"
+	// ProtocolGRPC exports over OTLP/gRPC. CollectorEndpoint is a host:port
+	// authority with no signal path, because gRPC addresses a service method
+	// rather than a URL.
+	ProtocolGRPC Protocol = "grpc"
+)
+
 // Config controls how InitTracer wires the OTLP exporters and span resource.
 //
-// Ingest is OTLP/HTTP over CollectorEndpoint. Headers are attached to every
-// export request (e.g. to carry a credential), and SpanAttributes stamps
-// runtime-derived identity onto every span. Tenant identity may be carried
-// either as a static "org.id" resource attribute (OrgID) or via SpanAttributes.
+// Protocol selects the transport and therefore how CollectorEndpoint is read;
+// an empty value means ProtocolHTTP. Headers are attached to every export (e.g.
+// to carry a credential), and SpanAttributes stamps runtime-derived identity
+// onto every span. Tenant identity may be carried either as a static "org.id"
+// resource attribute (OrgID) or via SpanAttributes.
 type Config struct {
 	ServiceName       string
 	OrgID             string
+	Protocol          Protocol
 	CollectorEndpoint string
 	Headers           map[string]string
 	SpanAttributes    func() map[string]string
+	// Insecure disables transport security for ProtocolGRPC, for a collector
+	// reached over a trusted network or a local development stack. It is ignored
+	// by ProtocolHTTP, where the scheme in CollectorEndpoint already decides.
+	Insecure bool
 }
 
 func GetTracer() trace.Tracer {
@@ -129,9 +150,17 @@ func InitTracer(ctx context.Context, cfg Config) (func(context.Context) error, e
 	}, nil
 }
 
-// buildTraceExporter constructs the OTLP/HTTP trace exporter. The /v1/traces
-// signal path is derived from CollectorEndpoint.
+// buildTraceExporter constructs the OTLP trace exporter for cfg.Protocol.
 func buildTraceExporter(ctx context.Context, cfg Config) (*otlptrace.Exporter, error) {
+	if cfg.Protocol == ProtocolGRPC {
+		return buildGRPCTraceExporter(ctx, cfg)
+	}
+	return buildHTTPTraceExporter(ctx, cfg)
+}
+
+// buildHTTPTraceExporter constructs the OTLP/HTTP trace exporter. The /v1/traces
+// signal path is derived from CollectorEndpoint.
+func buildHTTPTraceExporter(ctx context.Context, cfg Config) (*otlptrace.Exporter, error) {
 	traceOpts := []otlptracehttp.Option{
 		otlptracehttp.WithEndpointURL(signalURL(cfg.CollectorEndpoint, "/v1/traces")),
 	}
@@ -144,6 +173,36 @@ func buildTraceExporter(ctx context.Context, cfg Config) (*otlptrace.Exporter, e
 		return nil, fmt.Errorf("failed to create http trace exporter: %w", err)
 	}
 	return traceExporter, nil
+}
+
+// buildGRPCTraceExporter constructs the OTLP/gRPC trace exporter. Unlike the
+// HTTP endpoint, CollectorEndpoint is an authority (host:port) carrying no
+// signal path, so any scheme or path is stripped before use.
+func buildGRPCTraceExporter(ctx context.Context, cfg Config) (*otlptrace.Exporter, error) {
+	traceOpts := []otlptracegrpc.Option{
+		otlptracegrpc.WithEndpoint(grpcAuthority(cfg.CollectorEndpoint)),
+	}
+	if cfg.Insecure {
+		traceOpts = append(traceOpts, otlptracegrpc.WithInsecure())
+	}
+	if len(cfg.Headers) > 0 {
+		traceOpts = append(traceOpts, otlptracegrpc.WithHeaders(cfg.Headers))
+	}
+
+	traceExporter, err := otlptracegrpc.New(ctx, traceOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create grpc trace exporter: %w", err)
+	}
+	return traceExporter, nil
+}
+
+// grpcAuthority reduces an endpoint to the host:port form the gRPC exporter
+// expects, so a configuration value written as a URL still works.
+func grpcAuthority(endpoint string) string {
+	if u, err := url.Parse(endpoint); err == nil && u.Host != "" {
+		return u.Host
+	}
+	return strings.TrimSuffix(endpoint, "/")
 }
 
 // signalURL joins an OTLP base endpoint with a signal path. When the base

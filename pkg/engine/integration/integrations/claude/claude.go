@@ -305,13 +305,13 @@ func init() {
 		"api_key": {
 			Type:        integration.FieldTypePassword,
 			Label:       "API Key",
-			Placeholder: "sk-ant-...",
+			Description: "sk-ant-...",
 			Required:    true,
 		},
 		"model": {
 			Type:        integration.FieldTypeString,
 			Label:       "Model",
-			Placeholder: defaultModel,
+			Description: defaultModel,
 			Required:    false,
 			Default:     defaultModel,
 		},

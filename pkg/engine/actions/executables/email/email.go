@@ -90,37 +90,37 @@ func init() {
 		"senderEmail": {
 			Type:        actions.FieldTypeString,
 			Label:       "Sender Email",
-			Placeholder: "sender@example.com",
+			Description: "sender@example.com",
 			Required:    true,
 		},
 		"recipientEmail": {
 			Type:        actions.FieldTypeString,
 			Label:       "Recipient Email",
-			Placeholder: "recipient@example.com",
+			Description: "recipient@example.com",
 			Required:    true,
 		},
 		"name": {
 			Type:        actions.FieldTypeString,
 			Label:       "Sender Name",
-			Placeholder: "John Doe",
+			Description: "John Doe",
 			Required:    true,
 		},
 		"subject": {
 			Type:        actions.FieldTypeString,
 			Label:       "Subject",
-			Placeholder: "Email subject",
+			Description: "Email subject",
 			Required:    false,
 		},
 		"auth": {
 			Type:        actions.FieldTypeMap,
 			Label:       "Server Configuration",
-			Placeholder: "SMTP server authentication details",
+			Description: "SMTP server authentication details",
 			Required:    true,
 		},
 		"content": {
 			Type:        actions.FieldTypeString,
 			Label:       "Content",
-			Placeholder: "Email content",
+			Description: "Email content",
 			Required:    true,
 		},
 	}

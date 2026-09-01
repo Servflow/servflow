@@ -70,13 +70,13 @@ func init() {
 		"value": {
 			Type:        actions.FieldTypeString,
 			Label:       "Value",
-			Placeholder: "Value to hash",
+			Description: "Value to hash",
 			Required:    true,
 		},
 		"algorithm": {
 			Type:        actions.FieldTypeString,
 			Label:       "Algorithm",
-			Placeholder: "Hash algorithm (bcrypt)",
+			Description: "Hash algorithm (bcrypt)",
 			Required:    true,
 			Default:     "bcrypt",
 		},

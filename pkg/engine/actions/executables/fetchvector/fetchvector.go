@@ -87,19 +87,19 @@ func init() {
 		"integration": {
 			Type:        actions.FieldTypeIntegration,
 			Label:       "Vector Database",
-			Placeholder: "The vector store to search",
+			Description: "The vector store to search",
 			Required:    true,
 		},
 		"vector": {
 			Type:        actions.FieldTypeString,
 			Label:       "Vector",
-			Placeholder: "Vector data or identifier",
+			Description: "Vector data or identifier",
 			Required:    false,
 		},
 		"options": {
 			Type:        actions.FieldTypeMap,
 			Label:       "Options",
-			Placeholder: "Additional query options",
+			Description: "Additional query options",
 			Required:    false,
 		},
 	}

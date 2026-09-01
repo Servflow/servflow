@@ -76,13 +76,13 @@ func init() {
 		"api_key": {
 			Type:        integration.FieldTypePassword,
 			Label:       "API Key",
-			Placeholder: "sk-...",
+			Description: "sk-...",
 			Required:    true,
 		},
 		"model": {
 			Type:        integration.FieldTypeString,
 			Label:       "Model",
-			Placeholder: "gpt-4.1",
+			Description: "gpt-4.1",
 			Required:    false,
 			Default:     defaultModel,
 		},

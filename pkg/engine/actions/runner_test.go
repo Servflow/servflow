@@ -235,3 +235,15 @@ func TestRunner_ReturnsTraceFields(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, map[string]string{"url": "https://example.com"}, fields)
 }
+
+func TestRunner_ExecutableIsTheConstructedAction(t *testing.T) {
+	v1 := &runnerV1{}
+	r1, err := NewRunner(registerRunnerV1(t, "runner-exec-v1", v1), json.RawMessage(`{}`))
+	require.NoError(t, err)
+	assert.Same(t, v1, r1.Executable())
+
+	v2 := &runnerV2{}
+	r2, err := NewRunner(registerRunnerV2(t, "runner-exec-v2", v2), json.RawMessage(`{}`))
+	require.NoError(t, err)
+	assert.Same(t, v2, r2.Executable())
+}

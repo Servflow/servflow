@@ -151,13 +151,13 @@ func init() {
 		"connectionString": {
 			Type:        integration.FieldTypePassword,
 			Label:       "Connection String",
-			Placeholder: "mongodb://localhost:27017",
+			Description: "mongodb://localhost:27017",
 			Required:    true,
 		},
 		"dbName": {
 			Type:        integration.FieldTypeString,
 			Label:       "Database Name",
-			Placeholder: "mydb",
+			Description: "mydb",
 			Required:    true,
 		},
 	}

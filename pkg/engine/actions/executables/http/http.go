@@ -179,13 +179,13 @@ func init() {
 		"url": {
 			Type:        actions.FieldTypeString,
 			Label:       "URL",
-			Placeholder: "https://api.example.com/endpoint",
+			Description: "https://api.example.com/endpoint",
 			Required:    true,
 		},
 		"method": {
 			Type:        actions.FieldTypeString,
 			Label:       "HTTP Method",
-			Placeholder: "GET, POST, PUT, DELETE, PATCH",
+			Description: "GET, POST, PUT, DELETE, PATCH",
 			Required:    true,
 			Default:     "GET",
 			Values:      []string{"GET", "POST", "PUT", "DELETE", "PATCH"},
@@ -193,13 +193,13 @@ func init() {
 		"headers": {
 			Type:        actions.FieldTypeMap,
 			Label:       "Headers",
-			Placeholder: "HTTP headers as key-value pairs",
+			Description: "HTTP headers as key-value pairs",
 			Required:    false,
 		},
 		"body": {
 			Type:        actions.FieldTypeMap,
 			Label:       "Request Body",
-			Placeholder: "Request body data",
+			Description: "Request body data",
 			Required:    false,
 			Metadata: map[string]string{
 				"type": "httpbody",
@@ -208,20 +208,20 @@ func init() {
 		"responsePath": {
 			Type:        actions.FieldTypeString,
 			Label:       "Response Path",
-			Placeholder: "JSONPath to extract from response (optional)",
+			Description: "JSONPath to extract from response (optional)",
 			Required:    false,
 		},
 		"expectedResponseCode": {
 			Type:        actions.FieldTypeString,
 			Label:       "Expected Response Code",
-			Placeholder: "200",
+			Description: "200",
 			Required:    false,
 			Default:     "",
 		},
 		"failIfResponseEmpty": {
 			Type:        actions.FieldTypeBoolean,
 			Label:       "Fail if Response Empty",
-			Placeholder: "Treat empty response as failure",
+			Description: "Treat empty response as failure",
 			Required:    false,
 			Default:     true,
 		},

@@ -37,7 +37,7 @@ const (
 type FieldInfo struct {
 	Type        FieldType `json:"type"`
 	Label       string    `json:"label"`
-	Placeholder string    `json:"placeholder"`
+	Description string    `json:"description"`
 	Required    bool      `json:"required"`
 	Default     any       `json:"default,omitempty"`
 	Values      []string  `json:"values,omitempty"`

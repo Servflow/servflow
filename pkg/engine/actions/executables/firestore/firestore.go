@@ -68,25 +68,25 @@ func init() {
 		"serviceAccount": {
 			Type:        actions.FieldTypeString,
 			Label:       "Service Account",
-			Placeholder: "Firebase service account JSON",
+			Description: "Firebase service account JSON",
 			Required:    true,
 		},
 		"projectID": {
 			Type:        actions.FieldTypeString,
 			Label:       "Project ID",
-			Placeholder: "Firebase project ID",
+			Description: "Firebase project ID",
 			Required:    true,
 		},
 		"collectionID": {
 			Type:        actions.FieldTypeString,
 			Label:       "Collection ID",
-			Placeholder: "Firestore collection name",
+			Description: "Firestore collection name",
 			Required:    true,
 		},
 		"documentTemplate": {
 			Type:        actions.FieldTypeString,
 			Label:       "Document Template",
-			Placeholder: "Document template JSON",
+			Description: "Document template JSON",
 			Required:    true,
 		},
 	}

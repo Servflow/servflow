@@ -71,14 +71,14 @@ func init() {
 		"type": {
 			Type:        integration.FieldTypeSelect,
 			Label:       "Database Type",
-			Placeholder: "Select database type",
+			Description: "Select database type",
 			Required:    true,
 			Values:      supportedDrivers,
 		},
 		"connectionString": {
 			Type:        integration.FieldTypePassword,
 			Label:       "Connection String",
-			Placeholder: "postgres://user:pass@localhost:5432/dbname",
+			Description: "postgres://user:pass@localhost:5432/dbname",
 			Required:    true,
 		},
 	}

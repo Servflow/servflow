@@ -74,13 +74,13 @@ func init() {
 		"key": {
 			Type:        actions.FieldTypeString,
 			Label:       "Key",
-			Placeholder: "Storage key to retrieve",
+			Description: "Storage key to retrieve",
 			Required:    true,
 		},
 		"failIfEmpty": {
 			Type:        actions.FieldTypeBoolean,
 			Label:       "Fail if Empty",
-			Placeholder: "Treat missing key as failure",
+			Description: "Treat missing key as failure",
 			Required:    false,
 			Default:     false,
 		},

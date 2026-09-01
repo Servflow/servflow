@@ -66,13 +66,13 @@ func init() {
 		"key": {
 			Type:        actions.FieldTypeString,
 			Label:       "Key",
-			Placeholder: "Storage key",
+			Description: "Storage key",
 			Required:    true,
 		},
 		"value": {
 			Type:        actions.FieldTypeString,
 			Label:       "Value",
-			Placeholder: "Value to store",
+			Description: "Value to store",
 			Required:    true,
 		},
 	}

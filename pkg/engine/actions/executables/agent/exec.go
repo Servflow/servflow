@@ -175,13 +175,13 @@ func init() {
 		"toolConfigs": {
 			Type:        "array",
 			Label:       "Tool Configurations",
-			Placeholder: "Array of tool configurations",
+			Description: "Array of tool configurations",
 			Required:    false,
 		},
 		"systemPrompt": {
 			Type:        actions.FieldTypeString,
 			Label:       "System Prompt",
-			Placeholder: "System instructions for the agent",
+			Description: "System instructions for the agent",
 			Required:    false,
 		},
 		"fileUpload": {
@@ -192,13 +192,13 @@ func init() {
 		"userPrompt": {
 			Type:        actions.FieldTypeString,
 			Label:       "User Prompt",
-			Placeholder: "User message or query",
+			Description: "User message or query",
 			Required:    false,
 		},
 		"integration": {
 			Type:        actions.FieldTypeIntegration,
 			Label:       "AI Integration",
-			Placeholder: "The AI provider integration to call",
+			Description: "The AI provider integration to call",
 			Required:    true,
 		},
 	}

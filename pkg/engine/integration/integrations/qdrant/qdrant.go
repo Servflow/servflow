@@ -54,7 +54,7 @@ func init() {
 		"url": {
 			Type:        integration.FieldTypeString,
 			Label:       "URL",
-			Placeholder: "localhost:6334",
+			Description: "localhost:6334",
 			Required:    true,
 		},
 	}

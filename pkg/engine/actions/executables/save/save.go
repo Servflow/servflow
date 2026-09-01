@@ -177,31 +177,31 @@ func init() {
 		"integration": {
 			Type:        actions.FieldTypeIntegration,
 			Label:       "Database Integration",
-			Placeholder: "The SQL or MongoDB integration to write to",
+			Description: "The SQL or MongoDB integration to write to",
 			Required:    true,
 		},
 		"table": {
 			Type:        actions.FieldTypeString,
 			Label:       "Table",
-			Placeholder: "Database table name",
+			Description: "Database table name",
 			Required:    true,
 		},
 		"datasourceOptions": {
 			Type:        actions.FieldTypeMap,
 			Label:       "Datasource Options",
-			Placeholder: "Additional datasource options",
+			Description: "Additional datasource options",
 			Required:    false,
 		},
 		"fields": {
 			Type:        actions.FieldTypeMap,
 			Label:       "Fields",
-			Placeholder: "Data fields to save",
+			Description: "Data fields to save",
 			Required:    true,
 		},
 		"filters": {
 			Type:        actions.FieldTypeMap,
 			Label:       "Filters",
-			Placeholder: "Query filters to identify records to update (leave empty to insert)",
+			Description: "Query filters to identify records to update (leave empty to insert)",
 			Required:    false,
 			Metadata: map[string]string{
 				"type": "filter",

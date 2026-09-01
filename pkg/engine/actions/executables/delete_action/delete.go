@@ -82,13 +82,13 @@ func init() {
 		"integration": {
 			Type:        actions.FieldTypeIntegration,
 			Label:       "Database Integration",
-			Placeholder: "The SQL or MongoDB integration to delete from",
+			Description: "The SQL or MongoDB integration to delete from",
 			Required:    true,
 		},
 		"filters": {
 			Type:        actions.FieldTypeMap,
 			Label:       "Filters",
-			Placeholder: "Query filters to identify records to delete",
+			Description: "Query filters to identify records to delete",
 			Required:    true,
 			Metadata: map[string]string{
 				"type": "filter",
@@ -97,13 +97,13 @@ func init() {
 		"table": {
 			Type:        actions.FieldTypeString,
 			Label:       "Table",
-			Placeholder: "Database table name",
+			Description: "Database table name",
 			Required:    true,
 		},
 		"datasourceOptions": {
 			Type:        actions.FieldTypeMap,
 			Label:       "Datasource Options",
-			Placeholder: "Additional datasource options",
+			Description: "Additional datasource options",
 			Required:    false,
 		},
 	}

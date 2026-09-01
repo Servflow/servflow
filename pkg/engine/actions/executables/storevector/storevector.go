@@ -88,25 +88,25 @@ func init() {
 		"integration": {
 			Type:        actions.FieldTypeIntegration,
 			Label:       "Vector Database",
-			Placeholder: "The vector store to write to",
+			Description: "The vector store to write to",
 			Required:    true,
 		},
 		"fields": {
 			Type:        actions.FieldTypeMap,
 			Label:       "Fields",
-			Placeholder: "Data fields to store",
+			Description: "Data fields to store",
 			Required:    true,
 		},
 		"options": {
 			Type:        actions.FieldTypeMap,
 			Label:       "Options",
-			Placeholder: "Additional storage options",
+			Description: "Additional storage options",
 			Required:    false,
 		},
 		"vectors": {
 			Type:        actions.FieldTypeString,
 			Label:       "Vectors",
-			Placeholder: "Vector data to store",
+			Description: "Vector data to store",
 			Required:    true,
 		},
 	}

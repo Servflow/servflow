@@ -147,7 +147,7 @@ func init() {
 		"script": {
 			Type:        actions.FieldTypeTextArea,
 			Label:       "Script",
-			Placeholder: "JavaScript code containing servflowRun function",
+			Description: "JavaScript code containing servflowRun function",
 			Required:    true,
 			Metadata: map[string]string{
 				"language": "javascript",
@@ -156,7 +156,7 @@ func init() {
 		"dependencies": {
 			Type:        actions.FieldTypeTextArea,
 			Label:       "Dependencies",
-			Placeholder: "Bundled JavaScript dependencies (optional)",
+			Description: "Bundled JavaScript dependencies (optional)",
 			Required:    false,
 		},
 	}

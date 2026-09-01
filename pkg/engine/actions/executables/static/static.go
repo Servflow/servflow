@@ -57,13 +57,13 @@ func init() {
 		"return": {
 			Type:        actions.FieldTypeString,
 			Label:       "Return Value",
-			Placeholder: "Value to return",
+			Description: "Value to return",
 			Required:    true,
 		},
 		"config": {
 			Type:        actions.FieldTypeString,
 			Label:       "Config",
-			Placeholder: "Configuration string",
+			Description: "Configuration string",
 			Required:    false,
 		},
 	}

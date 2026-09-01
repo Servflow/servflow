@@ -76,3 +76,18 @@ func (r *Runner) Execute(ctx context.Context) (resp interface{}, fields map[stri
 	}
 	return r.v1.Execute(ctx, resolved)
 }
+
+// Executable returns the constructed action, whichever generation this runner
+// holds.
+//
+// It is here because a host may want to ask the action for behaviour the
+// engine has no opinion about — an agent tool asks whether the action can
+// render its own output for a model to read — and asking should not mean
+// re-deriving which generation the action is. The host asserts its own
+// interface on what comes back; the engine defines none.
+func (r *Runner) Executable() any {
+	if r.v2 != nil {
+		return r.v2
+	}
+	return r.v1
+}

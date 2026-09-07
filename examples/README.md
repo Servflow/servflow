@@ -38,25 +38,6 @@ curl http://localhost:8080/hello
 
 ---
 
-### 🟡 [Database Agent](./getting-started/db-agent/)
-**AI-powered natural language database queries**
-- **What it does**: Query your database using plain English questions
-- **Setup time**: 2 minutes  
-- **Prerequisites**: MongoDB database, OpenAI API key
-- **Learn**: AI integration, database queries, conversation history
-
-```bash
-cd db-agent
-export MONGODB_STRING="mongodb://localhost:27017/mydb"
-export OPENAI_API_KEY="sk-your-key-here"
-servflow start --integrations integrations.yaml configs/
-curl -X POST http://localhost:8080/db_agent -d '{"query": "How many users are there?"}'
-```
-
-**→ [Complete Tutorial](https://docs.servflow.io/getting-started/building-db-agent)**
-
----
-
 ### 🔴 [User Registration](./getting-started/user-registration/)
 **Complete user signup and authentication system**
 - **What it does**: User registration with validation, password hashing, JWT tokens
@@ -197,7 +178,6 @@ curl http://localhost:8080/your-endpoint
 
 ### Integration Patterns
 - **Database Connections** - MongoDB, PostgreSQL, MySQL
-- **AI Services** - OpenAI, Claude, language models
 - **External APIs** - HTTP requests and response processing
 - **Authentication** - JWT tokens, user management
 
@@ -215,7 +195,6 @@ curl http://localhost:8080/your-endpoint
 ```bash
 # Check if secrets are set
 echo $MONGODB_STRING
-echo $OPENAI_API_KEY
 
 # Set missing variables
 export MONGODB_STRING="your-connection-string"

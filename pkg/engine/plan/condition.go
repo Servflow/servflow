@@ -38,31 +38,102 @@ const (
 	TemplateAnd    = "and"
 )
 
-type ConditionStep struct {
+// Condition is a conditional compiled down to the one expression it
+// evaluates, together with the identity it reports while doing so.
+//
+// It carries no routing. Which step follows a verdict is the plan's business,
+// so a host that gates something other than a step on a conditional — an
+// agent's tools, say — compiles one of these and evaluates it directly,
+// rather than reimplementing the type inference, the template rules and the
+// span that go with a conditional.
+type Condition struct {
 	id         string
 	name       string
-	OnValid    *stepWrapper
-	OnInvalid  *stepWrapper
 	exprString string
 }
 
-func (c *ConditionStep) ID() string {
-	return c.id
-}
-
-func (c *ConditionStep) DisplayName() string {
-	if c.name != "" {
-		return c.name
+// NewCondition compiles a conditional into the expression it evaluates.
+//
+// The type is inferred when the conditional does not state one: a conditional
+// carrying a structure is structured, anything else is a template. OnTrue and
+// OnFalse are ignored — a compiled condition answers true or false and routes
+// nothing.
+//
+// id names the condition in its span and in the errors returned here. The
+// display name falls back to it, so a condition always has something to call
+// itself.
+func NewCondition(id string, condition apiconfig.Conditional) (*Condition, error) {
+	if condition.Type == "" {
+		if len(condition.Structure) > 0 {
+			condition.Type = ConditionalTypeStructured
+		} else {
+			condition.Type = ConditionalTypeTemplate
+		}
 	}
+
+	var (
+		exprString string
+		err        error
+	)
+	switch condition.Type {
+	case ConditionalTypeStructured:
+		if len(condition.Structure) == 0 {
+			return nil, fmt.Errorf("structured condition %s has empty structure", id)
+		}
+		exprString, err = ConvertStructureToTemplate(condition.Structure)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert structure to template for condition %s: %w", id, err)
+		}
+	case ConditionalTypeTemplate:
+		if condition.Expression == "" {
+			return nil, fmt.Errorf("template condition %s has empty expression", id)
+		}
+		exprString = condition.Expression
+	default:
+		return nil, fmt.Errorf("unsupported condition type: %s", condition.Type)
+	}
+
+	name := condition.Name
+	if name == "" {
+		name = id
+	}
+
+	return &Condition{
+		id:         id,
+		name:       name,
+		exprString: exprString,
+	}, nil
+}
+
+func (c *Condition) ID() string {
 	return c.id
 }
 
-// Execute will execute the conditions and generate error messages for conditions that use
-// request variables
-func (c *ConditionStep) execute(ctx context.Context) (*stepWrapper, error) {
+// Name is what the condition calls itself in a span or a message. It falls
+// back to the id, so it is never empty.
+func (c *Condition) Name() string {
+	return c.name
+}
+
+// Expression is the template the condition evaluates, whether it was written
+// as one or converted from a structure. A host that wants to judge the
+// template itself — parsing it at config-write time, say — reads it here
+// rather than reproducing the conversion.
+func (c *Condition) Expression() string {
+	return c.exprString
+}
+
+// Evaluate resolves the condition against the request context on ctx and
+// reports whether it rendered true.
+//
+// It opens the condition span itself, so a condition reads the same in a
+// trace wherever it is evaluated from. Validation errors raised by the
+// template functions (email, empty) are recorded on the request and do not
+// fail the evaluation, which is what lets a condition double as a validator.
+func (c *Condition) Evaluate(ctx context.Context) (bool, error) {
 	// set up tracer
 	var span trace.Span
-	ctx, span = tracing.StartCondition(ctx, c.id, c.DisplayName())
+	ctx, span = tracing.StartCondition(ctx, c.id, c.name)
 	defer span.End()
 
 	span.SetAttributes(attribute.String("sf.config", c.exprString))
@@ -74,19 +145,19 @@ func (c *ConditionStep) execute(ctx context.Context) (*stepWrapper, error) {
 	ctx = logging.WithLogger(ctx, logger)
 	if c.exprString == "" {
 		span.SetAttributes(attribute.Bool("sf.result", true))
-		return c.OnValid, nil
+		return true, nil
 	}
 
 	reqCtx, ok := requestctx.FromContext(ctx)
 	if !ok {
-		return nil, errors.New("invalid request context")
+		return false, errors.New("invalid request context")
 	}
 
 	tmpl, err := requestctx.CreateTextTemplate(ctx, c.exprString, nil)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
-		return nil, fmt.Errorf("error creating template for condition %w template: %s", err, c.exprString)
+		return false, fmt.Errorf("error creating template for condition %w template: %s", err, c.exprString)
 	}
 
 	resp, err := requestctx.ExecuteTemplateFromContext(ctx, tmpl)
@@ -95,21 +166,39 @@ func (c *ConditionStep) execute(ctx context.Context) (*stepWrapper, error) {
 			zap.String("condition", c.name), zap.String("expression", c.exprString), zap.Error(err))
 		logger.Debug("error executing template", zap.String("expression", c.exprString), zap.Any("resp", reqCtx.Variables()))
 		span.RecordError(err)
-		return nil, err
+		return false, err
 	}
 	// add validation errors they should not cause any failures
 	err = requestctx.AddValidationErrors(ctx)
 	if err != nil {
 		logger.Error("error adding validation error", zap.Error(err))
-		return nil, err
+		return false, err
 	}
 
 	logger.Debug("condition evaluated to "+resp, zap.String("condition", c.exprString))
-	if strings.TrimSpace(resp) == "true" {
-		span.SetAttributes(attribute.Bool("sf.result", true))
+	result := strings.TrimSpace(resp) == "true"
+	span.SetAttributes(attribute.Bool("sf.result", result))
+	return result, nil
+}
+
+// ConditionStep is a compiled condition placed in a plan: it evaluates, then
+// hands back the step the verdict selects.
+type ConditionStep struct {
+	*Condition
+	OnValid   *stepWrapper
+	OnInvalid *stepWrapper
+}
+
+// Execute will execute the conditions and generate error messages for conditions that use
+// request variables
+func (c *ConditionStep) execute(ctx context.Context) (*stepWrapper, error) {
+	valid, err := c.Evaluate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if valid {
 		return c.OnValid, nil
 	}
-	span.SetAttributes(attribute.Bool("sf.result", false))
 	return c.OnInvalid, nil
 }
 

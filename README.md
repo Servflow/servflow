@@ -29,7 +29,6 @@ ServFlow Engine is part of the ServFlow platform. Use it standalone (free foreve
 
 - **⚡ Zero Backend Code**: Build complete APIs using only YAML configurations
 - **🔗 Universal Integrations**: Connect to any database, AI service, or external API
-- **🧠 AI-Powered**: Built-in support for OpenAI, Claude, and other AI services
 - **📈 Infinitely Scalable**: Designed for high-performance and horizontal scaling
 - **⚙️ Configuration-Driven**: Version control your entire API logic
 
@@ -104,7 +103,6 @@ Ready-to-run examples you can download and use immediately:
 | 🎯 **Example** | 📋 **What it does** | ⏱️ **Setup Time** | 🔗 **Tutorial** |
 |---|---|---|---|
 | [**hello-world**](./examples/hello-world/) | Simple API response | 30 seconds | [Your First API](https://docs.servflow.io/getting-started/your-first-api) |
-| [**db-agent**](./examples/db-agent/) | AI-powered database queries | 2 minutes | [Database Agent](https://docs.servflow.io/getting-started/building-db-agent) |
 | [**user-registration**](./examples/user-registration/) | User signup with validation | 3 minutes | [User Registration](https://docs.servflow.io/getting-started/user-registration-api) |
 
 ### 🏃‍♂️ Using Examples
@@ -114,8 +112,8 @@ Ready-to-run examples you can download and use immediately:
 git clone https://github.com/servflow/servflow.git
 cd servflow/examples
 
-# 2. Choose an example (e.g., db-agent)
-cd db-agent
+# 2. Choose an example (e.g., hello-world)
+cd hello-world
 
 # 3. Follow the quick setup in each README
 # 4. Visit the docs for complete explanations
@@ -136,7 +134,7 @@ Each example includes:
 ServFlow Engine uses two types of configuration files:
 
 ### 1. **Integrations** (`integrations.yaml`)
-Define connections to databases, AI services, and external APIs:
+Define connections to databases and external APIs:
 
 ```yaml
 integrations:
@@ -145,10 +143,6 @@ integrations:
     config:
       connectionString: '{{ secret "MONGODB_STRING" }}'
       dbName: myapp
-  openai:
-    type: openai
-    config:
-      api_key: '{{ secret "OPENAI_API_KEY" }}'
 ```
 
 ### 2. **API Endpoints** (`configs/*.yaml`)
@@ -178,7 +172,6 @@ http:
 - [**Example Walkthrough**](https://docs.servflow.io/getting-started/example-walkthrough) - How to use this repository's examples
 
 ### 🧠 Learn by Building
-- [**Database Agent Tutorial**](https://docs.servflow.io/getting-started/building-db-agent) - Build AI-powered endpoints
 - [**User Registration Tutorial**](https://docs.servflow.io/getting-started/user-registration-api) - Create secure user APIs
 - [**Advanced Patterns**](https://docs.servflow.io/guides/) - Production-ready configurations
 
@@ -229,7 +222,6 @@ touch integrations.yaml
 
 # Set environment variables for secrets
 export MONGODB_STRING="mongodb://localhost:27017/mydb"
-export OPENAI_API_KEY="sk-your-api-key-here"
 
 # Start ServFlow Engine
 servflow-engine start --integrations integrations.yaml configs/

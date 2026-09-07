@@ -298,44 +298,15 @@ func (p *PlannerV2) generateConditionalStep(id string) (*ConditionStep, error) {
 		return nil, err
 	}
 
-	if condition.Type == "" {
-		if len(condition.Structure) > 0 {
-			condition.Type = ConditionalTypeStructured
-		} else {
-			condition.Type = ConditionalTypeTemplate
-		}
-	}
-
-	var exprString string
-	switch condition.Type {
-	case ConditionalTypeStructured:
-		if len(condition.Structure) == 0 {
-			return nil, fmt.Errorf("structured condition %s has empty structure", id)
-		}
-		exprString, err = ConvertStructureToTemplate(condition.Structure)
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert structure to template for condition %s: %w", id, err)
-		}
-	case ConditionalTypeTemplate, "":
-		if condition.Expression == "" {
-			return nil, fmt.Errorf("template condition %s has empty expression", id)
-		}
-		exprString = condition.Expression
-	default:
-		return nil, fmt.Errorf("unsupported condition type: %s", condition.Type)
-	}
-
-	name := condition.Name
-	if name == "" {
-		name = id
+	compiled, err := NewCondition(id, condition)
+	if err != nil {
+		return nil, err
 	}
 
 	return &ConditionStep{
-		id:         id,
-		name:       name,
-		OnValid:    validStep,
-		OnInvalid:  invalidStep,
-		exprString: exprString,
+		Condition: compiled,
+		OnValid:   validStep,
+		OnInvalid: invalidStep,
 	}, nil
 }
 

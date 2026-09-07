@@ -20,9 +20,11 @@ func TestConditionStep_Execute(t *testing.T) {
 
 	t.Run("fail", func(t *testing.T) {
 		condition := ConditionStep{
-			OnValid:    &stepWrapper{id: "valid", step: validStep},
-			OnInvalid:  &stepWrapper{id: "invalid", step: invalidStep},
-			exprString: `{{ email .test "email" }}`,
+			Condition: &Condition{
+				exprString: `{{ email .test "email" }}`,
+			},
+			OnValid:   &stepWrapper{id: "valid", step: validStep},
+			OnInvalid: &stepWrapper{id: "invalid", step: invalidStep},
 		}
 
 		ctx := requestctx2.NewTestContext()
@@ -33,9 +35,11 @@ func TestConditionStep_Execute(t *testing.T) {
 	})
 	t.Run("on empty condition", func(t *testing.T) {
 		condition := ConditionStep{
-			OnValid:    &stepWrapper{id: "valid", step: validStep},
-			OnInvalid:  &stepWrapper{id: "invalid", step: invalidStep},
-			exprString: "",
+			Condition: &Condition{
+				exprString: "",
+			},
+			OnValid:   &stepWrapper{id: "valid", step: validStep},
+			OnInvalid: &stepWrapper{id: "invalid", step: invalidStep},
 		}
 
 		ctx := requestctx2.NewTestContext()
@@ -45,9 +49,11 @@ func TestConditionStep_Execute(t *testing.T) {
 	})
 	t.Run("on empty template", func(t *testing.T) {
 		condition := ConditionStep{
-			OnValid:    &stepWrapper{id: "valid", step: validStep},
-			OnInvalid:  &stepWrapper{id: "invalid", step: invalidStep},
-			exprString: "{{ }}",
+			Condition: &Condition{
+				exprString: "{{ }}",
+			},
+			OnValid:   &stepWrapper{id: "valid", step: validStep},
+			OnInvalid: &stepWrapper{id: "invalid", step: invalidStep},
 		}
 
 		ctx := requestctx2.NewTestContext()
@@ -56,9 +62,11 @@ func TestConditionStep_Execute(t *testing.T) {
 	})
 	t.Run("pass", func(t *testing.T) {
 		condition := ConditionStep{
-			OnValid:    &stepWrapper{id: "valid", step: validStep},
-			OnInvalid:  &stepWrapper{id: "invalid", step: invalidStep},
-			exprString: `{{ email .test "email"}}`,
+			Condition: &Condition{
+				exprString: `{{ email .test "email"}}`,
+			},
+			OnValid:   &stepWrapper{id: "valid", step: validStep},
+			OnInvalid: &stepWrapper{id: "invalid", step: invalidStep},
 		}
 
 		ctx := requestctx2.NewTestContext()
@@ -69,9 +77,11 @@ func TestConditionStep_Execute(t *testing.T) {
 	})
 	t.Run("fail with error", func(t *testing.T) {
 		condition := ConditionStep{
-			OnValid:    &stepWrapper{id: "valid", step: validStep},
-			OnInvalid:  &stepWrapper{id: "invalid", step: invalidStep},
-			exprString: `{{ email .test "email"}}`,
+			Condition: &Condition{
+				exprString: `{{ email .test "email"}}`,
+			},
+			OnValid:   &stepWrapper{id: "valid", step: validStep},
+			OnInvalid: &stepWrapper{id: "invalid", step: invalidStep},
 		}
 
 		ctx := requestctx2.NewTestContext()
@@ -183,17 +193,23 @@ func TestConditionTemplateFunctions(t *testing.T) {
 			require.NoError(t, err)
 
 			validNext := ConditionStep{
-				id: "valid",
+				Condition: &Condition{
+					id: "valid",
+				},
 			}
 			invalidNext := ConditionStep{
-				id: "invalid",
+				Condition: &Condition{
+					id: "invalid",
+				},
 			}
 
 			cond := ConditionStep{
-				id:         "test",
-				exprString: testCase.template,
-				OnValid:    &stepWrapper{id: "valid", step: &validNext},
-				OnInvalid:  &stepWrapper{id: "invalid", step: &invalidNext},
+				Condition: &Condition{
+					id:         "test",
+					exprString: testCase.template,
+				},
+				OnValid:   &stepWrapper{id: "valid", step: &validNext},
+				OnInvalid: &stepWrapper{id: "invalid", step: &invalidNext},
 			}
 
 			next, err := cond.execute(ctx)

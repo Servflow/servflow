@@ -35,3 +35,13 @@ docker-build:
 
 docker-push:
 	docker push $(DOCKER_IMAGE)
+
+hooks:
+	git config core.hooksPath .githooks
+	@echo "==> commit-msg and pre-push hooks active"
+
+lint-commits:
+	@sh scripts/commit-msg_test.sh
+	@sh scripts/commit-msg.sh --range $${RANGE:-origin/main..HEAD}
+
+.PHONY: hooks lint-commits

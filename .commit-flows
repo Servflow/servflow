@@ -1,0 +1,16 @@
+# Allowed values for the Flow trailer. Keep in sync with the flow registry in
+# the commit convention guide; edit both in the same change:
+# https://git.servflow.io/servflow/servflowai/src/branch/main/docs/commit-convention.md
+sign-in
+set-up-instance
+build-agent
+build-workflow
+run-agent
+chat-with-agent
+install-template
+connect-integration
+manage-providers
+manage-secrets
+inspect-trace
+operate-from-cli
+upgrade-plan

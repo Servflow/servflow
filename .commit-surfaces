@@ -1,0 +1,15 @@
+# Allowed commit scopes for this repo. Keep in sync with the surface registry
+# in the commit convention guide; edit both in the same change:
+# https://git.servflow.io/servflow/servflowai/src/branch/main/docs/commit-convention.md
+plan
+actions
+entries
+integrations
+requestctx
+responses
+secrets
+server
+config
+tracing
+shared
+infra

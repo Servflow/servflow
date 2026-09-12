@@ -76,7 +76,7 @@ type Inference struct {
 // duration clock. provider is the semconv gen_ai.provider.name value
 // ("anthropic", "openai"); model is the requested model id.
 func StartInference(ctx context.Context, provider, model string) (context.Context, *Inference) {
-	ctx, span := start(ctx, "chat", provider+" "+model,
+	ctx, span := createSpan(ctx, "chat", provider+" "+model,
 		attribute.String(AttrGenAIOperation, opChat),
 		attribute.String(AttrGenAIProvider, provider),
 		attribute.String(AttrGenAIRequestModel, model),

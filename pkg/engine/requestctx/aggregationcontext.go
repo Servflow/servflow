@@ -38,8 +38,8 @@ type RequestContext struct {
 	// Own mutex; never nil (see NewRequestContext).
 	secrets *secretTable
 
-	// spanAttrs are the request-wide attributes stamped on this request's root
-	// span by pkg/tracing. Set once in Start before the ctx is shared;
+	// spanAttrs are the request-wide attributes stamped on every span of this
+	// request by pkg/tracing. Set once in Start before the ctx is shared;
 	// read-only afterwards.
 	spanAttrs []attribute.KeyValue
 	// lc is the request completion latch (see lifecycle.go).

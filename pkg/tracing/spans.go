@@ -73,7 +73,7 @@ const (
 	AttrAgentTurnTools     = "sf.agent.turn_tools"     // tool names the model asked for on this turn
 	AttrAgentToolsWithheld = "sf.agent.tools_withheld" // tools were withheld to force a final answer
 
-	AttrRequestID = requestctx.AttrRequestID // stamped on the root span via the rc
+	AttrRequestID = requestctx.AttrRequestID // stamped on every span via the rc
 )
 
 // createSpan creates a span with a low-cardinality name and always attaches the
@@ -87,22 +87,46 @@ func createSpan(ctx context.Context, spanName, display string, attrs ...attribut
 		// Re-store the wrapped span so trace.SpanFromContext(ctx) callers also
 		// get the scrubbing wrapper, not the raw span.
 		ctx = trace.ContextWithSpan(ctx, span)
+		// The request's attributes go on every span it creates, not on the root
+		// alone: the trace backend matches per span, so identity carried only by
+		// the root cannot narrow a search for one agent's model calls.
+		attrs = append(attrs, rc.SpanAttributes()...)
 	}
 	span.SetAttributes(append(attrs, attribute.String(AttrName, display))...)
 	return ctx, span
 }
 
-// bindRoot hands a root entry span to the request lifecycle: the
+// bindRootLifecycle hands a root entry span to the request lifecycle: the
 // RequestContext defers its End until the main flow AND all child flows
-// complete, and stamps the request token totals right before ending. It also
-// stamps the request-wide attributes (sf.request_id, host attrs like sf.agent)
-// on the root span only — child spans do not carry them. Without an rc in ctx
-// (tests, tracing-disabled callers) the caller keeps manual End responsibility.
-func bindRoot(ctx context.Context, span trace.Span) {
+// complete, and stamps the request token totals right before ending. Without
+// an rc in ctx (tests, tracing-disabled callers) the caller keeps manual End
+// responsibility.
+//
+// It decorates nothing. The request's attributes reach this span through
+// createSpan, the same way they reach every other span of the request.
+func bindRootLifecycle(ctx context.Context, span trace.Span) {
 	if rc, ok := requestctx.FromContext(ctx); ok {
-		span.SetAttributes(rc.SpanAttributes()...)
 		rc.BindRootSpan(span, func(s trace.Span) { stampRequestTokens(rc, s) })
 	}
+}
+
+// Span names for the two agent-shaped spans. spanAgentCall is a whole run of
+// an agent's workflow and the stem every entry-qualified variant is built
+// from; spanAgentCallNode is one agent node inside such a run.
+const (
+	spanAgentCall     = "Agent Call"
+	spanAgentCallNode = "AgentCall"
+)
+
+// entrySpanName qualifies the agent-call span with the entry that started the
+// run, so a trace distinguishes a webhook delivery from a sub-workflow call
+// without opening the span. The entry set is fixed by the host, so this stays
+// low-cardinality.
+func entrySpanName(entry string) string {
+	if entry == "" {
+		return spanAgentCall
+	}
+	return spanAgentCall + ": " + entry
 }
 
 // rootDisplay picks the friendly label for a workflow root span: the
@@ -121,7 +145,7 @@ func StartHTTPEntry(ctx context.Context, name, id string) (context.Context, trac
 	ctx, span := createSpan(ctx, "HTTP Entry", rootDisplay(name, id),
 		attribute.String(AttrStepType, "request"),
 		attribute.String(AttrWorkflow, id))
-	bindRoot(ctx, span)
+	bindRootLifecycle(ctx, span)
 	return ctx, span
 }
 
@@ -170,11 +194,15 @@ func StartResponse(ctx context.Context, id, name string) (context.Context, trace
 
 // StartWorkflowExecute spans a workflow invoked through a trigger (e.g. callworkflow).
 // name is the workflow's friendly display name and id its stable config id.
-func StartWorkflowExecute(ctx context.Context, name, id string) (context.Context, trace.Span) {
-	ctx, span := createSpan(ctx, "Workflow Execute", rootDisplay(name, id),
+//
+// entry names the door the run came through, which the host decides and the
+// engine cannot know, so the span says which kind of call this was rather than
+// naming the machinery that ran it. An empty entry leaves the bare span name.
+func StartWorkflowExecute(ctx context.Context, name, id, entry string) (context.Context, trace.Span) {
+	ctx, span := createSpan(ctx, entrySpanName(entry), rootDisplay(name, id),
 		attribute.String(AttrStepType, "trigger"),
 		attribute.String(AttrWorkflow, id))
-	bindRoot(ctx, span)
+	bindRootLifecycle(ctx, span)
 	return ctx, span
 }
 
@@ -184,7 +212,7 @@ func StartScheduledExecution(ctx context.Context, name, id string) (context.Cont
 	ctx, span := createSpan(ctx, "Scheduled Execution", rootDisplay(name, id),
 		attribute.String(AttrStepType, "scheduled"),
 		attribute.String(AttrWorkflow, id))
-	bindRoot(ctx, span)
+	bindRootLifecycle(ctx, span)
 	return ctx, span
 }
 
@@ -194,22 +222,26 @@ func StartDashboardRun(ctx context.Context, name, id string) (context.Context, t
 	ctx, span := createSpan(ctx, "Dashboard Run", rootDisplay(name, id),
 		attribute.String(AttrStepType, "request"),
 		attribute.String(AttrWorkflow, id))
-	bindRoot(ctx, span)
+	bindRootLifecycle(ctx, span)
 	return ctx, span
 }
 
 // StartAgentInvoke spans a whole agent-action run (the GenAI invoke_agent
-// operation). Its child chat spans are created at the integration boundary.
+// operation). Its child model-call spans are created at the provider boundary.
+//
+// The span is named for what it is rather than for the GenAI operation it
+// reports. gen_ai.operation.name still carries invoke_agent, so a backend that
+// reads the conventions classifies it the same as before.
 func StartAgentInvoke(ctx context.Context, name string) (context.Context, trace.Span) {
 	display := name
 	if display == "" {
-		display = opInvokeAgent
+		display = spanAgentCallNode
 	}
 	attrs := []attribute.KeyValue{attribute.String(AttrGenAIOperation, opInvokeAgent)}
 	if name != "" {
 		attrs = append(attrs, attribute.String(AttrGenAIAgentName, name))
 	}
-	return createSpan(ctx, "invoke_agent", display, attrs...)
+	return createSpan(ctx, spanAgentCallNode, display, attrs...)
 }
 
 // StartAgentTurn spans one iteration of the agent's tool-calling loop: a single
@@ -230,14 +262,27 @@ func StartAgentTurn(ctx context.Context, turn int) (context.Context, trace.Span)
 
 // StartMCPTool spans the invocation of an MCP tool. Carries both the sf.* tool
 // keys and the GenAI execute_tool attributes.
+//
+// The span is a child, which is what an MCP tool called from inside an agent
+// run is. A host whose whole request IS the tool call wants StartMCPEntry: the
+// lifecycle holds one root span per request, so binding this one would replace
+// the entry span and leave it unended, and therefore unexported.
 func StartMCPTool(ctx context.Context, name string) (context.Context, trace.Span) {
-	ctx, span := createSpan(ctx, "MCP Tool", name,
+	return createSpan(ctx, "MCP Tool", name,
 		attribute.String(AttrToolName, name),
 		attribute.String(AttrToolType, "mcp"),
 		attribute.String(AttrGenAIOperation, opExecuteTool),
 		attribute.String(AttrGenAIToolName, name),
 		attribute.String(AttrGenAIToolType, "mcp"))
-	bindRoot(ctx, span)
+}
+
+// StartMCPEntry spans an MCP tool call that is itself the request, as it is for
+// a server whose callers speak MCP and nothing else. The span is the run's
+// root, so the request lifecycle owns its End and stamps the token totals on
+// it.
+func StartMCPEntry(ctx context.Context, name string) (context.Context, trace.Span) {
+	ctx, span := StartMCPTool(ctx, name)
+	bindRootLifecycle(ctx, span)
 	return ctx, span
 }
 

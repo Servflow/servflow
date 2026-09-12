@@ -79,12 +79,12 @@ func (e *Engine) createMCPHandler(config *apiconfig.APIConfig) error {
 			},
 			TemplateFuncsExclusive: true,
 		})
-		// The lifecycle owns the MCP root span (bound in StartMCPTool): Done
+		// The lifecycle owns the MCP root span (bound in StartMCPEntry): Done
 		// ends it once any dispatched chains drain.
 		defer reqCtx.Done()
 		logger := logging.FromContext(ctx)
 
-		ctx, _ = tracing.StartMCPTool(ctx, config.McpTool.Name) // lifecycle-owned; no manual End
+		ctx, _ = tracing.StartMCPEntry(ctx, config.McpTool.Name) // lifecycle-owned; no manual End
 
 		if _, err := p.Execute(ctx, config.McpTool.Start); err != nil {
 			logger.Error("error executing planner", zap.Error(err))

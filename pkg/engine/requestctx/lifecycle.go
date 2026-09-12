@@ -15,7 +15,7 @@ import (
 // Span attribute keys owned by the request layer. pkg/tracing aliases them
 // (it imports this package; the reverse would cycle).
 const (
-	// AttrRequestID is stamped on the request's root span via SpanAttributes.
+	// AttrRequestID is stamped on every span of the request via SpanAttributes.
 	AttrRequestID = "sf.request_id"
 )
 

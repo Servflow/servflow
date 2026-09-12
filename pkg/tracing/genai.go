@@ -72,11 +72,15 @@ type Inference struct {
 	start    time.Time
 }
 
-// StartInference opens a GenAI "chat" span around one model call and starts the
+// StartInference opens an "LLM Call" span around one model call and starts the
 // duration clock. provider is the semconv gen_ai.provider.name value
 // ("anthropic", "openai"); model is the requested model id.
+//
+// The span is named for what it is rather than for the GenAI operation it
+// reports. gen_ai.operation.name still carries chat, so a backend that reads
+// the conventions classifies it the same as before.
 func StartInference(ctx context.Context, provider, model string) (context.Context, *Inference) {
-	ctx, span := start(ctx, "chat", provider+" "+model,
+	ctx, span := createSpan(ctx, "LLM Call", provider+" "+model,
 		attribute.String(AttrGenAIOperation, opChat),
 		attribute.String(AttrGenAIProvider, provider),
 		attribute.String(AttrGenAIRequestModel, model),

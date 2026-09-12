@@ -30,7 +30,7 @@ func endedByName(t *testing.T, spans []sdktrace.ReadOnlySpan, name string) sdktr
 // TestLifecycleBinding_RootEndsAfterFlow proves the rc lifecycle owns the root
 // span end: a root bound via StartHTTPEntry stays un-ended after Done while a
 // child flow is open, then ends exactly once when the flow drains — covering
-// request-wide attr stamping on the root only (not children), token totals
+// request-wide attr stamping on every span of the request, token totals
 // stamped at end including late tokens, and root ⊇ child in time.
 func TestLifecycleBinding_RootEndsAfterFlow(t *testing.T) {
 	sr := tracetest.NewSpanRecorder()
@@ -69,13 +69,17 @@ func TestLifecycleBinding_RootEndsAfterFlow(t *testing.T) {
 	child := endedByName(t, ended, "Action")
 
 	rootAttrs := attrMap(root.Attributes())
-	// Request id + host attr live on the ROOT span only.
 	assert.Equal(t, "req-123", rootAttrs[requestctx.AttrRequestID])
 	assert.Equal(t, "AcctBot", rootAttrs["sf.agent"])
-	// Child spans do NOT carry the request-wide attributes.
+	// Child spans carry them too: the backend matches per span, so identity
+	// the root alone held could not narrow a search for one agent's spans.
 	childAttrs := attrMap(child.Attributes())
-	assert.NotContains(t, childAttrs, requestctx.AttrRequestID)
-	assert.NotContains(t, childAttrs, "sf.agent")
+	assert.Equal(t, "req-123", childAttrs[requestctx.AttrRequestID])
+	assert.Equal(t, "AcctBot", childAttrs["sf.agent"])
+
+	// The token totals stay on the root: they are a request aggregate, and the
+	// lifecycle stamps them once, on the span it owns.
+	assert.NotContains(t, childAttrs, AttrUsageTotal)
 
 	// Late tokens landed on the root (stamped by the beforeEnd hook).
 	assert.Equal(t, int64(150), rootAttrs[AttrUsageTotal])

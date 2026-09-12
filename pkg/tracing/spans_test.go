@@ -70,7 +70,7 @@ func TestWorkflowRootSpans(t *testing.T) {
 			return StartHTTPEntry(ctx, "My Workflow", "my-workflow")
 		}},
 		{"trigger", func(ctx context.Context) (context.Context, trace.Span) {
-			return StartWorkflowExecute(ctx, "My Workflow", "my-workflow")
+			return StartWorkflowExecute(ctx, "My Workflow", "my-workflow", "trigger")
 		}},
 		{"scheduled", func(ctx context.Context) (context.Context, trace.Span) {
 			return StartScheduledExecution(ctx, "My Workflow", "my-workflow")
@@ -165,5 +165,69 @@ func TestSpansScrubTrackedSecrets(t *testing.T) {
 				t.Errorf("recorded error not scrubbed: %q", a.Value.AsString())
 			}
 		}
+	}
+}
+
+// TestAgentNodeSpanAttributes covers the two things the agent-node constructor
+// decides: the GenAI operation it reports, which a backend reads to classify
+// the span, and the label an agent with no name of its own falls back to.
+func TestAgentNodeSpanAttributes(t *testing.T) {
+	cases := []struct {
+		name        string
+		agent       string
+		wantDisplay string
+	}{
+		{"named agent labels the span", "Responder", "Responder"},
+		{"unnamed agent falls back to the span name", "", "AgentCall"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			sr := tracetest.NewSpanRecorder()
+			otel.SetTracerProvider(sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(sr)))
+			tracer = otel.Tracer("servflow-test")
+
+			_, span := StartAgentInvoke(context.Background(), tc.agent)
+			span.End()
+
+			attrs := attrMap(sr.Ended()[0].Attributes())
+			if got := attrs[AttrGenAIOperation]; got != opInvokeAgent {
+				t.Errorf("%s = %v, want %q", AttrGenAIOperation, got, opInvokeAgent)
+			}
+			if got := attrs[AttrName]; got != tc.wantDisplay {
+				t.Errorf("%s = %v, want %q", AttrName, got, tc.wantDisplay)
+			}
+		})
+	}
+}
+
+// TestRequestTotalsLandOnTheEntrySpan holds the rule that one request has one
+// root span: the entry span is the span the lifecycle ends and stamps the token
+// totals on, however many tool calls run underneath it. A tool constructor that
+// binds itself breaks this by replacing the entry span, which then never ends
+// and never exports.
+func TestRequestTotalsLandOnTheEntrySpan(t *testing.T) {
+	sr := tracetest.NewSpanRecorder()
+	otel.SetTracerProvider(sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(sr)))
+	tracer = otel.Tracer("servflow-test")
+
+	ctx, rc := requestctx.Start(context.Background(), requestctx.Options{ID: "req-mcp"})
+	ctx, _ = StartHTTPEntry(ctx, "My Workflow", "wf-id")
+
+	// A tool call one level down, ended by its own caller.
+	_, toolSpan := StartMCPTool(ctx, "search")
+	rc.AddTokenUsage(10, 5)
+	toolSpan.End()
+
+	// The response is written; the lifecycle ends the span it owns.
+	rc.Done()
+
+	root := endedByName(t, sr.Ended(), "HTTP Entry")
+	if got := attrMap(root.Attributes())[AttrUsageTotal]; got != int64(15) {
+		t.Errorf("%s = %v, want 15 on the entry span", AttrUsageTotal, got)
+	}
+
+	tool := endedByName(t, sr.Ended(), "MCP Tool")
+	if _, ok := attrMap(tool.Attributes())[AttrUsageTotal]; ok {
+		t.Errorf("%s must not land on a tool span", AttrUsageTotal)
 	}
 }

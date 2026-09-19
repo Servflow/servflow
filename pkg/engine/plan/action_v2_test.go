@@ -12,8 +12,7 @@ import (
 // TestActionV2_OutputPublishing covers the request-variable contract: an action
 // that returns a value publishes it under its id, and an action that returns nil
 // publishes nothing at all. The nil case is what lets an action route its result
-// elsewhere — the agent action contributes to the request conversation instead of
-// handing a value to later steps.
+// elsewhere instead of handing a value to later steps.
 func TestActionV2_OutputPublishing(t *testing.T) {
 	t.Run("nil output writes no variable", func(t *testing.T) {
 		ctrl := gomock.NewController(t)

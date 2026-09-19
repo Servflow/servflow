@@ -57,16 +57,8 @@ type Options struct {
 	// Parent links a sub-workflow to its caller: secrets are shared, the
 	// parent's workspace is inherited, the request id is derived from the
 	// parent's, and this request registers as a child flow of the parent, so the
-	// parent's total time transitively covers this request's entire lifetime. A
-	// child with no explicit ConversationID gets its own thread, named under its
-	// parent's — threads are never shared between requests.
+	// parent's total time transitively covers this request's entire lifetime.
 	Parent *RequestContext
-	// ConversationID selects the request's conversation thread. When set, the
-	// thread is resumed from the log store (empty if new) so a later request with
-	// the same id continues it. When empty, a fresh thread with a generated id is
-	// created. Either way, what agents append is written through to the log store
-	// in the background.
-	ConversationID string
 }
 
 // Start opens a request and its main flow. The caller MUST call Done() when
@@ -101,7 +93,6 @@ func Start(ctx context.Context, opts Options) (context.Context, *RequestContext)
 			rc.SetWorkspace(ws)
 		}
 	}
-	rc.setConversation(resolveConversation(opts))
 	ctx = WithAggregationContext(ctx, rc)
 	if opts.Logger != nil {
 		l := WrapWithScrubber(opts.Logger.With(zap.String("request_id", id)), rc)

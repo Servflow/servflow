@@ -35,7 +35,7 @@ func RunServer(cfg *config.Config) error {
 	if err != nil {
 		return err
 	}
-	// Conversations are written by a background writer, whose failures happen
+	// Log entries are written by a background writer, whose failures happen
 	// after the appending request has moved on. Without a logger they are lost.
 	storage.SetLogger(logging.GetNewLogger())
 

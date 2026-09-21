@@ -12,11 +12,17 @@ import (
 	"go.uber.org/zap"
 )
 
-// Span attribute keys owned by the request layer. pkg/tracing aliases them
+// Constants the request layer owns. pkg/tracing aliases the attribute keys
 // (it imports this package; the reverse would cycle).
 const (
 	// AttrRequestID is stamped on every span of the request via SpanAttributes.
 	AttrRequestID = "sf.request_id"
+
+	// IDSeparator joins a child request's id to its caller's (see Start). It is
+	// safe in a filesystem path, a container name and a URL segment, and it
+	// appears in no id the engine generates, so splitting on it recovers the
+	// exact lineage.
+	IDSeparator = "."
 )
 
 // flowDrainTimeout caps how long completion waits for child flows after
@@ -56,8 +62,9 @@ type Options struct {
 	TemplateFuncsExclusive bool
 	// Parent links a sub-workflow to its caller: secrets are shared, the
 	// parent's workspace is inherited, the request id is derived from the
-	// parent's, and this request registers as a child flow of the parent, so the
-	// parent's total time transitively covers this request's entire lifetime.
+	// parent's as "<parent>" + IDSeparator + "<child>", and this request
+	// registers as a child flow of the parent, so the parent's total time
+	// transitively covers this request's entire lifetime.
 	Parent *RequestContext
 }
 
@@ -70,9 +77,13 @@ func Start(ctx context.Context, opts Options) (context.Context, *RequestContext)
 		id = fmt.Sprintf("request_%d", time.Now().UnixNano())
 	}
 	if opts.Parent != nil {
-		// A child's id carries its caller's, so a sub-workflow's request and its
-		// thread are both traceable to the run that started them.
-		id = opts.Parent.ID() + "/" + id
+		// A child's id carries its caller's, so a sub-run is traceable to the
+		// run that started it. The separator is "." and not "/": the id is not
+		// only logged and stamped on spans, it also names per-run things a host
+		// creates — a directory, a sandbox container — and "/" is the one
+		// character that makes it unusable for all of them without escaping.
+		// Not ":" either, which is what pkg/storage builds log keys with.
+		id = opts.Parent.ID() + IDSeparator + id
 	}
 	rc := NewRequestContext(id)
 	rc.spanAttrs = append(append([]attribute.KeyValue{}, opts.SpanAttributes...),

@@ -3,6 +3,7 @@ package requestctx
 import (
 	"context"
 	"io"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -193,6 +194,34 @@ func TestLifecycle_ParentWorkspaceInherited(t *testing.T) {
 	// No parent at all: unchanged.
 	_, solo := Start(context.Background(), Options{ID: "solo"})
 	assert.Nil(t, solo.GetWorkspace())
+}
+
+// Case 7c: Parent — a child's id carries its caller's, and stays usable where
+// a host puts it. Hosts name per-run directories and sandbox containers after
+// the id, so the derived form must survive as a single path component and as a
+// container name: no separator that needs escaping, and no collision with the
+// ":" pkg/storage builds log keys with.
+func TestLifecycle_ParentIDLineage(t *testing.T) {
+	_, parent := Start(context.Background(), Options{ID: "trigger_reviewer_1"})
+	_, child := Start(context.Background(), Options{ID: "trigger_fetch_2", Parent: parent})
+	_, grand := Start(context.Background(), Options{ID: "trigger_read_3", Parent: child})
+
+	assert.Equal(t, "trigger_reviewer_1.trigger_fetch_2", child.ID())
+	assert.Equal(t, "trigger_reviewer_1.trigger_fetch_2.trigger_read_3", grand.ID())
+
+	// Splitting on the separator recovers the lineage, which is the whole point
+	// of deriving the id rather than generating a fresh one.
+	assert.Equal(t,
+		[]string{"trigger_reviewer_1", "trigger_fetch_2", "trigger_read_3"},
+		strings.Split(grand.ID(), IDSeparator))
+
+	// The characters a host cannot escape past.
+	for _, bad := range []string{"/", ":", "\\"} {
+		assert.NotContains(t, grand.ID(), bad,
+			"a derived id must stay usable as a path component and a container name")
+	}
+	// Docker's container-name grammar, which is the strictest consumer.
+	assert.Regexp(t, `^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`, grand.ID())
 }
 
 // Case 8: beforeEnd hooks observe the span before End.

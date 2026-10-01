@@ -9,6 +9,7 @@ import (
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/integration"
 	"github.com/Servflow/servflow/pkg/engine/integration/integrations/filters"
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -27,8 +28,10 @@ type fetchImplementation interface {
 }
 
 type Action struct {
-	fetchImplementation fetchImplementation
-	cfg                 Config
+	// integrationID is kept apart from cfg so the integration id never goes
+	// through template resolution with the rest of the config.
+	integrationID string
+	cfg           Config
 }
 
 func New(config Config) (*Action, error) {
@@ -42,20 +45,11 @@ func New(config Config) (*Action, error) {
 		return nil, errors.New("database field required")
 	}
 
-	i, err := integration.GetIntegration(context.Background(), config.Integration)
-	if err != nil {
-		return nil, err
-	}
 	config.Integration = ""
 
-	u, ok := i.(fetchImplementation)
-	if !ok {
-		return nil, errors.New("integration is not a fetch implementation")
-	}
-
 	return &Action{
-		cfg:                 config,
-		fetchImplementation: u,
+		integrationID: integrationRef,
+		cfg:           config,
 	}, nil
 }
 
@@ -69,6 +63,15 @@ func (a *Action) Execute(ctx context.Context, modifiedConfig string) (interface{
 
 	if err := json.Unmarshal([]byte(modifiedConfig), &cfg); err != nil {
 		return nil, nil, err
+	}
+
+	i, err := requestctx.GetIntegration(ctx, a.integrationID)
+	if err != nil {
+		return nil, nil, err
+	}
+	impl, ok := i.(fetchImplementation)
+	if !ok {
+		return nil, nil, errors.New("integration is not a fetch implementation")
 	}
 
 	token, err := jwt.Parse(cfg.Token, func(token *jwt.Token) (interface{}, error) {
@@ -94,7 +97,7 @@ func (a *Action) Execute(ctx context.Context, modifiedConfig string) (interface{
 		return nil, nil, errors.New("token subject is invalid")
 	}
 
-	resp, err := a.fetchImplementation.Fetch(ctx, map[string]string{"collection": cfg.Collection}, filters.Filter{
+	resp, err := impl.Fetch(ctx, map[string]string{"collection": cfg.Collection}, filters.Filter{
 		Field:      cfg.DatabaseField,
 		Operation:  filters.Equals,
 		Comparator: subject,
@@ -116,7 +119,8 @@ func (a *Action) Type() string {
 	return "authenticate"
 }
 
-func init() {
+// Definition describes the authenticate action to a host that offers it.
+func Definition() actions.Definition {
 	fields := map[string]actions.FieldInfo{
 		"integration": {
 			Type:        actions.FieldTypeIntegration,
@@ -157,7 +161,8 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("authenticate", actions.ActionRegistrationInfo{
+	return actions.Definition{
+		Type:        "authenticate",
 		Name:        "Authenticate",
 		Description: "Validates JWT tokens and authenticates users against database records",
 		Fields:      fields,
@@ -165,14 +170,12 @@ func init() {
 			Kind:        actions.OutputValue,
 			Description: "The authenticated subject, taken from the token's sub claim.",
 		},
-		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
+		New: func(config json.RawMessage) (actions.ActionExecutable, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {
 				return nil, fmt.Errorf("error creating authenticate action: %v", err)
 			}
 			return New(cfg)
 		},
-	}); err != nil {
-		panic(err)
 	}
 }

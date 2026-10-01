@@ -208,7 +208,8 @@ func (a *JWT) decodeWithKey(ctx context.Context, tokenString string) (interface{
 	return nil, fmt.Errorf("invalid token")
 }
 
-func init() {
+// Definition describes the jwt action to a host that offers it.
+func Definition() actions.Definition {
 	fields := map[string]actions.FieldInfo{
 		"mode": {
 			Type:        actions.FieldTypeString,
@@ -249,7 +250,8 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("jwt", actions.ActionRegistrationInfo{
+	return actions.Definition{
+		Type:        "jwt",
 		Name:        "JWT Token",
 		Description: "Creates and validates JSON Web Tokens for authentication",
 		Fields:      fields,
@@ -257,14 +259,12 @@ func init() {
 			Kind:        actions.OutputValue,
 			Description: "The signed token when encoding, and the token's sub claim when decoding.",
 		},
-		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
+		New: func(config json.RawMessage) (actions.ActionExecutable, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {
 				return nil, fmt.Errorf("error creating jwt action: %v", err)
 			}
 			return New(cfg), nil
 		},
-	}); err != nil {
-		panic(err)
 	}
 }

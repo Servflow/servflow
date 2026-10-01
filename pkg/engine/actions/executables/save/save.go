@@ -32,7 +32,6 @@ type Config struct {
 
 type Save struct {
 	cfg *Config
-	i   saveIntegration
 }
 
 func (s *Save) Type() string {
@@ -47,20 +46,7 @@ func New(config Config) (*Save, error) {
 		return nil, errors.New("table is required")
 	}
 
-	i, err := integration.GetIntegration(context.Background(), config.Integration)
-	if err != nil {
-		return nil, err
-	}
-
-	si, ok := i.(saveIntegration)
-	if !ok {
-		return nil, errors.New("integration does not support save operations (must implement Store and Update)")
-	}
-
-	return &Save{
-		cfg: &config,
-		i:   si,
-	}, nil
+	return &Save{cfg: &config}, nil
 }
 
 func (s *Save) Execute(ctx context.Context) (interface{}, map[string]string, error) {
@@ -78,18 +64,27 @@ func (s *Save) Execute(ctx context.Context) (interface{}, map[string]string, err
 		return nil, nil, fmt.Errorf("failed to resolve fields: %w", err)
 	}
 
+	i, err := requestctx.GetIntegration(ctx, s.cfg.Integration)
+	if err != nil {
+		return nil, nil, err
+	}
+	impl, ok := i.(saveIntegration)
+	if !ok {
+		return nil, nil, errors.New("integration does not support save operations (must implement Store and Update)")
+	}
+
 	options := map[string]string{"collection": s.cfg.Table}
 
 	// If no filters, this is an INSERT operation
 	if len(s.cfg.Filters) == 0 {
-		return s.executeInsert(ctx, rc, resolvedFields, options)
+		return s.executeInsert(ctx, rc, impl, resolvedFields, options)
 	}
 
 	// With filters, this is an UPDATE operation
-	return s.executeUpdate(ctx, rc, resolvedFields, options)
+	return s.executeUpdate(ctx, rc, impl, resolvedFields, options)
 }
 
-func (s *Save) executeInsert(ctx context.Context, rc requestctx.RequestContext, fields map[string]interface{}, options map[string]string) (interface{}, map[string]string, error) {
+func (s *Save) executeInsert(ctx context.Context, rc requestctx.RequestContext, impl saveIntegration, fields map[string]interface{}, options map[string]string) (interface{}, map[string]string, error) {
 	logger := logging.FromContext(ctx)
 
 	// Generate ID if not provided
@@ -101,7 +96,7 @@ func (s *Save) executeInsert(ctx context.Context, rc requestctx.RequestContext, 
 
 	logger.Debug("save action executing insert", zap.Any("id", id))
 
-	err := s.i.Store(ctx, fields, options)
+	err := impl.Store(ctx, fields, options)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error storing: %w", err)
 	}
@@ -109,7 +104,7 @@ func (s *Save) executeInsert(ctx context.Context, rc requestctx.RequestContext, 
 	return map[string]interface{}{"id": id}, nil, nil
 }
 
-func (s *Save) executeUpdate(ctx context.Context, rc requestctx.RequestContext, fields map[string]interface{}, options map[string]string) (interface{}, map[string]string, error) {
+func (s *Save) executeUpdate(ctx context.Context, rc requestctx.RequestContext, impl saveIntegration, fields map[string]interface{}, options map[string]string) (interface{}, map[string]string, error) {
 	logger := logging.FromContext(ctx)
 
 	// Resolve templates in filters
@@ -120,7 +115,7 @@ func (s *Save) executeUpdate(ctx context.Context, rc requestctx.RequestContext, 
 
 	logger.Debug("save action executing update", zap.Int("filter_count", len(resolvedFilters)))
 
-	id, err := s.i.Update(ctx, fields, options, resolvedFilters...)
+	id, err := impl.Update(ctx, fields, options, resolvedFilters...)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error updating: %w", err)
 	}
@@ -172,7 +167,8 @@ func (s *Save) resolveFilters(ctx context.Context, rc requestctx.RequestContext,
 	return resolved, nil
 }
 
-func init() {
+// Definition describes the save action to a host that offers it.
+func Definition() actions.Definition {
 	fields := map[string]actions.FieldInfo{
 		"integration": {
 			Type:        actions.FieldTypeIntegration,
@@ -209,7 +205,8 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("save", actions.ActionRegistrationInfo{
+	return actions.Definition{
+		Type:        "save",
 		Name:        "Save Data",
 		Description: "Inserts new records or updates existing records in database tables. When filters are provided, updates matching records; otherwise inserts a new record.",
 		Fields:      fields,
@@ -219,15 +216,12 @@ func init() {
 				{Path: "id", Type: "string", Description: "The id of the saved record."},
 			},
 		},
-		UseV2: true,
-		ConstructorV2: func(config json.RawMessage) (actions.ActionExecutableV2, error) {
+		NewV2: func(config json.RawMessage) (actions.ActionExecutableV2, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {
 				return nil, fmt.Errorf("error creating save action: %v", err)
 			}
 			return New(cfg)
 		},
-	}); err != nil {
-		panic(err)
 	}
 }

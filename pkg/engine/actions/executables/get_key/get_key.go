@@ -68,7 +68,8 @@ func (g *GetKey) Execute(ctx context.Context, modifiedConfig string) (interface{
 	return value, nil, nil
 }
 
-func init() {
+// Definition describes the get_key action to a host that offers it.
+func Definition() actions.Definition {
 	fields := map[string]actions.FieldInfo{
 		"key": {
 			Type:        actions.FieldTypeString,
@@ -85,7 +86,8 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("get_key", actions.ActionRegistrationInfo{
+	return actions.Definition{
+		Type:        "get_key",
 		Name:        "Get Key",
 		Description: "Retrieves a value from persistent storage by key",
 		Fields:      fields,
@@ -93,14 +95,12 @@ func init() {
 			Kind:        actions.OutputValue,
 			Description: "The stored value, or empty when the key is not set.",
 		},
-		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
+		New: func(config json.RawMessage) (actions.ActionExecutable, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {
 				return nil, fmt.Errorf("error creating get_key action: %v", err)
 			}
 			return NewExecutable(cfg), nil
 		},
-	}); err != nil {
-		panic(err)
 	}
 }

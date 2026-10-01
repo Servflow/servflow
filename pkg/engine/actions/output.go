@@ -104,11 +104,12 @@ func (o OutputInfo) For(config map[string]string) OutputInfo {
 	return variant
 }
 
-// validate rejects a description that cannot be resolved against the action's
-// own config fields. Registration is the only moment this can be caught: once
+// Validate rejects a description that cannot be resolved against the action's
+// own config fields. A host calls it when it registers the action, the only
+// moment this can be caught: once
 // the dashboard is reading a selector that names no field, all it can do is
 // offer the wrong variables and let them resolve to empty at run time.
-func (o OutputInfo) validate(fields map[string]FieldInfo) error {
+func (o OutputInfo) Validate(fields map[string]FieldInfo) error {
 	if o.VariantField == "" {
 		if len(o.Variants) > 0 {
 			return errors.New("output declares variants without a variantField")

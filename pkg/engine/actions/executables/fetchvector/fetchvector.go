@@ -8,6 +8,7 @@ import (
 
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/integration"
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
 )
 
 type fetchVectorIntegration interface {
@@ -24,8 +25,7 @@ type Config struct {
 }
 
 type FetchVector struct {
-	cfg              *Config
-	fetchIntegration fetchVectorIntegration
+	cfg *Config
 }
 
 func (f FetchVector) Type() string {
@@ -51,7 +51,16 @@ func (f FetchVector) Execute(ctx context.Context, modifiedConfig string) (interf
 		return nil, nil, fmt.Errorf("invalid value for vectors: %v", err)
 	}
 
-	resultFields, err := f.fetchIntegration.FetchVector(vectors, newCfg.Options)
+	i, err := requestctx.GetIntegration(ctx, f.cfg.Integration)
+	if err != nil {
+		return nil, nil, err
+	}
+	impl, ok := i.(fetchVectorIntegration)
+	if !ok {
+		return nil, nil, errors.New("integration does not implement vector storage")
+	}
+
+	resultFields, err := impl.FetchVector(vectors, newCfg.Options)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error fetching vectors: %v", err)
 	}
@@ -66,23 +75,11 @@ func New(config Config) (*FetchVector, error) {
 	if config.Integration == "" {
 		return nil, fmt.Errorf("no integration ID provided")
 	}
-	i, err := integration.GetIntegration(context.Background(), config.Integration)
-	if err != nil {
-		return nil, err
-	}
-
-	u, ok := i.(fetchVectorIntegration)
-	if !ok {
-		return nil, errors.New("integration does not implement vector storage")
-	}
-
-	return &FetchVector{
-		cfg:              &config,
-		fetchIntegration: u,
-	}, nil
+	return &FetchVector{cfg: &config}, nil
 }
 
-func init() {
+// Definition describes the fetchvectors action to a host that offers it.
+func Definition() actions.Definition {
 	fields := map[string]actions.FieldInfo{
 		"integration": {
 			Type:        actions.FieldTypeIntegration,
@@ -104,7 +101,8 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("fetchvectors", actions.ActionRegistrationInfo{
+	return actions.Definition{
+		Type:        "fetchvectors",
 		Name:        "Fetch Vectors",
 		Description: "Retrieves vector embeddings from vector databases for similarity search",
 		Fields:      fields,
@@ -112,14 +110,12 @@ func init() {
 			Kind:        actions.OutputDynamic,
 			Description: "A list of the nearest stored vectors, each carrying the fields it was saved with.",
 		},
-		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
+		New: func(config json.RawMessage) (actions.ActionExecutable, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {
 				return nil, fmt.Errorf("error creating fetchvector action: %v", err)
 			}
 			return New(cfg)
 		},
-	}); err != nil {
-		panic(err)
 	}
 }

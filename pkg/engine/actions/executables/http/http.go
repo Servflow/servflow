@@ -173,7 +173,8 @@ func (h *Http) Execute(ctx context.Context) (interface{}, map[string]string, err
 	return value.Value(), fields, nil
 }
 
-func init() {
+// Definition describes the http action to a host that offers it.
+func Definition() actions.Definition {
 	fields := map[string]actions.FieldInfo{
 		"url": {
 			Type:        actions.FieldTypeString,
@@ -226,7 +227,8 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("http", actions.ActionRegistrationInfo{
+	return actions.Definition{
+		Type:        "http",
 		Name:        "HTTP Request",
 		Description: "Makes HTTP requests to external APIs and returns the response",
 		Fields:      fields,
@@ -234,15 +236,12 @@ func init() {
 			Kind:        actions.OutputDynamic,
 			Description: "The response body parsed as JSON, or the text of the body when it is not JSON. Setting responsePath narrows this to the value at that path.",
 		},
-		UseV2: true,
-		ConstructorV2: func(config json.RawMessage) (actions.ActionExecutableV2, error) {
+		NewV2: func(config json.RawMessage) (actions.ActionExecutableV2, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {
 				return nil, fmt.Errorf("error creating http action: %v", err)
 			}
 			return New(cfg), nil
 		},
-	}); err != nil {
-		panic(err)
 	}
 }

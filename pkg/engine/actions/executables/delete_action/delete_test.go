@@ -6,24 +6,15 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/Servflow/servflow/pkg/engine/integration"
 	"github.com/Servflow/servflow/pkg/engine/integration/integrations/filters"
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
+	"github.com/Servflow/servflow/pkg/engine/requestctx/requestctxtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )
 
 func TestNewDeleteAction(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockIntegration := NewMockdeleteImplementation(ctrl)
-	integration.ReplaceIntegrationType("mock", func(m map[string]any) (integration.Integration, error) {
-		return mockIntegration, nil
-	})
-	err := integration.InitializeIntegration("mock", "testID", nil)
-	require.NoError(t, err)
-
 	del, err := New(Config{
 		Integration:       "testID",
 		Table:             "mock_table",
@@ -59,12 +50,9 @@ func TestDelete_Execute(t *testing.T) {
 			filters.Filter{Field: "id", Comparator: "1"},
 		).Return(nil)
 
-		integration.ReplaceIntegrationType("mock", func(m map[string]any) (integration.Integration, error) {
-			return mockIntegration, nil
-		})
-
-		err := integration.InitializeIntegration("mock", "mockds", nil)
-		require.NoError(t, err)
+		rc := requestctxtest.New()
+		rc.SetIntegration("mockds", mockIntegration)
+		ctx := requestctx.With(context.Background(), rc)
 
 		d, err := New(Config{
 			Integration:       "mockds",
@@ -82,7 +70,7 @@ func TestDelete_Execute(t *testing.T) {
 		// Create JSON string for filters
 		modifiedConfig := `[{"field":"id","comparator":"1"}]`
 
-		resp, _, err := d.Execute(context.Background(), modifiedConfig)
+		resp, _, err := d.Execute(ctx, modifiedConfig)
 		require.NoError(t, err)
 		assert.Nil(t, resp) // Delete operation should return nil
 	})
@@ -98,10 +86,9 @@ func TestDelete_Execute(t *testing.T) {
 			filters.Filter{Field: "id", Comparator: "1"},
 		).Return(errors.New("random error deleting"))
 
-		integration.ReplaceIntegrationType("mock", func(m map[string]any) (integration.Integration, error) {
-			return mockIntegration, nil
-		})
-		integration.InitializeIntegration("mock", "mockds", nil)
+		rc := requestctxtest.New()
+		rc.SetIntegration("mockds", mockIntegration)
+		ctx := requestctx.With(context.Background(), rc)
 
 		d, err := New(Config{
 			Integration:       "mockds",
@@ -119,7 +106,7 @@ func TestDelete_Execute(t *testing.T) {
 		// Create JSON string for filters
 		modifiedConfig := `[{"field":"id","comparator":"1"}]`
 
-		_, _, err = d.Execute(context.Background(), modifiedConfig)
+		_, _, err = d.Execute(ctx, modifiedConfig)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "delete with filters")
 	})
@@ -129,10 +116,9 @@ func TestDelete_Execute(t *testing.T) {
 		defer ctr.Finish()
 
 		mockIntegration := NewMockdeleteImplementation(ctr)
-		integration.ReplaceIntegrationType("mock", func(m map[string]any) (integration.Integration, error) {
-			return mockIntegration, nil
-		})
-		integration.InitializeIntegration("mock", "mockds", nil)
+		rc := requestctxtest.New()
+		rc.SetIntegration("mockds", mockIntegration)
+		ctx := requestctx.With(context.Background(), rc)
 
 		d, err := New(Config{
 			Integration:       "mockds",
@@ -150,7 +136,7 @@ func TestDelete_Execute(t *testing.T) {
 		// Invalid JSON string for filters
 		modifiedConfig := `{"invalid":"json"`
 
-		_, _, err = d.Execute(context.Background(), modifiedConfig)
+		_, _, err = d.Execute(ctx, modifiedConfig)
 		require.Error(t, err)
 	})
 

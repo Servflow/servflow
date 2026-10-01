@@ -63,7 +63,8 @@ func (f *Firestore) Execute(ctx context.Context, modifiedConfig string) (interfa
 	return modifiedConfig, nil, nil
 }
 
-func init() {
+// Definition describes the firestore action to a host that offers it.
+func Definition() actions.Definition {
 	fields := map[string]actions.FieldInfo{
 		"serviceAccount": {
 			Type:        actions.FieldTypeString,
@@ -91,7 +92,8 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("firestore", actions.ActionRegistrationInfo{
+	return actions.Definition{
+		Type:        "firestore",
 		Name:        "Firestore",
 		Description: "Stores documents in Google Cloud Firestore database",
 		Fields:      fields,
@@ -99,14 +101,12 @@ func init() {
 			Kind:        actions.OutputValue,
 			Description: "The document that was written, as the JSON text it was sent as.",
 		},
-		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
+		New: func(config json.RawMessage) (actions.ActionExecutable, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {
 				return nil, fmt.Errorf("error creating firestore action: %v", err)
 			}
 			return NewFirestoreExecutable(cfg)
 		},
-	}); err != nil {
-		panic(err)
 	}
 }

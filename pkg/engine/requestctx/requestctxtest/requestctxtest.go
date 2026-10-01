@@ -10,6 +10,7 @@ import (
 	"sync"
 	"text/template"
 
+	"github.com/Servflow/servflow/pkg/engine/integration"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 )
 
@@ -18,12 +19,13 @@ import (
 // returns its input. A test that needs template functions or secret handling
 // belongs with the host's implementation.
 type Context struct {
-	mu        sync.Mutex
-	id        string
-	variables map[string]any
-	files     map[string]*requestctx.FileValue
-	workspace requestctx.Workspace
-	request   *http.Request
+	mu           sync.Mutex
+	id           string
+	variables    map[string]any
+	files        map[string]*requestctx.FileValue
+	workspace    requestctx.Workspace
+	request      *http.Request
+	integrations map[string]integration.Integration
 }
 
 var _ requestctx.RequestContext = (*Context)(nil)
@@ -31,9 +33,10 @@ var _ requestctx.RequestContext = (*Context)(nil)
 // New returns an empty Context with the id "test".
 func New() *Context {
 	return &Context{
-		id:        "test",
-		variables: make(map[string]any),
-		files:     make(map[string]*requestctx.FileValue),
+		id:           "test",
+		variables:    make(map[string]any),
+		files:        make(map[string]*requestctx.FileValue),
+		integrations: make(map[string]integration.Integration),
 	}
 }
 
@@ -47,6 +50,13 @@ func (c *Context) SetWorkspace(ws requestctx.Workspace) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.workspace = ws
+}
+
+// SetIntegration makes integ the integration configured under id.
+func (c *Context) SetIntegration(id string, integ integration.Integration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.integrations[id] = integ
 }
 
 // SetRequest gives the request an HTTP request.
@@ -127,4 +137,14 @@ func (c *Context) Request() *http.Request {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.request
+}
+
+func (c *Context) Integration(id string) (integration.Integration, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	integ, ok := c.integrations[id]
+	if !ok {
+		return nil, fmt.Errorf("integration %s not registered", id)
+	}
+	return integ, nil
 }

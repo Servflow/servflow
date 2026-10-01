@@ -142,7 +142,8 @@ func getRequestParams(req *http.Request) map[string]string {
 	return params
 }
 
-func init() {
+// Definition describes the javascript action to a host that offers it.
+func Definition() actions.Definition {
 	fields := map[string]actions.FieldInfo{
 		"script": {
 			Type:        actions.FieldTypeTextArea,
@@ -161,7 +162,8 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("javascript", actions.ActionRegistrationInfo{
+	return actions.Definition{
+		Type:        "javascript",
 		Name:        "JavaScript",
 		Description: "Executes JavaScript code using a servflowRun function with access to request variables",
 		Fields:      fields,
@@ -169,14 +171,12 @@ func init() {
 			Kind:        actions.OutputDynamic,
 			Description: "Whatever the script's servflowRun function returns.",
 		},
-		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
+		New: func(config json.RawMessage) (actions.ActionExecutable, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {
 				return nil, fmt.Errorf("error creating javascript action: %w", err)
 			}
 			return NewExecutable(cfg)
 		},
-	}); err != nil {
-		panic(err)
 	}
 }

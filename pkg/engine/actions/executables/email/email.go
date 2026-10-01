@@ -85,7 +85,8 @@ func (e *Email) Execute(ctx context.Context, filledInConfig string) (interface{}
 	return nil, nil, nil
 }
 
-func init() {
+// Definition describes the email action to a host that offers it.
+func Definition() actions.Definition {
 	fields := map[string]actions.FieldInfo{
 		"senderEmail": {
 			Type:        actions.FieldTypeString,
@@ -125,7 +126,8 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("email", actions.ActionRegistrationInfo{
+	return actions.Definition{
+		Type:        "email",
 		Name:        "Send Email",
 		Description: "Sends email messages via SMTP server",
 		Fields:      fields,
@@ -133,14 +135,12 @@ func init() {
 			Kind:        actions.OutputNone,
 			Description: "Sending mail reports success by continuing; it publishes nothing.",
 		},
-		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
+		New: func(config json.RawMessage) (actions.ActionExecutable, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {
 				return nil, fmt.Errorf("error creating email action: %v", err)
 			}
 			return New(cfg), nil
 		},
-	}); err != nil {
-		panic(err)
 	}
 }

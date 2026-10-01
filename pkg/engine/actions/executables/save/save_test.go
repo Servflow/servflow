@@ -5,17 +5,17 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/Servflow/servflow/pkg/engine/integration"
 	"github.com/Servflow/servflow/pkg/engine/integration/integrations/filters"
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/engine/requestctx/requestctxtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )
 
-func setupTestContext(t *testing.T) context.Context {
-	ctx := requestctxtest.NewContext()
-	return ctx
+func setupTestContext(t *testing.T) (context.Context, *requestctxtest.Context) {
+	rc := requestctxtest.New()
+	return requestctx.With(context.Background(), rc), rc
 }
 
 func TestSave_Insert(t *testing.T) {
@@ -23,17 +23,12 @@ func TestSave_Insert(t *testing.T) {
 		ctr := gomock.NewController(t)
 		defer ctr.Finish()
 
-		ctx := setupTestContext(t)
+		ctx, rc := setupTestContext(t)
 
 		mockIntegration := NewMocksaveIntegration(ctr)
 		mockIntegration.EXPECT().Store(gomock.Any(), map[string]interface{}{"id": "test-id", "name": "test"}, map[string]string{"collection": "mock_table"}).Return(nil)
 
-		integration.ReplaceIntegrationType("mock", func(m map[string]any) (integration.Integration, error) {
-			return mockIntegration, nil
-		})
-
-		err := integration.InitializeIntegration("mock", "mockds", nil)
-		require.NoError(t, err)
+		rc.SetIntegration("mockds", mockIntegration)
 
 		save, err := New(Config{
 			Integration: "mockds",
@@ -51,17 +46,12 @@ func TestSave_Insert(t *testing.T) {
 		ctr := gomock.NewController(t)
 		defer ctr.Finish()
 
-		ctx := setupTestContext(t)
+		ctx, rc := setupTestContext(t)
 
 		mockIntegration := NewMocksaveIntegration(ctr)
 		mockIntegration.EXPECT().Store(gomock.Any(), gomock.Any(), map[string]string{"collection": "mock_table"}).Return(nil)
 
-		integration.ReplaceIntegrationType("mock", func(m map[string]any) (integration.Integration, error) {
-			return mockIntegration, nil
-		})
-
-		err := integration.InitializeIntegration("mock", "mockds", nil)
-		require.NoError(t, err)
+		rc.SetIntegration("mockds", mockIntegration)
 
 		save, err := New(Config{
 			Integration: "mockds",
@@ -83,15 +73,12 @@ func TestSave_Insert(t *testing.T) {
 		ctr := gomock.NewController(t)
 		defer ctr.Finish()
 
-		ctx := setupTestContext(t)
+		ctx, rc := setupTestContext(t)
 
 		mockIntegration := NewMocksaveIntegration(ctr)
 		mockIntegration.EXPECT().Store(gomock.Any(), gomock.Any(), gomock.Any()).Return(errors.New("store error"))
 
-		integration.ReplaceIntegrationType("mock", func(m map[string]any) (integration.Integration, error) {
-			return mockIntegration, nil
-		})
-		integration.InitializeIntegration("mock", "mockds", nil)
+		rc.SetIntegration("mockds", mockIntegration)
 
 		save, err := New(Config{
 			Integration: "mockds",
@@ -111,7 +98,7 @@ func TestSave_Update(t *testing.T) {
 		ctr := gomock.NewController(t)
 		defer ctr.Finish()
 
-		ctx := setupTestContext(t)
+		ctx, rc := setupTestContext(t)
 
 		filtersList := []filters.Filter{
 			{Field: "id", Operation: "==", Comparator: "123"},
@@ -125,12 +112,7 @@ func TestSave_Update(t *testing.T) {
 			filtersList[0],
 		).Return("123", nil)
 
-		integration.ReplaceIntegrationType("mock", func(m map[string]any) (integration.Integration, error) {
-			return mockIntegration, nil
-		})
-
-		err := integration.InitializeIntegration("mock", "mockds", nil)
-		require.NoError(t, err)
+		rc.SetIntegration("mockds", mockIntegration)
 
 		save, err := New(Config{
 			Integration: "mockds",
@@ -149,7 +131,7 @@ func TestSave_Update(t *testing.T) {
 		ctr := gomock.NewController(t)
 		defer ctr.Finish()
 
-		ctx := setupTestContext(t)
+		ctx, rc := setupTestContext(t)
 
 		filtersList := []filters.Filter{
 			{Field: "id", Operation: "==", Comparator: "123"},
@@ -158,10 +140,7 @@ func TestSave_Update(t *testing.T) {
 		mockIntegration := NewMocksaveIntegration(ctr)
 		mockIntegration.EXPECT().Update(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", errors.New("update error"))
 
-		integration.ReplaceIntegrationType("mock", func(m map[string]any) (integration.Integration, error) {
-			return mockIntegration, nil
-		})
-		integration.InitializeIntegration("mock", "mockds", nil)
+		rc.SetIntegration("mockds", mockIntegration)
 
 		save, err := New(Config{
 			Integration: "mockds",
@@ -198,15 +177,6 @@ func TestSave_Validation(t *testing.T) {
 }
 
 func TestSave_Type(t *testing.T) {
-	ctr := gomock.NewController(t)
-	defer ctr.Finish()
-
-	mockIntegration := NewMocksaveIntegration(ctr)
-	integration.ReplaceIntegrationType("mock", func(m map[string]any) (integration.Integration, error) {
-		return mockIntegration, nil
-	})
-	integration.InitializeIntegration("mock", "mockds", nil)
-
 	save, err := New(Config{
 		Integration: "mockds",
 		Table:       "mock_table",

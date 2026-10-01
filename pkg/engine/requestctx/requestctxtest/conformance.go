@@ -15,7 +15,7 @@ import (
 
 // Conformance checks the behavior actions rely on from a RequestContext.
 // newContext must return a context carrying a fresh RequestContext with no
-// variables, files, workspace, request, or secrets.
+// variables, files, workspace, request, secrets, or integrations.
 func Conformance(t *testing.T, newContext func() context.Context) {
 	t.Helper()
 
@@ -96,7 +96,7 @@ func Conformance(t *testing.T, newContext func() context.Context) {
 		assert.ErrorIs(t, err, requestctx.ErrFileNotFound)
 	})
 
-	t.Run("a fresh request has no workspace, request, or secrets", func(t *testing.T) {
+	t.Run("a fresh request has no workspace, request, secrets, or integrations", func(t *testing.T) {
 		ctx := newContext()
 		rc := mustRC(t, ctx)
 
@@ -105,6 +105,9 @@ func Conformance(t *testing.T, newContext func() context.Context) {
 		assert.Nil(t, rc.Request())
 		assert.False(t, rc.HasSecrets())
 		assert.Equal(t, "nothing secret", rc.Scrub("nothing secret"))
+
+		_, err = requestctx.GetIntegration(ctx, "not-configured")
+		assert.Error(t, err)
 	})
 }
 

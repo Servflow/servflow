@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"net/http"
+
+	"github.com/Servflow/servflow/pkg/engine/integration"
 )
 
 // ErrNoContext is returned when a context carries no RequestContext.
@@ -44,6 +46,9 @@ type RequestContext interface {
 	// Request returns the HTTP request that opened this request, or nil when
 	// it did not arrive over HTTP.
 	Request() *http.Request
+
+	// Integration returns the live integration configured under id.
+	Integration(id string) (integration.Integration, error)
 }
 
 type contextKey struct{}
@@ -66,4 +71,14 @@ func FromContextOrError(ctx context.Context) (RequestContext, error) {
 		return nil, ErrNoContext
 	}
 	return rc, nil
+}
+
+// GetIntegration returns the integration configured under id for the request
+// ctx carries.
+func GetIntegration(ctx context.Context, id string) (integration.Integration, error) {
+	rc, err := FromContextOrError(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return rc.Integration(id)
 }

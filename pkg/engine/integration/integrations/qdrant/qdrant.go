@@ -49,7 +49,8 @@ func parseHostPort(url string) (string, int) {
 	return parts[0], port
 }
 
-func init() {
+// Definition describes the qdrant integration to a host that offers it.
+func Definition() integration.Definition {
 	fields := map[string]integration.FieldInfo{
 		"url": {
 			Type:        integration.FieldTypeString,
@@ -59,20 +60,19 @@ func init() {
 		},
 	}
 
-	if err := integration.RegisterIntegration("qdrant", integration.RegistrationInfo{
+	return integration.Definition{
+		Type:        "qdrant",
 		Name:        "Qdrant",
 		Description: "Qdrant vector database for similarity search and vector storage",
 		ImageURL:    "https://d2ojax9k5fldtt.cloudfront.net/qdrant.svg",
 		Fields:      fields,
-		Constructor: func(m map[string]any) (integration.Integration, error) {
+		New: func(m map[string]any) (integration.Integration, error) {
 			host, port := parseHostPort(m["url"].(string))
 			return New(&Config{
 				Host: host,
 				Port: port,
 			})
 		},
-	}); err != nil {
-		panic(err)
 	}
 }
 

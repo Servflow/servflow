@@ -61,7 +61,8 @@ func (s *StoreKey) Execute(ctx context.Context, modifiedConfig string) (interfac
 	return cfg.Value, nil, nil
 }
 
-func init() {
+// Definition describes the store_key action to a host that offers it.
+func Definition() actions.Definition {
 	fields := map[string]actions.FieldInfo{
 		"key": {
 			Type:        actions.FieldTypeString,
@@ -77,7 +78,8 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("store_key", actions.ActionRegistrationInfo{
+	return actions.Definition{
+		Type:        "store_key",
 		Name:        "Store Key",
 		Description: "Stores a key-value pair in persistent storage",
 		Fields:      fields,
@@ -85,14 +87,12 @@ func init() {
 			Kind:        actions.OutputValue,
 			Description: "The value that was stored.",
 		},
-		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
+		New: func(config json.RawMessage) (actions.ActionExecutable, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {
 				return nil, fmt.Errorf("error creating store_key action: %v", err)
 			}
 			return NewExecutable(cfg), nil
 		},
-	}); err != nil {
-		panic(err)
 	}
 }

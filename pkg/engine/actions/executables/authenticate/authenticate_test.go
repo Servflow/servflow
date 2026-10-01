@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/Servflow/servflow/pkg/engine/integration"
 	"github.com/Servflow/servflow/pkg/engine/integration/integrations/filters"
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
+	"github.com/Servflow/servflow/pkg/engine/requestctx/requestctxtest"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,51 +31,7 @@ func TestAuthenticate_New(t *testing.T) {
 		assert.Contains(t, err.Error(), "database field required")
 	})
 
-	t.Run("integration not found", func(t *testing.T) {
-		ctr := gomock.NewController(t)
-		defer ctr.Finish()
-
-		_, err := New(Config{
-			Integration:   "nonexistent",
-			DatabaseField: "email",
-		})
-		require.Error(t, err)
-	})
-
-	t.Run("integration not a fetch implementation", func(t *testing.T) {
-		ctr := gomock.NewController(t)
-		defer ctr.Finish()
-
-		mockInvalidIntegration := &mockInvalidIntegration{}
-
-		integration.ReplaceIntegrationType("invalid", func(m map[string]any) (integration.Integration, error) {
-			return mockInvalidIntegration, nil
-		})
-
-		err := integration.InitializeIntegration("invalid", "invalidds", nil)
-		require.NoError(t, err)
-
-		_, err = New(Config{
-			Integration:   "invalidds",
-			DatabaseField: "email",
-		})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "integration is not a fetch implementation")
-	})
-
 	t.Run("successful initialization", func(t *testing.T) {
-		ctr := gomock.NewController(t)
-		defer ctr.Finish()
-
-		mockIntegration := NewMockfetchImplementation(ctr)
-
-		integration.ReplaceIntegrationType("mock", func(m map[string]any) (integration.Integration, error) {
-			return mockIntegration, nil
-		})
-
-		err := integration.InitializeIntegration("mock", "mockds", nil)
-		require.NoError(t, err)
-
 		auth, err := New(Config{
 			Integration:   "mockds",
 			DatabaseField: "email",
@@ -119,12 +76,9 @@ func TestAuthenticate_Execute(t *testing.T) {
 			filters.Filter{Field: dbField, Operation: filters.Equals, Comparator: email},
 		).Return(fetchReturn, nil)
 
-		integration.ReplaceIntegrationType("mock", func(m map[string]any) (integration.Integration, error) {
-			return mockIntegration, nil
-		})
-
-		err := integration.InitializeIntegration("mock", "mockds", nil)
-		require.NoError(t, err)
+		rc := requestctxtest.New()
+		rc.SetIntegration("mockds", mockIntegration)
+		ctx := requestctx.With(context.Background(), rc)
 
 		auth, err := New(Config{
 			Integration:   "mockds",
@@ -145,7 +99,7 @@ func TestAuthenticate_Execute(t *testing.T) {
 		configStr, err := json.Marshal(config)
 		require.NoError(t, err)
 
-		result, _, err := auth.Execute(context.Background(), string(configStr))
+		result, _, err := auth.Execute(ctx, string(configStr))
 		require.NoError(t, err)
 		assert.Equal(t, email, result)
 	})
@@ -155,12 +109,9 @@ func TestAuthenticate_Execute(t *testing.T) {
 		defer ctr.Finish()
 
 		mockIntegration := NewMockfetchImplementation(ctr)
-		integration.ReplaceIntegrationType("mock", func(m map[string]any) (integration.Integration, error) {
-			return mockIntegration, nil
-		})
-
-		err := integration.InitializeIntegration("mock", "mockds", nil)
-		require.NoError(t, err)
+		rc := requestctxtest.New()
+		rc.SetIntegration("mockds", mockIntegration)
+		ctx := requestctx.With(context.Background(), rc)
 
 		auth, err := New(Config{
 			Integration:   "mockds",
@@ -180,7 +131,7 @@ func TestAuthenticate_Execute(t *testing.T) {
 		configStr, err := json.Marshal(config)
 		require.NoError(t, err)
 
-		_, _, err = auth.Execute(context.Background(), string(configStr))
+		_, _, err = auth.Execute(ctx, string(configStr))
 		require.Error(t, err)
 	})
 
@@ -189,12 +140,9 @@ func TestAuthenticate_Execute(t *testing.T) {
 		defer ctr.Finish()
 
 		mockIntegration := NewMockfetchImplementation(ctr)
-		integration.ReplaceIntegrationType("mock", func(m map[string]any) (integration.Integration, error) {
-			return mockIntegration, nil
-		})
-
-		err := integration.InitializeIntegration("mock", "mockds", nil)
-		require.NoError(t, err)
+		rc := requestctxtest.New()
+		rc.SetIntegration("mockds", mockIntegration)
+		ctx := requestctx.With(context.Background(), rc)
 
 		auth, err := New(Config{
 			Integration:   "mockds",
@@ -216,7 +164,7 @@ func TestAuthenticate_Execute(t *testing.T) {
 		configStr, err := json.Marshal(config)
 		require.NoError(t, err)
 
-		_, _, err = auth.Execute(context.Background(), string(configStr))
+		_, _, err = auth.Execute(ctx, string(configStr))
 		require.Error(t, err)
 	})
 
@@ -234,12 +182,9 @@ func TestAuthenticate_Execute(t *testing.T) {
 		require.NoError(t, err)
 
 		mockIntegration := NewMockfetchImplementation(ctr)
-		integration.ReplaceIntegrationType("mock", func(m map[string]any) (integration.Integration, error) {
-			return mockIntegration, nil
-		})
-
-		err = integration.InitializeIntegration("mock", "mockds", nil)
-		require.NoError(t, err)
+		rc := requestctxtest.New()
+		rc.SetIntegration("mockds", mockIntegration)
+		ctx := requestctx.With(context.Background(), rc)
 
 		auth, err := New(Config{
 			Integration:   "mockds",
@@ -258,7 +203,7 @@ func TestAuthenticate_Execute(t *testing.T) {
 		configStr, err := json.Marshal(config)
 		require.NoError(t, err)
 
-		_, _, err = auth.Execute(context.Background(), string(configStr))
+		_, _, err = auth.Execute(ctx, string(configStr))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "token subject is invalid")
 	})
@@ -278,12 +223,9 @@ func TestAuthenticate_Execute(t *testing.T) {
 			filters.Filter{Field: dbField, Operation: filters.Equals, Comparator: nonexistentEmail},
 		).Return(fetchReturn, nil)
 
-		integration.ReplaceIntegrationType("mock", func(m map[string]any) (integration.Integration, error) {
-			return mockIntegration, nil
-		})
-
-		err := integration.InitializeIntegration("mock", "mockds", nil)
-		require.NoError(t, err)
+		rc := requestctxtest.New()
+		rc.SetIntegration("mockds", mockIntegration)
+		ctx := requestctx.With(context.Background(), rc)
 
 		auth, err := New(Config{
 			Integration:   "mockds",
@@ -304,7 +246,7 @@ func TestAuthenticate_Execute(t *testing.T) {
 		configStr, err := json.Marshal(config)
 		require.NoError(t, err)
 
-		resp, _, err := auth.Execute(context.Background(), string(configStr))
+		resp, _, err := auth.Execute(ctx, string(configStr))
 		require.Error(t, err)
 		assert.Nil(t, resp)
 		assert.Contains(t, err.Error(), "token subject is invalid")
@@ -344,4 +286,35 @@ type mockInvalidIntegration struct{}
 
 func (m *mockInvalidIntegration) Type() string {
 	return "invalid"
+}
+
+// The integration is looked up when the action runs, so a missing or
+// unsuitable one fails the step, not the constructor.
+func TestAuthenticate_ExecuteIntegrationErrors(t *testing.T) {
+	t.Run("integration not found", func(t *testing.T) {
+		auth, err := New(Config{
+			Integration:   "nonexistent",
+			DatabaseField: "email",
+		})
+		require.NoError(t, err)
+
+		_, _, err = auth.Execute(requestctxtest.NewContext(), auth.Config())
+		require.Error(t, err)
+	})
+
+	t.Run("integration not a fetch implementation", func(t *testing.T) {
+		rc := requestctxtest.New()
+		rc.SetIntegration("invalidds", &mockInvalidIntegration{})
+		ctx := requestctx.With(context.Background(), rc)
+
+		auth, err := New(Config{
+			Integration:   "invalidds",
+			DatabaseField: "email",
+		})
+		require.NoError(t, err)
+
+		_, _, err = auth.Execute(ctx, auth.Config())
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "integration is not a fetch implementation")
+	})
 }

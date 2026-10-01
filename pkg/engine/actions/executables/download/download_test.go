@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/engine/requestctx/requestctxtest"
@@ -75,7 +74,7 @@ func TestDownload_Execute(t *testing.T) {
 				requestctx.AddRequestFile(reqCtx, "testfile", requestctx.NewFileValue(file, "original.txt"))
 			},
 			config: Config{
-				File:      apiconfig.FileInput{Type: apiconfig.FileInputTypeRequest, Identifier: "testfile"},
+				File:      requestctx.FileInput{Type: requestctx.FileInputTypeRequest, Identifier: "testfile"},
 				FileName:  "custom.txt",
 				Overwrite: false,
 			},
@@ -89,7 +88,7 @@ func TestDownload_Execute(t *testing.T) {
 				requestctx.AddRequestFile(reqCtx, "testfile", requestctx.NewFileValue(file, "original.txt"))
 			},
 			config: Config{
-				File:      apiconfig.FileInput{Type: apiconfig.FileInputTypeRequest, Identifier: "testfile"},
+				File:      requestctx.FileInput{Type: requestctx.FileInputTypeRequest, Identifier: "testfile"},
 				FileName:  "",
 				Overwrite: false,
 			},
@@ -106,7 +105,7 @@ func TestDownload_Execute(t *testing.T) {
 				ws.files[path.Join(destPath, "existing.txt")] = []byte("old content")
 			},
 			config: Config{
-				File:      apiconfig.FileInput{Type: apiconfig.FileInputTypeRequest, Identifier: "testfile"},
+				File:      requestctx.FileInput{Type: requestctx.FileInputTypeRequest, Identifier: "testfile"},
 				FileName:  "existing.txt",
 				Overwrite: true,
 			},
@@ -123,7 +122,7 @@ func TestDownload_Execute(t *testing.T) {
 				ws.files[path.Join(destPath, "existing.txt")] = []byte("old content")
 			},
 			config: Config{
-				File:      apiconfig.FileInput{Type: apiconfig.FileInputTypeRequest, Identifier: "testfile"},
+				File:      requestctx.FileInput{Type: requestctx.FileInputTypeRequest, Identifier: "testfile"},
 				FileName:  "existing.txt",
 				Overwrite: false,
 			},
@@ -133,7 +132,7 @@ func TestDownload_Execute(t *testing.T) {
 		{
 			name: "missing file input",
 			config: Config{
-				File:      apiconfig.FileInput{Type: apiconfig.FileInputTypeRequest, Identifier: "nonexistent"},
+				File:      requestctx.FileInput{Type: requestctx.FileInputTypeRequest, Identifier: "nonexistent"},
 				FileName:  "output.txt",
 				Overwrite: false,
 			},
@@ -149,7 +148,7 @@ func TestDownload_Execute(t *testing.T) {
 				requestctx.AddRequestFile(reqCtx, "testfile", requestctx.NewFileValue(file, "test.txt"))
 			},
 			config: Config{
-				File:      apiconfig.FileInput{Type: apiconfig.FileInputTypeRequest, Identifier: "testfile"},
+				File:      requestctx.FileInput{Type: requestctx.FileInputTypeRequest, Identifier: "testfile"},
 				FileName:  "test.txt",
 				Overwrite: false,
 			},
@@ -164,7 +163,7 @@ func TestDownload_Execute(t *testing.T) {
 			},
 			noWorkspace: true,
 			config: Config{
-				File:      apiconfig.FileInput{Type: apiconfig.FileInputTypeRequest, Identifier: "testfile"},
+				File:      requestctx.FileInput{Type: requestctx.FileInputTypeRequest, Identifier: "testfile"},
 				FileName:  "test.txt",
 				Overwrite: false,
 			},

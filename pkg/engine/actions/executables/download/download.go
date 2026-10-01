@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"path"
 
-	"github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
@@ -14,10 +13,10 @@ import (
 )
 
 type Config struct {
-	File            apiconfig.FileInput `json:"file" yaml:"file"`
-	DestinationPath string              `json:"destinationPath" yaml:"destinationPath"`
-	FileName        string              `json:"fileName" yaml:"fileName"`
-	Overwrite       bool                `json:"overwrite" yaml:"overwrite"`
+	File            requestctx.FileInput `json:"file" yaml:"file"`
+	DestinationPath string               `json:"destinationPath" yaml:"destinationPath"`
+	FileName        string               `json:"fileName" yaml:"fileName"`
+	Overwrite       bool                 `json:"overwrite" yaml:"overwrite"`
 }
 
 type Download struct {

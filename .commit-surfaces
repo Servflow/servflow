@@ -4,6 +4,5 @@
 actions
 integrations
 requestctx
-secrets
 shared
 infra

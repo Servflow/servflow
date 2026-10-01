@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 )
 
@@ -84,15 +83,15 @@ func Conformance(t *testing.T, newContext func() context.Context) {
 		requestctx.AddRequestFile(rc, "upload", requestctx.NewFileValue(io.NopCloser(strings.NewReader("req")), "a.txt"))
 		requestctx.AddActionFile(rc, "render", requestctx.NewFileValue(io.NopCloser(strings.NewReader("act")), "b.txt"))
 
-		f, err := requestctx.GetFileFromContext(ctx, apiconfig.FileInput{Type: apiconfig.FileInputTypeRequest, Identifier: "upload"})
+		f, err := requestctx.GetFileFromContext(ctx, requestctx.FileInput{Type: requestctx.FileInputTypeRequest, Identifier: "upload"})
 		require.NoError(t, err)
 		assert.Equal(t, "a.txt", f.Name)
 
-		f, err = requestctx.GetFileFromContext(ctx, apiconfig.FileInput{Type: apiconfig.FileInputTypeAction, Identifier: "action.render"})
+		f, err = requestctx.GetFileFromContext(ctx, requestctx.FileInput{Type: requestctx.FileInputTypeAction, Identifier: "action.render"})
 		require.NoError(t, err)
 		assert.Equal(t, "b.txt", f.Name)
 
-		_, err = requestctx.GetFileFromContext(ctx, apiconfig.FileInput{Type: apiconfig.FileInputTypeRequest, Identifier: "missing"})
+		_, err = requestctx.GetFileFromContext(ctx, requestctx.FileInput{Type: requestctx.FileInputTypeRequest, Identifier: "missing"})
 		assert.ErrorIs(t, err, requestctx.ErrFileNotFound)
 	})
 

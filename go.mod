@@ -5,7 +5,6 @@ go 1.25.0
 require (
 	cloud.google.com/go/firestore v1.15.0
 	github.com/MicahParks/keyfunc/v3 v3.7.0
-	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2
 	github.com/dop251/goja v0.0.0-20260219130522-0ba9a5494a59
 	github.com/gabriel-vasile/mimetype v1.4.11
 	github.com/go-sql-driver/mysql v1.8.1
@@ -19,14 +18,10 @@ require (
 	github.com/testcontainers/testcontainers-go v0.36.0
 	github.com/tidwall/gjson v1.18.0
 	go.mongodb.org/mongo-driver v1.17.0
-	go.opentelemetry.io/otel v1.44.0
-	go.opentelemetry.io/otel/sdk v1.44.0
-	go.opentelemetry.io/otel/trace v1.44.0
 	go.uber.org/mock v0.4.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.51.0
 	google.golang.org/api v0.189.0
-	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -97,8 +92,12 @@ require (
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.49.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0 // indirect
+	go.opentelemetry.io/otel v1.44.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.26.0 // indirect
 	go.opentelemetry.io/otel/metric v1.44.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.44.0 // indirect
+	go.opentelemetry.io/otel/sdk/metric v1.44.0 // indirect
+	go.opentelemetry.io/otel/trace v1.44.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
 	golang.org/x/net v0.55.0 // indirect
@@ -112,6 +111,7 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	google.golang.org/grpc v1.81.1 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
 //replace git.servflow.io/servflow/apiconfig => ../apiconfig

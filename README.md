@@ -1,19 +1,25 @@
 # ServFlow engine
 
 This module is the library of actions and integrations that a ServFlow host
-runs. It has no planner, server, or binary of its own. [ServFlow](https://git.servflow.io/servflow/servflowai)
-compiles workflow configs, runs requests, and calls the actions registered here.
+runs. It has no registries, planner, server, or binary of its own. [ServFlow](https://git.servflow.io/servflow/servflowai)
+registers the actions and integrations it offers, compiles workflow configs,
+and runs requests.
 
 ## Use an action or integration
 
-Each action and integration registers itself when its package is imported. To
-make one available to a host, import it for its side effect:
+Each action and integration package exports a `Definition` function that
+describes it: its type, name, fields, and constructor. Nothing registers
+itself. To offer one, a host calls `Definition` and adds the result to its own
+registry:
 
 ```go
 import (
-	_ "github.com/Servflow/servflow/pkg/engine/actions/executables/http"
-	_ "github.com/Servflow/servflow/pkg/engine/integration/integrations/mongo"
+	"github.com/Servflow/servflow/pkg/engine/actions/executables/http"
+	"github.com/Servflow/servflow/pkg/engine/integration/integrations/mongo"
 )
+
+registry.RegisterAction(http.Definition())
+registry.RegisterIntegration(mongo.Definition())
 ```
 
 ## Actions
@@ -40,7 +46,7 @@ The following actions live in `pkg/engine/actions/executables`:
 | `store_key` | `store_key` |
 | `storevector` | `storevector` |
 
-`stub` is a test helper and isn't offered in the catalog.
+`stub` is a test helper; a host offers it only in tests.
 
 ## Integrations
 
@@ -53,20 +59,18 @@ Actions and integrations compile against these packages. A host implements or
 supplies what they declare:
 
 `pkg/engine/actions`
-: The action registry, the `ActionExecutable` and `ActionExecutableV2`
-  interfaces, and `ErrFailure`, which an action wraps to mark a failure the run
-  can recover from.
+: The `ActionExecutable` and `ActionExecutableV2` interfaces, `Definition`, the
+  field and output types, and `ErrFailure`, which an action wraps to mark a
+  failure the run can recover from.
 
 `pkg/engine/integration`
-: The integration registry and manager.
+: The `Integration` interface, `Definition`, and the field types.
 
 `pkg/engine/requestctx`
 : The `RequestContext` interface an action reads request state through:
-  variables, template resolution, secret scrubbing, files, the workspace, and
-  the HTTP request. The host implements it.
-
-`pkg/engine/secrets`
-: Secret lookup, backed by storage the host adds.
+  variables, template resolution, secret scrubbing, files, the workspace, the
+  HTTP request, and the request's integrations. The host implements it.
+  `FileInput`, which names a file an action reads, lives here too.
 
 `pkg/engine/kv`
 : The key-value store behind `get_key` and `store_key`. The host sets it with
@@ -74,10 +78,6 @@ supplies what they declare:
 
 `pkg/logging`
 : Request-scoped logging.
-
-`pkg/apiconfig`
-: The config types an action or integration reads: file inputs and
-  integration configs.
 
 ## Develop
 

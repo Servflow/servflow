@@ -14,11 +14,11 @@ registry:
 
 ```go
 import (
-	"github.com/Servflow/servflow/pkg/engine/actions/executables/http"
+	"github.com/Servflow/servflow/pkg/engine/actions/executables/fetch"
 	"github.com/Servflow/servflow/pkg/engine/integration/integrations/mongo"
 )
 
-registry.RegisterAction(http.Definition())
+registry.RegisterAction(fetch.Definition())
 registry.RegisterIntegration(mongo.Definition())
 ```
 
@@ -28,22 +28,13 @@ The following actions live in `pkg/engine/actions/executables`:
 
 | Type | Package |
 |---|---|
-| `authenticate` | `authenticate` |
 | `delete` | `delete_action` |
-| `download` | `download` |
-| `email` | `email` |
 | `fetch` | `fetch` |
 | `fetchvectors` | `fetchvector` |
 | `firestore` | `firestore` |
-| `get_key` | `get_key` |
 | `hash` | `hash` |
-| `http` | `http` |
-| `javascript` | `javascript` |
-| `jwt` | `jwt` |
 | `mongoquery` | `mongoquery` |
-| `save` | `save` |
 | `static` | `static` |
-| `store_key` | `store_key` |
 | `storevector` | `storevector` |
 
 `stub` is a test helper; a host offers it only in tests.
@@ -52,6 +43,18 @@ The following actions live in `pkg/engine/actions/executables`:
 
 The following integrations live in `pkg/engine/integration/integrations`:
 `mongo`, `qdrant`, and `sql`.
+
+## Services
+
+Each of these packages holds a service's integration and, where it has them,
+its actions:
+
+| Service | Integration | Actions |
+|---|---|---|
+| Binance | `pkg/binance/integration` | `pkg/binance/actions`: `binance/getprice`, `binance/spotorder`, `binance/pricedifference`, `binance/tradeinfo`, `binance/accountbalance`, `binance/futuresorder` |
+
+A package with several actions exports `Definitions`, which returns all of
+them.
 
 ## The contract
 
@@ -71,10 +74,6 @@ supplies what they declare:
   variables, template resolution, secret scrubbing, files, the workspace, the
   HTTP request, and the request's integrations. The host implements it.
   `FileInput`, which names a file an action reads, lives here too.
-
-`pkg/engine/kv`
-: The key-value store behind `get_key` and `store_key`. The host sets it with
-  `kv.SetStore`.
 
 `pkg/logging`
 : Request-scoped logging.

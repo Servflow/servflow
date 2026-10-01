@@ -2,9 +2,9 @@
 
 This module is a library: the actions and integrations a ServFlow host
 registers, plus the types they compile against (`pkg/engine/actions`,
-`pkg/engine/integration`, `pkg/engine/requestctx`, `pkg/engine/kv`,
-`pkg/logging`). Each action and integration package exports a `Definition`
-function and has no `init()`; the host registers what it wants. There are no
+`pkg/engine/integration`, `pkg/engine/requestctx`, `pkg/logging`).
+`pkg/binance` holds Binance's integration and actions together. Each action and integration package exports
+a `Definition` function and has no `init()`; the host registers what it wants. There are no
 registries, planner, server, secret manager, or binary here; servflowai runs
 requests. Nothing here may import servflowai.
 

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"strings"
 	"sync"
 	"text/template"
@@ -20,10 +19,7 @@ import (
 
 type contextKey string
 
-const (
-	ContextKey        contextKey = "planContextKey"
-	RequestContextKey contextKey = "planRequestContextKey"
-)
+const ContextKey contextKey = "planContextKey"
 
 type Plan struct {
 	steps           map[string]stepWrapper
@@ -39,18 +35,6 @@ var (
 type stepWrapper struct {
 	id   string
 	step Step
-}
-
-func WithRequest(ctx context.Context, r *http.Request) context.Context {
-	return context.WithValue(ctx, RequestContextKey, r)
-}
-
-func RequestFromContext(ctx context.Context) (*http.Request, error) {
-	r, ok := ctx.Value(RequestContextKey).(*http.Request)
-	if !ok {
-		return nil, errors.New("request context is missing")
-	}
-	return r, nil
 }
 
 func ExecuteSingleAction(actionType string, config json.RawMessage) (any, map[string]string, error) {

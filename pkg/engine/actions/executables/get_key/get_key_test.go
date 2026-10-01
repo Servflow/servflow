@@ -6,22 +6,15 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Servflow/servflow/pkg/storage"
+	"github.com/Servflow/servflow/pkg/engine/kv"
+	"github.com/Servflow/servflow/pkg/engine/kv/kvtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestMain(m *testing.M) {
-	client, err := storage.GetClient()
-	if err != nil {
-		panic(err)
-	}
-
-	code := m.Run()
-
-	client.Close()
-
-	os.Exit(code)
+	kv.SetStore(kvtest.New())
+	os.Exit(m.Run())
 }
 
 func TestGetKey_Execute(t *testing.T) {
@@ -29,7 +22,7 @@ func TestGetKey_Execute(t *testing.T) {
 		key := "get-key-test-existing"
 		value := "test-value"
 
-		err := storage.Set(key, value)
+		err := kv.Set(key, value)
 		require.NoError(t, err)
 
 		executable := NewExecutable(Config{Key: key})

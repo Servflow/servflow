@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
@@ -240,7 +239,7 @@ func TestExecutable_Execute_RequestBody(t *testing.T) {
 
 			ctx := requestctx.NewTestContext()
 			req := httptest.NewRequest(http.MethodPost, "/test", strings.NewReader(tt.body))
-			ctx = plan.WithRequest(ctx, req)
+			setRequest(t, ctx, req)
 
 			result, _, err := exec.Execute(ctx, tt.script)
 			require.NoError(t, err)
@@ -319,7 +318,7 @@ func TestExecutable_Execute_Params(t *testing.T) {
 
 			ctx := requestctx.NewTestContext()
 			req := tt.setupReq()
-			ctx = plan.WithRequest(ctx, req)
+			setRequest(t, ctx, req)
 
 			result, _, err := exec.Execute(ctx, tt.script)
 			require.NoError(t, err)
@@ -346,7 +345,7 @@ func TestExecutable_Execute_AllParameters(t *testing.T) {
 	require.NoError(t, err)
 
 	req := httptest.NewRequest(http.MethodPost, "/test?id=999", strings.NewReader(`{"message":"hello"}`))
-	ctx = plan.WithRequest(ctx, req)
+	setRequest(t, ctx, req)
 
 	result, _, err := exec.Execute(ctx, script)
 	require.NoError(t, err)
@@ -388,9 +387,16 @@ func TestExecutable_Execute_BackwardCompatibility(t *testing.T) {
 	require.NoError(t, err)
 
 	req := httptest.NewRequest(http.MethodPost, "/test?id=123", strings.NewReader(`{"data":"ignored"}`))
-	ctx = plan.WithRequest(ctx, req)
+	setRequest(t, ctx, req)
 
 	result, _, err := exec.Execute(ctx, script)
 	require.NoError(t, err)
 	assert.Equal(t, "test", result)
+}
+
+func setRequest(t *testing.T, ctx context.Context, req *http.Request) {
+	t.Helper()
+	rc, err := requestctx.FromContextOrError(ctx)
+	require.NoError(t, err)
+	rc.SetRequest(req)
 }

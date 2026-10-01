@@ -31,12 +31,6 @@ type Action struct {
 	dispatch []string
 }
 
-var (
-	// ErrFailure is a non-fatal action, it should be written to the error message item in the request variable,
-	// and should not interrupt the workflow
-	ErrFailure = errors.New("action failed")
-)
-
 func (a *Action) ID() string {
 	return a.id
 }
@@ -107,7 +101,7 @@ func (a *Action) execute(ctx context.Context) (*stepWrapper, error) {
 		// strings with secrets) — scrub before anything records or stores them.
 		errMsg := reqCtx.Scrub(err.Error())
 		span.RecordError(errors.New(errMsg))
-		if errors.Is(err, ErrFailure) {
+		if errors.Is(err, actions.ErrFailure) {
 			if err := requestctx.AddRequestVariables(ctx, map[string]interface{}{requestctx.ErrorTagStripped: errMsg}, ""); err != nil {
 				return nil, err
 			}

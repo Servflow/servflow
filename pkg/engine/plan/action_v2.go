@@ -69,7 +69,7 @@ func (a *ActionV2) execute(ctx context.Context) (*stepWrapper, error) {
 		errMsg := reqCtx.Scrub(err.Error())
 		span.RecordError(errors.New(errMsg))
 		span.SetStatus(codes.Error, errMsg)
-		if errors.Is(err, ErrFailure) {
+		if errors.Is(err, actions.ErrFailure) {
 			if err := requestctx.AddRequestVariables(ctx, map[string]interface{}{requestctx.ErrorTagStripped: errMsg}, ""); err != nil {
 				return nil, err
 			}

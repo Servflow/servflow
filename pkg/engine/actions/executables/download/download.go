@@ -8,7 +8,6 @@ import (
 
 	"github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/actions"
-	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
 	"go.uber.org/zap"
@@ -56,12 +55,12 @@ func (d *Download) Execute(ctx context.Context, modifiedConfig string) (interfac
 	// path is interpreted relative to its root, never the host filesystem.
 	ws, err := requestctx.WorkspaceFromContext(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("%w: %v", plan.ErrFailure, err)
+		return nil, nil, fmt.Errorf("%w: %v", actions.ErrFailure, err)
 	}
 
 	fileValue, err := requestctx.GetFileFromContext(ctx, cfg.File)
 	if err != nil {
-		return nil, nil, fmt.Errorf("%w: file not found: %v", plan.ErrFailure, err)
+		return nil, nil, fmt.Errorf("%w: file not found: %v", actions.ErrFailure, err)
 	}
 	defer fileValue.Close()
 
@@ -71,7 +70,7 @@ func (d *Download) Execute(ctx context.Context, modifiedConfig string) (interfac
 	}
 
 	if fileName == "" {
-		return nil, nil, fmt.Errorf("%w: no filename specified and original filename is empty", plan.ErrFailure)
+		return nil, nil, fmt.Errorf("%w: no filename specified and original filename is empty", actions.ErrFailure)
 	}
 
 	// path.Join cleans the workspace-relative path; confinement (".." rejection)
@@ -80,7 +79,7 @@ func (d *Download) Execute(ctx context.Context, modifiedConfig string) (interfac
 
 	if !cfg.Overwrite {
 		if _, err := ws.Stat(ctx, destPath); err == nil {
-			return nil, nil, fmt.Errorf("%w: file already exists: %s", plan.ErrFailure, destPath)
+			return nil, nil, fmt.Errorf("%w: file already exists: %s", actions.ErrFailure, destPath)
 		}
 	}
 

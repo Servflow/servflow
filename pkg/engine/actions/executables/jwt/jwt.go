@@ -11,7 +11,6 @@ import (
 
 	"github.com/MicahParks/keyfunc/v3"
 	"github.com/Servflow/servflow/pkg/engine/actions"
-	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/golang-jwt/jwt/v5"
 	"go.uber.org/zap"
@@ -128,7 +127,7 @@ func (a *JWT) decodeWithJwks(ctx context.Context, tokenString string) (interface
 	token, err := jwt.Parse(tokenString, k.Keyfunc)
 	if err != nil {
 		if a.config.FailOnValidationError {
-			return nil, fmt.Errorf("%w: %v", plan.ErrFailure, err)
+			return nil, fmt.Errorf("%w: %v", actions.ErrFailure, err)
 		}
 		return nil, err
 	}
@@ -138,13 +137,13 @@ func (a *JWT) decodeWithJwks(ctx context.Context, tokenString string) (interface
 			return sub, nil
 		}
 		if a.config.FailOnValidationError {
-			return nil, fmt.Errorf("%w: sub claim not found", plan.ErrFailure)
+			return nil, fmt.Errorf("%w: sub claim not found", actions.ErrFailure)
 		}
 		return nil, fmt.Errorf("sub claim not found")
 	}
 
 	if a.config.FailOnValidationError {
-		return nil, fmt.Errorf("%w: invalid token", plan.ErrFailure)
+		return nil, fmt.Errorf("%w: invalid token", actions.ErrFailure)
 	}
 	return nil, fmt.Errorf("invalid token")
 }
@@ -175,7 +174,7 @@ func (a *JWT) decodeWithKey(ctx context.Context, tokenString string) (interface{
 			pub, err := x509.ParsePKIXPublicKey(block.Bytes)
 			if err != nil {
 				if a.config.FailOnValidationError {
-					return nil, fmt.Errorf("%w: invalid token - %v", plan.ErrFailure, err)
+					return nil, fmt.Errorf("%w: invalid token - %v", actions.ErrFailure, err)
 				}
 				return nil, err
 			}
@@ -199,12 +198,12 @@ func (a *JWT) decodeWithKey(ctx context.Context, tokenString string) (interface{
 			return sub, nil
 		}
 		if a.config.FailOnValidationError {
-			return nil, fmt.Errorf("%w: sub claim not found", plan.ErrFailure)
+			return nil, fmt.Errorf("%w: sub claim not found", actions.ErrFailure)
 		}
 		return nil, fmt.Errorf("sub claim not found")
 	}
 	if a.config.FailOnValidationError {
-		return nil, fmt.Errorf("%w: invalid token", plan.ErrFailure)
+		return nil, fmt.Errorf("%w: invalid token", actions.ErrFailure)
 	}
 	return nil, fmt.Errorf("invalid token")
 }

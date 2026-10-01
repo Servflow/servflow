@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/Servflow/servflow/pkg/engine/actions"
-	"github.com/Servflow/servflow/pkg/storage"
+	"github.com/Servflow/servflow/pkg/engine/kv"
 )
 
 type StoreKey struct {
@@ -54,7 +54,7 @@ func (s *StoreKey) Execute(ctx context.Context, modifiedConfig string) (interfac
 		return nil, nil, errors.New("key cannot be empty")
 	}
 
-	if err := storage.Set(cfg.Key, cfg.Value); err != nil {
+	if err := kv.Set(cfg.Key, cfg.Value); err != nil {
 		return nil, nil, fmt.Errorf("failed to store key: %w", err)
 	}
 

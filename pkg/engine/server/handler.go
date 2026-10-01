@@ -200,8 +200,8 @@ func (h *APIHandler) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	// check) reassigns Body on the request it is handed, so the `body` function
 	// must be captured on that same *http.Request. initTracing has already
 	// read-and-restored the body onto this req before the copy.
-	ctx = plan.WithRequest(ctx, req)
 	req = req.WithContext(ctx)
+	rectx.SetRequest(req)
 
 	rectx.AddRequestTemplateFunctions(requestTemplateFunctions(req), false)
 

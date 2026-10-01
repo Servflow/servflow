@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/Servflow/servflow/pkg/apiconfig"
-	"github.com/Servflow/servflow/pkg/engine/plan"
+	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -199,7 +199,7 @@ func TestDownload_Execute(t *testing.T) {
 
 			if tc.expectError {
 				require.Error(t, err)
-				assert.ErrorIs(t, err, plan.ErrFailure)
+				assert.ErrorIs(t, err, actions.ErrFailure)
 				if tc.errorContains != "" {
 					assert.Contains(t, err.Error(), tc.errorContains)
 				}

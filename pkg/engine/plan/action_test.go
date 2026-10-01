@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Servflow/servflow/pkg/apiconfig"
+	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -208,7 +209,7 @@ func TestAction_Execute(t *testing.T) {
 			mockExec := NewMockActionExecutable(ctrl)
 			mockExec.EXPECT().Config().Return("").AnyTimes()
 			mockExec.EXPECT().Type().Return("mock").AnyTimes()
-			mockExec.EXPECT().Execute(gomock.Any(), "").Return("response string", nil, fmt.Errorf("%w: dummy error", ErrFailure)).AnyTimes()
+			mockExec.EXPECT().Execute(gomock.Any(), "").Return("response string", nil, fmt.Errorf("%w: dummy error", actions.ErrFailure)).AnyTimes()
 
 			nextStep := testStep{id: "next"}
 			failStep := testStep{id: "fail"}

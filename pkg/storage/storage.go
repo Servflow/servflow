@@ -263,3 +263,11 @@ func Get(key string) (string, bool, error) {
 
 	return result.Value, result.Found, err
 }
+
+// KV is this package's key-value functions as a value, for a host to hand to
+// kv.SetStore.
+type KV struct{}
+
+func (KV) Get(key string) (string, bool, error) { return Get(key) }
+
+func (KV) Set(key, value string) error { return Set(key, value) }

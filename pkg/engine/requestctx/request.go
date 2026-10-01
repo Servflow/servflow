@@ -19,3 +19,20 @@ func ReadAndRestoreBody(req *http.Request) string {
 	req.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 	return string(bodyBytes)
 }
+
+// SetRequest records the HTTP request that opened this request context. The
+// host sets it once, before the context is shared; a request that did not
+// arrive over HTTP has none.
+func (rc *RequestContext) SetRequest(req *http.Request) {
+	rc.Lock()
+	defer rc.Unlock()
+	rc.request = req
+}
+
+// Request returns the HTTP request that opened this request context, or nil
+// when it did not arrive over HTTP.
+func (rc *RequestContext) Request() *http.Request {
+	rc.Lock()
+	defer rc.Unlock()
+	return rc.request
+}

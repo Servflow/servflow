@@ -9,6 +9,7 @@ import (
 	"os/signal"
 
 	"github.com/Servflow/servflow/config"
+	"github.com/Servflow/servflow/pkg/engine/kv"
 	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/engine/server"
 	"github.com/Servflow/servflow/pkg/logging"
@@ -38,6 +39,8 @@ func RunServer(cfg *config.Config) error {
 	// Log entries are written by a background writer, whose failures happen
 	// after the appending request has moved on. Without a logger they are lost.
 	storage.SetLogger(logging.GetNewLogger())
+	// get_key and store_key read and write through kv; back it with this store.
+	kv.SetStore(storage.KV{})
 
 	eng, err := server.New(
 		cfg.Env,

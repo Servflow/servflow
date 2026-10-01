@@ -5,7 +5,10 @@ import (
 	"errors"
 )
 
-var ErrorFatal = errors.New("fatal error")
+// ErrFailure marks an action error the run can recover from. An action wraps
+// it ("%w: invalid token"); the host records the message and takes the
+// step's failure branch instead of stopping the run. Any other error stops it.
+var ErrFailure = errors.New("action failed")
 
 // ActionExecutable is the v1 action interface.
 // Actions return their config as a string template, and receive

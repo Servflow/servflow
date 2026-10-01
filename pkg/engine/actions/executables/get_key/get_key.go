@@ -6,8 +6,7 @@ import (
 	"fmt"
 
 	"github.com/Servflow/servflow/pkg/engine/actions"
-	"github.com/Servflow/servflow/pkg/engine/plan"
-	"github.com/Servflow/servflow/pkg/storage"
+	"github.com/Servflow/servflow/pkg/engine/kv"
 )
 
 type GetKey struct {
@@ -54,14 +53,14 @@ func (g *GetKey) Execute(ctx context.Context, modifiedConfig string) (interface{
 		return nil, nil, nil
 	}
 
-	value, found, err := storage.Get(cfg.Key)
+	value, found, err := kv.Get(cfg.Key)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get key: %w", err)
 	}
 
 	if !found {
 		if cfg.FailIfEmpty {
-			return nil, nil, fmt.Errorf("%w: key '%s' not found", plan.ErrFailure, cfg.Key)
+			return nil, nil, fmt.Errorf("%w: key '%s' not found", actions.ErrFailure, cfg.Key)
 		}
 		return "", nil, nil
 	}

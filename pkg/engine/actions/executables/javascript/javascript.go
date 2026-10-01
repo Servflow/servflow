@@ -7,7 +7,6 @@ import (
 	"net/http"
 
 	"github.com/Servflow/servflow/pkg/engine/actions"
-	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"github.com/Servflow/servflow/pkg/logging"
 	"github.com/dop251/goja"
@@ -113,10 +112,11 @@ func getRequestBodyAndParams(ctx context.Context) (string, map[string]string) {
 	params := make(map[string]string)
 	requestBody := ""
 
-	req, err := plan.RequestFromContext(ctx)
-	if err != nil {
+	rc, ok := requestctx.FromContext(ctx)
+	if !ok || rc.Request() == nil {
 		return requestBody, params
 	}
+	req := rc.Request()
 
 	requestBody = requestctx.ReadAndRestoreBody(req)
 	params = getRequestParams(req)

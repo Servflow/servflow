@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"sync"
 	"sync/atomic"
 	"text/template"
@@ -25,6 +26,7 @@ type RequestContext struct {
 	validationErrors []error
 	availableFiles   map[string]*FileValue
 	workspace        Workspace
+	request          *http.Request
 
 	// tokenInput/tokenOutput accumulate LLM token usage across every model call
 	// in this request. Observability-only — not exposed to workflow templates.

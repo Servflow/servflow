@@ -5,6 +5,7 @@ go 1.25.0
 require (
 	cloud.google.com/go/firestore v1.15.0
 	github.com/MicahParks/keyfunc/v3 v3.7.0
+	github.com/adshao/go-binance/v2 v2.8.7
 	github.com/dop251/goja v0.0.0-20260219130522-0ba9a5494a59
 	github.com/gabriel-vasile/mimetype v1.4.11
 	github.com/go-sql-driver/mysql v1.8.1
@@ -35,6 +36,7 @@ require (
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/MicahParks/jwkset v0.11.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
+	github.com/bitly/go-simplejson v0.5.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
@@ -60,7 +62,9 @@ require (
 	github.com/google/s2a-go v0.1.7 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.2 // indirect
 	github.com/googleapis/gax-go/v2 v2.12.5 // indirect
+	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0 // indirect
+	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/magiconair/properties v1.8.9 // indirect
@@ -78,6 +82,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/shirou/gopsutil/v4 v4.25.1 // indirect
+	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect

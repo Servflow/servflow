@@ -1,13 +1,19 @@
 # ServFlow engine: agent rules
 
+This module is a library: the actions and integrations a ServFlow host
+registers, plus the contract they compile against (`pkg/engine/actions`,
+`pkg/engine/integration`, `pkg/engine/requestctx`, `pkg/engine/secrets`,
+`pkg/engine/kv`, `pkg/logging`, `pkg/apiconfig`). It has no planner, server,
+or binary; servflowai runs requests. Nothing here may import servflowai.
+
 ## Commits follow the ServFlow commit convention
 
 Header: `<type>(<surface>/<feature>)!: <subject>`, 72 characters or fewer,
 imperative, lowercase first letter, no trailing period, describes the effect
 and not the file. Types: `feat fix perf refactor style test docs build ci
-chore revert`. Surfaces for this repo, the only scopes allowed: `plan
-actions entries integrations requestctx responses secrets server config
-tracing shared infra`. The feature segment is free-form and optional.
+chore revert`. Surfaces for this repo, the only scopes allowed: `actions
+integrations requestctx secrets shared infra`. The feature segment is
+free-form and optional.
 
 Footer trailers: `Flow: <flow>` is required on `feat`, `fix`, and `perf`,
 from `.commit-flows`. `Refs: #N` when an issue exists. `!` in the header

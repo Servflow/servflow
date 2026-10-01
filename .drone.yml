@@ -15,7 +15,6 @@ trigger:
   event:
     - push
     - pull_request
-    - tag
 
 steps:
   - name: debug-docker
@@ -50,10 +49,6 @@ steps:
     depends_on:
       - wait-for-redis
       - code-quality
-    when:
-      event:
-        exclude:
-          - tag
     environment:
       DATABASE_URL: "user=postgres password=password host=database port=5432 dbname=postgres sslmode=disable"
       TESTCONTAINERS_RYUK_DISABLED: true
@@ -66,53 +61,6 @@ steps:
         path: /var/run/docker.sock
     commands:
       - go test ./...
-
-  - name: e2e-tests
-    image: wemakeservices/wemake-dind:24.0.0
-    privileged: true
-    depends_on:
-      - wait-for-redis
-      - code-quality
-    when:
-      event:
-        exclude:
-          - tag
-    commands:
-      - dockerd &
-      - sleep 5
-      - docker info
-      - cd testsuite && bash ./runtest.sh
-
-  - name: fetch
-    image: docker:git
-    when:
-      event:
-        - tag
-    commands:
-      - git fetch --tags
-
-  - name: goreleaser
-    image: goreleaser/goreleaser
-    privileged: true
-    depends_on:
-      - fetch
-      - code-quality
-    when:
-      event:
-        - tag
-    volumes:
-      - name: docker-sock
-        path: /var/run/docker.sock
-    environment:
-      GITHUB_TOKEN:
-        from_secret: github_token
-      DOCKER_USERNAME:
-        from_secret: docker_username
-      DOCKER_PASSWORD:
-        from_secret: docker_password
-      DOCKER_REGISTRY: ""
-    commands:
-      - goreleaser release
 
 volumes:
   - name: deps

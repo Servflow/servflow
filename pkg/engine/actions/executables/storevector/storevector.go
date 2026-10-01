@@ -8,6 +8,7 @@ import (
 
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/integration"
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
 )
 
 type storeVectorIntegration interface {
@@ -23,8 +24,7 @@ type Config struct {
 }
 
 type StoreVectors struct {
-	cfg                    *Config
-	storeVectorIntegration storeVectorIntegration
+	cfg *Config
 }
 
 func (s StoreVectors) Type() string {
@@ -55,7 +55,16 @@ func (s StoreVectors) Execute(ctx context.Context, modifiedConfig string) (inter
 		return nil, nil, fmt.Errorf("invalid value for vectors: %w", err)
 	}
 
-	err = s.storeVectorIntegration.StoreVectors(vectors, newCfg.Fields, s.cfg.Options)
+	i, err := requestctx.GetIntegration(ctx, s.cfg.Integration)
+	if err != nil {
+		return nil, nil, err
+	}
+	impl, ok := i.(storeVectorIntegration)
+	if !ok {
+		return nil, nil, errors.New("integration does not implement vector storage")
+	}
+
+	err = impl.StoreVectors(vectors, newCfg.Fields, s.cfg.Options)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -67,23 +76,11 @@ func New(config Config) (*StoreVectors, error) {
 	if config.Integration == "" {
 		return nil, fmt.Errorf("no integration ID provided")
 	}
-	i, err := integration.GetIntegration(context.Background(), config.Integration)
-	if err != nil {
-		return nil, err
-	}
-
-	u, ok := i.(storeVectorIntegration)
-	if !ok {
-		return nil, errors.New("integration does not implement vector storage")
-	}
-
-	return &StoreVectors{
-		cfg:                    &config,
-		storeVectorIntegration: u,
-	}, nil
+	return &StoreVectors{cfg: &config}, nil
 }
 
-func init() {
+// Definition describes the storevector action to a host that offers it.
+func Definition() actions.Definition {
 	fields := map[string]actions.FieldInfo{
 		"integration": {
 			Type:        actions.FieldTypeIntegration,
@@ -111,7 +108,8 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("storevector", actions.ActionRegistrationInfo{
+	return actions.Definition{
+		Type:        "storevector",
 		Name:        "Store Vectors",
 		Description: "Stores vector embeddings into vector databases for similarity search",
 		Fields:      fields,
@@ -119,14 +117,12 @@ func init() {
 			Kind:        actions.OutputNone,
 			Description: "Storing vectors reports success by continuing; it publishes nothing.",
 		},
-		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
+		New: func(config json.RawMessage) (actions.ActionExecutable, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {
 				return nil, fmt.Errorf("error creating storevector action: %v", err)
 			}
 			return New(cfg)
 		},
-	}); err != nil {
-		panic(err)
 	}
 }

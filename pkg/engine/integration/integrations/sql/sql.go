@@ -66,7 +66,8 @@ func (s *SQL) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func init() {
+// Definition describes the sql integration to a host that offers it.
+func Definition() integration.Definition {
 	fields := map[string]integration.FieldInfo{
 		"type": {
 			Type:        integration.FieldTypeSelect,
@@ -83,19 +84,18 @@ func init() {
 		},
 	}
 
-	if err := integration.RegisterIntegration("sql", integration.RegistrationInfo{
+	return integration.Definition{
+		Type:        "sql",
 		Name:        "SQL Database",
 		Description: "SQL database integration supporting PostgreSQL and MySQL",
 		ImageURL:    "https://d2ojax9k5fldtt.cloudfront.net/sql_logo.svg",
 		Fields:      fields,
-		Constructor: func(m map[string]any) (integration.Integration, error) {
+		New: func(m map[string]any) (integration.Integration, error) {
 			return newWrapper(Config{
 				Type:             m["type"].(string),
 				ConnectionString: m["connectionString"].(string),
 			})
 		},
-	}); err != nil {
-		panic(err)
 	}
 }
 

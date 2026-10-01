@@ -10,11 +10,11 @@ import (
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/integration"
 	"github.com/Servflow/servflow/pkg/engine/integration/integrations/filters"
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
 )
 
 type Delete struct {
-	cfg               *Config
-	deleteIntegration deleteImplementation
+	cfg *Config
 }
 
 func (d *Delete) Config() string {
@@ -48,19 +48,7 @@ func New(config Config) (*Delete, error) {
 	if config.Table == "" {
 		return nil, errors.New("table is required")
 	}
-	i, err := integration.GetIntegration(context.Background(), config.Integration)
-	if err != nil {
-		return nil, err
-	}
-
-	u, ok := i.(deleteImplementation)
-	if !ok {
-		return nil, errors.New("integration is not of type deleteImplementation")
-	}
-	return &Delete{
-		cfg:               &config,
-		deleteIntegration: u,
-	}, nil
+	return &Delete{cfg: &config}, nil
 }
 
 func (d *Delete) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
@@ -69,15 +57,25 @@ func (d *Delete) Execute(ctx context.Context, modifiedConfig string) (interface{
 		return "", nil, err
 	}
 
+	i, err := requestctx.GetIntegration(ctx, d.cfg.Integration)
+	if err != nil {
+		return "", nil, err
+	}
+	impl, ok := i.(deleteImplementation)
+	if !ok {
+		return "", nil, errors.New("integration is not of type deleteImplementation")
+	}
+
 	var ret interface{}
-	err := d.deleteIntegration.Delete(ctx, map[string]string{"collection": d.cfg.Table}, filters...)
+	err = impl.Delete(ctx, map[string]string{"collection": d.cfg.Table}, filters...)
 	if err != nil {
 		return "", nil, fmt.Errorf("delete with filters: %v", err)
 	}
 	return ret, nil, nil
 }
 
-func init() {
+// Definition describes the delete action to a host that offers it.
+func Definition() actions.Definition {
 	fields := map[string]actions.FieldInfo{
 		"integration": {
 			Type:        actions.FieldTypeIntegration,
@@ -108,7 +106,8 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("delete", actions.ActionRegistrationInfo{
+	return actions.Definition{
+		Type:        "delete",
 		Name:        "Delete Data",
 		Description: "Deletes records from database tables based on specified filters",
 		Fields:      fields,
@@ -116,14 +115,12 @@ func init() {
 			Kind:        actions.OutputNone,
 			Description: "Deleting reports success by continuing; it publishes nothing.",
 		},
-		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
+		New: func(config json.RawMessage) (actions.ActionExecutable, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {
 				return nil, fmt.Errorf("error creating delete action: %v", err)
 			}
 			return New(cfg)
 		},
-	}); err != nil {
-		panic(err)
 	}
 }

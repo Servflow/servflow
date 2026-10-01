@@ -9,7 +9,6 @@ import (
 	"io"
 	"strings"
 
-	"github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/gabriel-vasile/mimetype"
 )
 
@@ -17,6 +16,24 @@ const (
 	fileKeyActionPrefix  = "action."
 	fileKeyRequestPrefix = "request."
 )
+
+// ActionConfigPrefix prefixes a reference to an action, e.g.
+// "action.createUser". An action input names another action's file by it.
+const ActionConfigPrefix = "action."
+
+// The places a FileInput can name a file.
+const (
+	FileInputTypeRequest = "request"
+	FileInputTypeAction  = "action"
+	FileInputTypeStorage = "storage"
+)
+
+// FileInput names a file an action reads: one that arrived with the request,
+// one an earlier action produced, or one in the request's workspace.
+type FileInput struct {
+	Type       string `json:"type" yaml:"type"`
+	Identifier string `json:"identifier" yaml:"identifier"`
+}
 
 // TODO see if we want to limit file to reading once based on memory use and pressure
 
@@ -61,7 +78,7 @@ func (f *FileValue) Close() error {
 	return nil
 }
 
-func GetFileFromContext(ctx context.Context, fileInput apiconfig.FileInput) (*FileValue, error) {
+func GetFileFromContext(ctx context.Context, fileInput FileInput) (*FileValue, error) {
 	rc, err := FromContextOrError(ctx)
 	if err != nil {
 		return nil, err
@@ -69,11 +86,11 @@ func GetFileFromContext(ctx context.Context, fileInput apiconfig.FileInput) (*Fi
 
 	var key string
 	switch fileInput.Type {
-	case apiconfig.FileInputTypeRequest:
+	case FileInputTypeRequest:
 		key = fileKeyRequestPrefix + fileInput.Identifier
-	case apiconfig.FileInputTypeAction:
-		key = fileKeyActionPrefix + strings.TrimPrefix(fileInput.Identifier, apiconfig.ActionConfigPrefix)
-	case apiconfig.FileInputTypeStorage:
+	case FileInputTypeAction:
+		key = fileKeyActionPrefix + strings.TrimPrefix(fileInput.Identifier, ActionConfigPrefix)
+	case FileInputTypeStorage:
 		ws := rc.Workspace()
 		if ws == nil {
 			return nil, ErrNoWorkspace

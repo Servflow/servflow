@@ -6,7 +6,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/Servflow/servflow/pkg/engine/integration"
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
+	"github.com/Servflow/servflow/pkg/engine/requestctx/requestctxtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -29,22 +30,18 @@ func TestFetchVector_Execute(t *testing.T) {
 				"result": "success",
 			},
 		}, nil)
-		integration.ReplaceIntegrationType("mock", func(m map[string]interface{}) (integration.Integration, error) {
-			return mockIntegration, nil
-		})
-
-		err = integration.InitializeIntegration("mock", "mockid", nil)
-		require.NoError(t, err)
+		rc := requestctxtest.New()
+		rc.SetIntegration("mockid", mockIntegration)
+		ctx := requestctx.With(context.Background(), rc)
 
 		fetchVectorObj := FetchVector{
 			cfg: &Config{
 				Integration: "mockid",
 				Vector:      string(jsonVectors),
 			},
-			fetchIntegration: mockIntegration,
 		}
 
-		result, _, err := fetchVectorObj.Execute(context.Background(), fetchVectorObj.Config())
+		result, _, err := fetchVectorObj.Execute(ctx, fetchVectorObj.Config())
 		require.NoError(t, err)
 		assert.Equal(t, []map[string]any{
 			{
@@ -65,12 +62,9 @@ func TestFetchVector_Execute(t *testing.T) {
 
 		mockIntegration := NewMockfetchVectorIntegration(ctr)
 		mockIntegration.EXPECT().FetchVector(vectors, options).Return(nil, errors.New("dummy error"))
-		integration.ReplaceIntegrationType("mock", func(m map[string]interface{}) (integration.Integration, error) {
-			return mockIntegration, nil
-		})
-
-		err = integration.InitializeIntegration("mock", "mockid", nil)
-		require.NoError(t, err)
+		rc := requestctxtest.New()
+		rc.SetIntegration("mockid", mockIntegration)
+		ctx := requestctx.With(context.Background(), rc)
 
 		fetchVectorObj := FetchVector{
 			cfg: &Config{
@@ -78,10 +72,9 @@ func TestFetchVector_Execute(t *testing.T) {
 				Vector:      string(jsonVectors),
 				Options:     options,
 			},
-			fetchIntegration: mockIntegration,
 		}
 
-		_, _, err = fetchVectorObj.Execute(context.Background(), fetchVectorObj.Config())
+		_, _, err = fetchVectorObj.Execute(ctx, fetchVectorObj.Config())
 		assert.Error(t, err)
 	})
 }

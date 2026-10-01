@@ -6,8 +6,9 @@ import (
 	"testing"
 
 	"github.com/Servflow/servflow/pkg/engine/actions"
-	"github.com/Servflow/servflow/pkg/engine/integration"
 	"github.com/Servflow/servflow/pkg/engine/integration/integrations/filters"
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
+	"github.com/Servflow/servflow/pkg/engine/requestctx/requestctxtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -24,12 +25,9 @@ func TestFetch_Execute(t *testing.T) {
 
 		mockIntegration := NewMockfetchImplementation(ctr)
 		mockIntegration.EXPECT().Fetch(gomock.Any(), map[string]string{"collection": "mock"}, filters.Filter{Field: "id", Comparator: "1"}).Return(fetchReturn, nil)
-		integration.ReplaceIntegrationType("mock", func(m map[string]any) (integration.Integration, error) {
-			return mockIntegration, nil
-		})
-
-		err := integration.InitializeIntegration("mock", "mockds", nil)
-		require.NoError(t, err)
+		rc := requestctxtest.New()
+		rc.SetIntegration("mockds", mockIntegration)
+		ctx := requestctx.With(context.Background(), rc)
 
 		fetch, err := New(Config{
 			Table:       "mock",
@@ -43,7 +41,7 @@ func TestFetch_Execute(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		resp, _, err := fetch.Execute(context.Background(), fetch.Config())
+		resp, _, err := fetch.Execute(ctx, fetch.Config())
 		require.NoError(t, err)
 		assert.Equal(t, fetchReturn, resp)
 	})
@@ -55,10 +53,9 @@ func TestFetch_Execute(t *testing.T) {
 		mockIntegration := NewMockfetchImplementation(ctr)
 		mockIntegration.EXPECT().Fetch(gomock.Any(), map[string]string{"collection": "mock"}, filters.Filter{Field: "id", Comparator: "1"}).
 			Return(nil, errors.New("random error fetching"))
-		integration.ReplaceIntegrationType("mock", func(m map[string]any) (integration.Integration, error) {
-			return mockIntegration, nil
-		})
-		integration.InitializeIntegration("mock", "mockds", nil)
+		rc := requestctxtest.New()
+		rc.SetIntegration("mockds", mockIntegration)
+		ctx := requestctx.With(context.Background(), rc)
 
 		fetch, err := New(Config{
 			Table:       "mock",
@@ -72,7 +69,7 @@ func TestFetch_Execute(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		_, _, err = fetch.Execute(context.Background(), fetch.Config())
+		_, _, err = fetch.Execute(ctx, fetch.Config())
 		require.Error(t, err)
 	})
 
@@ -83,10 +80,9 @@ func TestFetch_Execute(t *testing.T) {
 		mockIntegration := NewMockfetchImplementation(ctr)
 		mockIntegration.EXPECT().Fetch(gomock.Any(), map[string]string{"collection": "mock"}, filters.Filter{Field: "id", Comparator: "1"}).
 			Return([]map[string]interface{}{}, nil)
-		integration.ReplaceIntegrationType("mock", func(m map[string]any) (integration.Integration, error) {
-			return mockIntegration, nil
-		})
-		integration.InitializeIntegration("mock", "mockds", nil)
+		rc := requestctxtest.New()
+		rc.SetIntegration("mockds", mockIntegration)
+		ctx := requestctx.With(context.Background(), rc)
 
 		fetch, err := New(Config{
 			Table:       "mock",
@@ -101,7 +97,7 @@ func TestFetch_Execute(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		_, _, err = fetch.Execute(context.Background(), fetch.Config())
+		_, _, err = fetch.Execute(ctx, fetch.Config())
 		require.Error(t, err)
 		assert.True(t, errors.Is(err, actions.ErrFailure), "Expected failure error to be wrapped with actions.ErrFailure")
 	})

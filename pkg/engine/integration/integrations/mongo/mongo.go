@@ -146,7 +146,8 @@ var (
 	collectionOption = "collection"
 )
 
-func init() {
+// Definition describes the mongo integration to a host that offers it.
+func Definition() integration.Definition {
 	fields := map[string]integration.FieldInfo{
 		"connectionString": {
 			Type:        integration.FieldTypePassword,
@@ -162,19 +163,18 @@ func init() {
 		},
 	}
 
-	if err := integration.RegisterIntegration("mongo", integration.RegistrationInfo{
+	return integration.Definition{
+		Type:        "mongo",
 		Name:        "MongoDB",
 		Description: "MongoDB database integration for document storage and retrieval",
 		ImageURL:    "https://d2ojax9k5fldtt.cloudfront.net/mongo.svg",
 		Fields:      fields,
-		Constructor: func(m map[string]any) (integration.Integration, error) {
+		New: func(m map[string]any) (integration.Integration, error) {
 			return newWrapper(Config{
 				ConnectionString: m["connectionString"].(string),
 				DBName:           m["dbName"].(string),
 			})
 		},
-	}); err != nil {
-		panic(err)
 	}
 }
 

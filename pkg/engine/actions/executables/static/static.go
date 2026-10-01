@@ -52,7 +52,8 @@ func (s *ExecutableV2) Execute(ctx context.Context) (interface{}, map[string]str
 	return resolved, nil, nil
 }
 
-func init() {
+// Definition describes the static action to a host that offers it.
+func Definition() actions.Definition {
 	fields := map[string]actions.FieldInfo{
 		"return": {
 			Type:        actions.FieldTypeString,
@@ -68,7 +69,8 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("static", actions.ActionRegistrationInfo{
+	return actions.Definition{
+		Type:        "static",
 		Name:        "Static Value",
 		Description: "Returns a static value configured at setup time",
 		Fields:      fields,
@@ -76,15 +78,12 @@ func init() {
 			Kind:        actions.OutputValue,
 			Description: "The text of the return template, with its variables filled in.",
 		},
-		UseV2: true,
-		ConstructorV2: func(config json.RawMessage) (actions.ActionExecutableV2, error) {
+		NewV2: func(config json.RawMessage) (actions.ActionExecutableV2, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {
 				return nil, fmt.Errorf("error creating static action: %v", err)
 			}
 			return NewExecutableV2(cfg), nil
 		},
-	}); err != nil {
-		panic(err)
 	}
 }

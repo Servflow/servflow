@@ -104,125 +104,61 @@ func TestOutputInfoJSON(t *testing.T) {
 	})
 }
 
-func TestRegisterActionValidatesOutput(t *testing.T) {
-	constructor := func(config json.RawMessage) (ActionExecutable, error) {
-		return &mockActionExecutable{}, nil
-	}
+func TestOutputValidate(t *testing.T) {
 	resourceField := map[string]FieldInfo{
 		"resource": {Type: FieldTypeString, Values: []string{"diff", "meta"}},
 	}
 
 	t.Run("variantField naming no config field is rejected", func(t *testing.T) {
-		err := RegisterAction("output-unknown-selector", ActionRegistrationInfo{
-			Constructor: constructor,
-			Fields:      resourceField,
-			Output: OutputInfo{
-				VariantField: "kind",
-				Variants:     map[string]OutputInfo{"diff": {Kind: OutputValue}},
-			},
-		})
+		err := OutputInfo{
+			VariantField: "kind",
+			Variants:     map[string]OutputInfo{"diff": {Kind: OutputValue}},
+		}.Validate(resourceField)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), `variantField "kind" is not a config field`)
-		assert.False(t, HasRegisteredActionType("output-unknown-selector"))
 	})
 
 	t.Run("variant outside the field's values is rejected", func(t *testing.T) {
-		err := RegisterAction("output-unknown-variant", ActionRegistrationInfo{
-			Constructor: constructor,
-			Fields:      resourceField,
-			Output: OutputInfo{
-				VariantField: "resource",
-				Variants:     map[string]OutputInfo{"patch": {Kind: OutputValue}},
-			},
-		})
+		err := OutputInfo{
+			VariantField: "resource",
+			Variants:     map[string]OutputInfo{"patch": {Kind: OutputValue}},
+		}.Validate(resourceField)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), `variant "patch" is not a value of field "resource"`)
 	})
 
 	t.Run("variantField without variants is rejected", func(t *testing.T) {
-		err := RegisterAction("output-empty-variants", ActionRegistrationInfo{
-			Constructor: constructor,
-			Fields:      resourceField,
-			Output:      OutputInfo{VariantField: "resource"},
-		})
+		err := OutputInfo{VariantField: "resource"}.Validate(resourceField)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "has no variants")
 	})
 
 	t.Run("variants without a variantField are rejected", func(t *testing.T) {
-		err := RegisterAction("output-orphan-variants", ActionRegistrationInfo{
-			Constructor: constructor,
-			Fields:      resourceField,
-			Output:      OutputInfo{Variants: map[string]OutputInfo{"diff": {Kind: OutputValue}}},
-		})
+		err := OutputInfo{Variants: map[string]OutputInfo{"diff": {Kind: OutputValue}}}.Validate(resourceField)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "variants without a variantField")
 	})
 
-	t.Run("a valid variant declaration registers", func(t *testing.T) {
-		err := RegisterAction("output-valid-variants", ActionRegistrationInfo{
-			Constructor: constructor,
-			Fields:      resourceField,
-			Output: OutputInfo{
-				VariantField: "resource",
-				Variants: map[string]OutputInfo{
-					"diff": {Kind: OutputValue},
-					"meta": {Kind: OutputObject, Fields: []OutputField{{Path: "title", Type: "string"}}},
-				},
+	t.Run("a valid variant declaration passes", func(t *testing.T) {
+		err := OutputInfo{
+			VariantField: "resource",
+			Variants: map[string]OutputInfo{
+				"diff": {Kind: OutputValue},
+				"meta": {Kind: OutputObject, Fields: []OutputField{{Path: "title", Type: "string"}}},
 			},
-		})
+		}.Validate(resourceField)
 		require.NoError(t, err)
-
-		info, err := GetInfoForAction("output-valid-variants")
-		require.NoError(t, err)
-		assert.Equal(t, "resource", info.Output.VariantField)
 	})
 
-	t.Run("an undescribed action registers as dynamic", func(t *testing.T) {
-		err := RegisterAction("output-undescribed", ActionRegistrationInfo{
-			Constructor: constructor,
-			Fields:      map[string]FieldInfo{},
-		})
-		require.NoError(t, err)
-
-		info, err := GetInfoForAction("output-undescribed")
-		require.NoError(t, err)
-		assert.Equal(t, OutputDynamic, info.Output.Kind)
+	t.Run("an undescribed action passes", func(t *testing.T) {
+		require.NoError(t, OutputInfo{}.Validate(map[string]FieldInfo{}))
 	})
 
 	t.Run("a selector field with open values accepts any variant", func(t *testing.T) {
-		err := RegisterAction("output-open-selector", ActionRegistrationInfo{
-			Constructor: constructor,
-			Fields:      map[string]FieldInfo{"mode": {Type: FieldTypeString}},
-			Output: OutputInfo{
-				VariantField: "mode",
-				Variants:     map[string]OutputInfo{"anything": {Kind: OutputValue}},
-			},
-		})
+		err := OutputInfo{
+			VariantField: "mode",
+			Variants:     map[string]OutputInfo{"anything": {Kind: OutputValue}},
+		}.Validate(map[string]FieldInfo{"mode": {Type: FieldTypeString}})
 		require.NoError(t, err)
 	})
-}
-
-func TestReplaceActionTypeKeepsOutput(t *testing.T) {
-	err := RegisterAction("output-replaceable", ActionRegistrationInfo{
-		Constructor: func(config json.RawMessage) (ActionExecutable, error) {
-			return &mockActionExecutable{config: "original"}, nil
-		},
-		Fields: map[string]FieldInfo{},
-		Output: OutputInfo{
-			Kind:   OutputObject,
-			Fields: []OutputField{{Path: "title", Type: "string"}},
-		},
-	})
-	require.NoError(t, err)
-
-	ReplaceActionType("output-replaceable", func(config json.RawMessage) (ActionExecutable, error) {
-		return &mockActionExecutable{config: "replaced"}, nil
-	})
-
-	info, err := GetInfoForAction("output-replaceable")
-	require.NoError(t, err)
-	assert.Equal(t, OutputObject, info.Output.Kind)
-	require.Len(t, info.Output.Fields, 1)
-	assert.Equal(t, "title", info.Output.Fields[0].Path)
 }

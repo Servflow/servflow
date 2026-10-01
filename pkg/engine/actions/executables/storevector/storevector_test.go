@@ -6,7 +6,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/Servflow/servflow/pkg/engine/integration"
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
+	"github.com/Servflow/servflow/pkg/engine/requestctx/requestctxtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -26,12 +27,9 @@ func TestStoreVectors_Execute(t *testing.T) {
 
 		mockIntegration := NewMockstoreVectorIntegration(ctr)
 		mockIntegration.EXPECT().StoreVectors(vectors, fields, map[string]string{"optiontest": "test"}).Return(nil)
-		integration.ReplaceIntegrationType("mock", func(m map[string]interface{}) (integration.Integration, error) {
-			return mockIntegration, nil
-		})
-
-		err = integration.InitializeIntegration("mock", "mockid", nil)
-		require.NoError(t, err)
+		rc := requestctxtest.New()
+		rc.SetIntegration("mockid", mockIntegration)
+		ctx := requestctx.With(context.Background(), rc)
 
 		storeVectors, err := New(Config{
 			Integration: "mockid",
@@ -41,7 +39,7 @@ func TestStoreVectors_Execute(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		_, _, err = storeVectors.Execute(context.Background(), storeVectors.Config())
+		_, _, err = storeVectors.Execute(ctx, storeVectors.Config())
 		require.NoError(t, err)
 	})
 
@@ -57,10 +55,9 @@ func TestStoreVectors_Execute(t *testing.T) {
 
 		mockIntegration := NewMockstoreVectorIntegration(ctr)
 		mockIntegration.EXPECT().StoreVectors(vectors, fields, map[string]string{"optiontest": "test"}).Return(errors.New("dummy error"))
-		integration.ReplaceIntegrationType("mock", func(m map[string]interface{}) (integration.Integration, error) {
-			return mockIntegration, nil
-		})
-		integration.InitializeIntegration("mock", "mockid", nil)
+		rc := requestctxtest.New()
+		rc.SetIntegration("mockid", mockIntegration)
+		ctx := requestctx.With(context.Background(), rc)
 
 		storeVectors, err := New(Config{
 			Integration: "mockid",
@@ -70,7 +67,7 @@ func TestStoreVectors_Execute(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		_, _, err = storeVectors.Execute(context.Background(), storeVectors.Config())
+		_, _, err = storeVectors.Execute(ctx, storeVectors.Config())
 		assert.Error(t, err)
 	})
 }

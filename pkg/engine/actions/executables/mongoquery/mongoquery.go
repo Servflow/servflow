@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/Servflow/servflow/pkg/engine/actions"
-	"github.com/Servflow/servflow/pkg/engine/integration"
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
 )
 
 type Config struct {
@@ -24,7 +24,6 @@ type mongoDBIntegration interface {
 
 type MGOQuery struct {
 	config Config
-	i      mongoDBIntegration
 }
 
 func (m *MGOQuery) Config() string {
@@ -43,20 +42,7 @@ func New(config Config) (*MGOQuery, error) {
 		return nil, errors.New("collection is required")
 	}
 
-	i, err := integration.GetIntegration(context.Background(), config.Integration)
-	if err != nil {
-		return nil, err
-	}
-
-	u, ok := i.(mongoDBIntegration)
-	if !ok {
-		return nil, errors.New("integration does not implement mongoDBIntegration")
-	}
-
-	return &MGOQuery{
-		config: config,
-		i:      u,
-	}, nil
+	return &MGOQuery{config: config}, nil
 }
 
 func (m *MGOQuery) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
@@ -66,7 +52,16 @@ func (m *MGOQuery) Execute(ctx context.Context, modifiedConfig string) (interfac
 	}
 	m.config = cfg
 
-	result, err := m.i.ExecuteQuery(ctx, cfg.Collection, cfg.FilterQuery, cfg.Projection)
+	i, err := requestctx.GetIntegration(ctx, cfg.Integration)
+	if err != nil {
+		return nil, nil, err
+	}
+	impl, ok := i.(mongoDBIntegration)
+	if !ok {
+		return nil, nil, errors.New("integration does not implement mongoDBIntegration")
+	}
+
+	result, err := impl.ExecuteQuery(ctx, cfg.Collection, cfg.FilterQuery, cfg.Projection)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error executing integration: %v", err)
 	}
@@ -83,7 +78,8 @@ func (m *MGOQuery) Type() string {
 	return "mongoquery"
 }
 
-func init() {
+// Definition describes the mongoquery action to a host that offers it.
+func Definition() actions.Definition {
 	fields := map[string]actions.FieldInfo{
 		"collection": {
 			Type:        actions.FieldTypeString,
@@ -118,7 +114,8 @@ func init() {
 		},
 	}
 
-	if err := actions.RegisterAction("mongoquery", actions.ActionRegistrationInfo{
+	return actions.Definition{
+		Type:        "mongoquery",
 		Name:        "MongoDB Query",
 		Description: "Executes queries against MongoDB collections with filtering and projection",
 		Fields:      fields,
@@ -126,14 +123,12 @@ func init() {
 			Kind:        actions.OutputDynamic,
 			Description: "A list of the matching documents, with the collection's own field names.",
 		},
-		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
+		New: func(config json.RawMessage) (actions.ActionExecutable, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {
 				return nil, fmt.Errorf("error creating mongoquery action: %v", err)
 			}
 			return New(cfg)
 		},
-	}); err != nil {
-		panic(err)
 	}
 }

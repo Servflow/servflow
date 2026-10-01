@@ -39,10 +39,12 @@ func (s *Executable) Execute(ctx context.Context, modifiedConfig string) (interf
 	return newFields, nil, nil
 }
 
-func init() {
+// Definition describes the stub action to a host that offers it.
+func Definition() actions.Definition {
 	fields := map[string]actions.FieldInfo{}
 
-	if err := actions.RegisterAction("stub", actions.ActionRegistrationInfo{
+	return actions.Definition{
+		Type:        "stub",
 		Name:        "Stub Action",
 		Description: "A placeholder action that accepts any configuration for testing purposes",
 		Fields:      fields,
@@ -50,14 +52,12 @@ func init() {
 			Kind:        actions.OutputDynamic,
 			Description: "The configured response, echoed back as it was written.",
 		},
-		Constructor: func(config json.RawMessage) (actions.ActionExecutable, error) {
+		New: func(config json.RawMessage) (actions.ActionExecutable, error) {
 			var fields map[string]interface{}
 			if err := json.Unmarshal(config, &fields); err != nil {
 				return nil, fmt.Errorf("error creating stub action: %v", err)
 			}
 			return NewExecutable(fields), nil
 		},
-	}); err != nil {
-		panic(err)
 	}
 }

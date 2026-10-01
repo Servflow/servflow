@@ -9,13 +9,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/Servflow/servflow/pkg/apiconfig"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
 )
 
 // Conformance checks the behavior actions rely on from a RequestContext.
 // newContext must return a context carrying a fresh RequestContext with no
-// variables, files, workspace, request, or secrets.
+// variables, files, workspace, request, secrets, or integrations.
 func Conformance(t *testing.T, newContext func() context.Context) {
 	t.Helper()
 
@@ -84,19 +83,19 @@ func Conformance(t *testing.T, newContext func() context.Context) {
 		requestctx.AddRequestFile(rc, "upload", requestctx.NewFileValue(io.NopCloser(strings.NewReader("req")), "a.txt"))
 		requestctx.AddActionFile(rc, "render", requestctx.NewFileValue(io.NopCloser(strings.NewReader("act")), "b.txt"))
 
-		f, err := requestctx.GetFileFromContext(ctx, apiconfig.FileInput{Type: apiconfig.FileInputTypeRequest, Identifier: "upload"})
+		f, err := requestctx.GetFileFromContext(ctx, requestctx.FileInput{Type: requestctx.FileInputTypeRequest, Identifier: "upload"})
 		require.NoError(t, err)
 		assert.Equal(t, "a.txt", f.Name)
 
-		f, err = requestctx.GetFileFromContext(ctx, apiconfig.FileInput{Type: apiconfig.FileInputTypeAction, Identifier: "action.render"})
+		f, err = requestctx.GetFileFromContext(ctx, requestctx.FileInput{Type: requestctx.FileInputTypeAction, Identifier: "action.render"})
 		require.NoError(t, err)
 		assert.Equal(t, "b.txt", f.Name)
 
-		_, err = requestctx.GetFileFromContext(ctx, apiconfig.FileInput{Type: apiconfig.FileInputTypeRequest, Identifier: "missing"})
+		_, err = requestctx.GetFileFromContext(ctx, requestctx.FileInput{Type: requestctx.FileInputTypeRequest, Identifier: "missing"})
 		assert.ErrorIs(t, err, requestctx.ErrFileNotFound)
 	})
 
-	t.Run("a fresh request has no workspace, request, or secrets", func(t *testing.T) {
+	t.Run("a fresh request has no workspace, request, secrets, or integrations", func(t *testing.T) {
 		ctx := newContext()
 		rc := mustRC(t, ctx)
 
@@ -105,6 +104,9 @@ func Conformance(t *testing.T, newContext func() context.Context) {
 		assert.Nil(t, rc.Request())
 		assert.False(t, rc.HasSecrets())
 		assert.Equal(t, "nothing secret", rc.Scrub("nothing secret"))
+
+		_, err = requestctx.GetIntegration(ctx, "not-configured")
+		assert.Error(t, err)
 	})
 }
 

@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"strings"
 
 	"github.com/Servflow/servflow/pkg/apiconfig"
@@ -22,37 +21,6 @@ const (
 // TODO see if we want to limit file to reading once based on memory use and pressure
 
 var ErrFileNotFound = errors.New("file not found")
-
-func (rc *RequestContext) LoadRequestFiles(r *http.Request) error {
-	if r == nil {
-		return nil
-	}
-
-	contentType := r.Header.Get("Content-Type")
-	if !strings.HasPrefix(contentType, "multipart/form-data") {
-		return nil
-	}
-
-	err := r.ParseMultipartForm(32 << 20) // 32 MB max memory
-	if err != nil {
-		return err
-	}
-
-	if r.MultipartForm != nil && r.MultipartForm.File != nil {
-		for fieldName, fileHeaders := range r.MultipartForm.File {
-			if len(fileHeaders) > 0 {
-				fileHeader := fileHeaders[0] // Take the first file if multiple
-				file, err := fileHeader.Open()
-				if err != nil {
-					continue
-				}
-				rc.AddRequestFile(fieldName, NewFileValue(file, fileHeader.Filename))
-			}
-		}
-	}
-
-	return nil
-}
 
 // FileValue provides safe, consistent access to file content.
 //
@@ -94,7 +62,7 @@ func (f *FileValue) Close() error {
 }
 
 func GetFileFromContext(ctx context.Context, fileInput apiconfig.FileInput) (*FileValue, error) {
-	reqCtx, err := FromContextOrError(ctx)
+	rc, err := FromContextOrError(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +74,7 @@ func GetFileFromContext(ctx context.Context, fileInput apiconfig.FileInput) (*Fi
 	case apiconfig.FileInputTypeAction:
 		key = fileKeyActionPrefix + strings.TrimPrefix(fileInput.Identifier, apiconfig.ActionConfigPrefix)
 	case apiconfig.FileInputTypeStorage:
-		ws := reqCtx.GetWorkspace()
+		ws := rc.Workspace()
 		if ws == nil {
 			return nil, ErrNoWorkspace
 		}
@@ -119,7 +87,7 @@ func GetFileFromContext(ctx context.Context, fileInput apiconfig.FileInput) (*Fi
 		return nil, nil
 	}
 
-	file, ok := reqCtx.availableFiles[key]
+	file, ok := rc.File(key)
 	if !ok {
 		return nil, ErrFileNotFound
 	}
@@ -127,16 +95,16 @@ func GetFileFromContext(ctx context.Context, fileInput apiconfig.FileInput) (*Fi
 	return file, nil
 }
 
-func (rc *RequestContext) AddRequestFile(fieldName string, file *FileValue) {
-	rc.Lock()
-	defer rc.Unlock()
-	rc.availableFiles[fileKeyRequestPrefix+fieldName] = file
+// AddRequestFile stores a file that arrived with the request under its form
+// field name, where a "request" file input finds it.
+func AddRequestFile(rc RequestContext, fieldName string, file *FileValue) {
+	rc.AddFile(fileKeyRequestPrefix+fieldName, file)
 }
 
-func (rc *RequestContext) AddActionFile(name string, file *FileValue) {
-	rc.Lock()
-	defer rc.Unlock()
-	rc.availableFiles[fileKeyActionPrefix+name] = file
+// AddActionFile stores a file an action produced under the action's name,
+// where an "action" file input finds it.
+func AddActionFile(rc RequestContext, name string, file *FileValue) {
+	rc.AddFile(fileKeyActionPrefix+name, file)
 }
 
 // GetContent returns the file's content as a byte slice.

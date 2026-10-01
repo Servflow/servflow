@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
+	"github.com/Servflow/servflow/pkg/engine/requestctx/requestctxtest"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -172,7 +173,7 @@ func TestExecutable_Execute(t *testing.T) {
 			exec, err := NewExecutable(tt.config)
 			require.NoError(t, err)
 
-			ctx := requestctx.NewTestContext()
+			ctx := requestctxtest.NewContext()
 			if tt.variables != nil {
 				err := requestctx.AddRequestVariables(ctx, tt.variables, "")
 				require.NoError(t, err)
@@ -237,7 +238,7 @@ func TestExecutable_Execute_RequestBody(t *testing.T) {
 			exec, err := NewExecutable(Config{Script: tt.script})
 			require.NoError(t, err)
 
-			ctx := requestctx.NewTestContext()
+			ctx := requestctxtest.NewContext()
 			req := httptest.NewRequest(http.MethodPost, "/test", strings.NewReader(tt.body))
 			setRequest(t, ctx, req)
 
@@ -316,7 +317,7 @@ func TestExecutable_Execute_Params(t *testing.T) {
 			exec, err := NewExecutable(Config{Script: tt.script})
 			require.NoError(t, err)
 
-			ctx := requestctx.NewTestContext()
+			ctx := requestctxtest.NewContext()
 			req := tt.setupReq()
 			setRequest(t, ctx, req)
 
@@ -340,7 +341,7 @@ func TestExecutable_Execute_AllParameters(t *testing.T) {
 	exec, err := NewExecutable(Config{Script: script})
 	require.NoError(t, err)
 
-	ctx := requestctx.NewTestContext()
+	ctx := requestctxtest.NewContext()
 	err = requestctx.AddRequestVariables(ctx, map[string]interface{}{"name": "TestUser"}, "")
 	require.NoError(t, err)
 
@@ -364,7 +365,7 @@ func TestExecutable_Execute_NoRequestInContext(t *testing.T) {
 	exec, err := NewExecutable(Config{Script: script})
 	require.NoError(t, err)
 
-	ctx := requestctx.NewTestContext()
+	ctx := requestctxtest.NewContext()
 
 	result, _, err := exec.Execute(ctx, script)
 	require.NoError(t, err)
@@ -382,7 +383,7 @@ func TestExecutable_Execute_BackwardCompatibility(t *testing.T) {
 	exec, err := NewExecutable(Config{Script: script})
 	require.NoError(t, err)
 
-	ctx := requestctx.NewTestContext()
+	ctx := requestctxtest.NewContext()
 	err = requestctx.AddRequestVariables(ctx, map[string]interface{}{"value": "test"}, "")
 	require.NoError(t, err)
 
@@ -398,5 +399,5 @@ func setRequest(t *testing.T, ctx context.Context, req *http.Request) {
 	t.Helper()
 	rc, err := requestctx.FromContextOrError(ctx)
 	require.NoError(t, err)
-	rc.SetRequest(req)
+	rc.(*requestctxtest.Context).SetRequest(req)
 }

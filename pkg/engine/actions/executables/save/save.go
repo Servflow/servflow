@@ -89,7 +89,7 @@ func (s *Save) Execute(ctx context.Context) (interface{}, map[string]string, err
 	return s.executeUpdate(ctx, rc, resolvedFields, options)
 }
 
-func (s *Save) executeInsert(ctx context.Context, rc *requestctx.RequestContext, fields map[string]interface{}, options map[string]string) (interface{}, map[string]string, error) {
+func (s *Save) executeInsert(ctx context.Context, rc requestctx.RequestContext, fields map[string]interface{}, options map[string]string) (interface{}, map[string]string, error) {
 	logger := logging.FromContext(ctx)
 
 	// Generate ID if not provided
@@ -109,7 +109,7 @@ func (s *Save) executeInsert(ctx context.Context, rc *requestctx.RequestContext,
 	return map[string]interface{}{"id": id}, nil, nil
 }
 
-func (s *Save) executeUpdate(ctx context.Context, rc *requestctx.RequestContext, fields map[string]interface{}, options map[string]string) (interface{}, map[string]string, error) {
+func (s *Save) executeUpdate(ctx context.Context, rc requestctx.RequestContext, fields map[string]interface{}, options map[string]string) (interface{}, map[string]string, error) {
 	logger := logging.FromContext(ctx)
 
 	// Resolve templates in filters
@@ -128,7 +128,7 @@ func (s *Save) executeUpdate(ctx context.Context, rc *requestctx.RequestContext,
 	return map[string]interface{}{"id": id}, nil, nil
 }
 
-func (s *Save) resolveFields(ctx context.Context, rc *requestctx.RequestContext, fields map[string]interface{}) (map[string]interface{}, error) {
+func (s *Save) resolveFields(ctx context.Context, rc requestctx.RequestContext, fields map[string]interface{}) (map[string]interface{}, error) {
 	resolved := make(map[string]interface{}, len(fields))
 
 	for key, value := range fields {
@@ -147,7 +147,7 @@ func (s *Save) resolveFields(ctx context.Context, rc *requestctx.RequestContext,
 	return resolved, nil
 }
 
-func (s *Save) resolveFilters(ctx context.Context, rc *requestctx.RequestContext, filtersList []filters.Filter) ([]filters.Filter, error) {
+func (s *Save) resolveFilters(ctx context.Context, rc requestctx.RequestContext, filtersList []filters.Filter) ([]filters.Filter, error) {
 	resolved := make([]filters.Filter, len(filtersList))
 
 	for i, f := range filtersList {

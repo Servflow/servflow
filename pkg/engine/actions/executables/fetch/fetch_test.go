@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/integration"
 	"github.com/Servflow/servflow/pkg/engine/integration/integrations/filters"
-	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -103,6 +103,6 @@ func TestFetch_Execute(t *testing.T) {
 
 		_, _, err = fetch.Execute(context.Background(), fetch.Config())
 		require.Error(t, err)
-		assert.True(t, errors.Is(err, plan.ErrFailure), "Expected failure error to be wrapped with plan.ErrFailure")
+		assert.True(t, errors.Is(err, actions.ErrFailure), "Expected failure error to be wrapped with actions.ErrFailure")
 	})
 }

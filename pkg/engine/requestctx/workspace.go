@@ -53,11 +53,11 @@ var (
 // ErrNoWorkspace if the request has none. This is the helper actions call before
 // touching files.
 func WorkspaceFromContext(ctx context.Context) (Workspace, error) {
-	reqCtx, err := FromContextOrError(ctx)
+	rc, err := FromContextOrError(ctx)
 	if err != nil {
 		return nil, err
 	}
-	ws := reqCtx.GetWorkspace()
+	ws := rc.Workspace()
 	if ws == nil {
 		return nil, ErrNoWorkspace
 	}

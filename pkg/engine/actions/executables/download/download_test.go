@@ -9,8 +9,9 @@ import (
 	"testing"
 
 	"github.com/Servflow/servflow/pkg/apiconfig"
-	"github.com/Servflow/servflow/pkg/engine/plan"
+	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
+	"github.com/Servflow/servflow/pkg/engine/requestctx/requestctxtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -71,7 +72,7 @@ func TestDownload_Execute(t *testing.T) {
 			setupContext: func(t *testing.T, ctx context.Context) {
 				reqCtx, _ := requestctx.FromContextOrError(ctx)
 				file := io.NopCloser(strings.NewReader("test file content"))
-				reqCtx.AddRequestFile("testfile", requestctx.NewFileValue(file, "original.txt"))
+				requestctx.AddRequestFile(reqCtx, "testfile", requestctx.NewFileValue(file, "original.txt"))
 			},
 			config: Config{
 				File:      apiconfig.FileInput{Type: apiconfig.FileInputTypeRequest, Identifier: "testfile"},
@@ -85,7 +86,7 @@ func TestDownload_Execute(t *testing.T) {
 			setupContext: func(t *testing.T, ctx context.Context) {
 				reqCtx, _ := requestctx.FromContextOrError(ctx)
 				file := io.NopCloser(strings.NewReader("test file content"))
-				reqCtx.AddRequestFile("testfile", requestctx.NewFileValue(file, "original.txt"))
+				requestctx.AddRequestFile(reqCtx, "testfile", requestctx.NewFileValue(file, "original.txt"))
 			},
 			config: Config{
 				File:      apiconfig.FileInput{Type: apiconfig.FileInputTypeRequest, Identifier: "testfile"},
@@ -99,7 +100,7 @@ func TestDownload_Execute(t *testing.T) {
 			setupContext: func(t *testing.T, ctx context.Context) {
 				reqCtx, _ := requestctx.FromContextOrError(ctx)
 				file := io.NopCloser(strings.NewReader("new content"))
-				reqCtx.AddRequestFile("testfile", requestctx.NewFileValue(file, "existing.txt"))
+				requestctx.AddRequestFile(reqCtx, "testfile", requestctx.NewFileValue(file, "existing.txt"))
 			},
 			setupFS: func(t *testing.T, ws *memWorkspace, destPath string) {
 				ws.files[path.Join(destPath, "existing.txt")] = []byte("old content")
@@ -116,7 +117,7 @@ func TestDownload_Execute(t *testing.T) {
 			setupContext: func(t *testing.T, ctx context.Context) {
 				reqCtx, _ := requestctx.FromContextOrError(ctx)
 				file := io.NopCloser(strings.NewReader("new content"))
-				reqCtx.AddRequestFile("testfile", requestctx.NewFileValue(file, "existing.txt"))
+				requestctx.AddRequestFile(reqCtx, "testfile", requestctx.NewFileValue(file, "existing.txt"))
 			},
 			setupFS: func(t *testing.T, ws *memWorkspace, destPath string) {
 				ws.files[path.Join(destPath, "existing.txt")] = []byte("old content")
@@ -145,7 +146,7 @@ func TestDownload_Execute(t *testing.T) {
 			setupContext: func(t *testing.T, ctx context.Context) {
 				reqCtx, _ := requestctx.FromContextOrError(ctx)
 				file := io.NopCloser(strings.NewReader("test file content"))
-				reqCtx.AddRequestFile("testfile", requestctx.NewFileValue(file, "test.txt"))
+				requestctx.AddRequestFile(reqCtx, "testfile", requestctx.NewFileValue(file, "test.txt"))
 			},
 			config: Config{
 				File:      apiconfig.FileInput{Type: apiconfig.FileInputTypeRequest, Identifier: "testfile"},
@@ -159,7 +160,7 @@ func TestDownload_Execute(t *testing.T) {
 			setupContext: func(t *testing.T, ctx context.Context) {
 				reqCtx, _ := requestctx.FromContextOrError(ctx)
 				file := io.NopCloser(strings.NewReader("test file content"))
-				reqCtx.AddRequestFile("testfile", requestctx.NewFileValue(file, "test.txt"))
+				requestctx.AddRequestFile(reqCtx, "testfile", requestctx.NewFileValue(file, "test.txt"))
 			},
 			noWorkspace: true,
 			config: Config{
@@ -174,12 +175,12 @@ func TestDownload_Execute(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := requestctx.NewTestContext()
+			rc := requestctxtest.New()
+			ctx := requestctx.With(context.Background(), rc)
 			ws := newMemWorkspace()
 
 			if !tc.noWorkspace {
-				reqCtx, _ := requestctx.FromContextOrError(ctx)
-				reqCtx.SetWorkspace(ws)
+				rc.SetWorkspace(ws)
 			}
 
 			if tc.setupContext != nil {
@@ -199,7 +200,7 @@ func TestDownload_Execute(t *testing.T) {
 
 			if tc.expectError {
 				require.Error(t, err)
-				assert.ErrorIs(t, err, plan.ErrFailure)
+				assert.ErrorIs(t, err, actions.ErrFailure)
 				if tc.errorContains != "" {
 					assert.Contains(t, err.Error(), tc.errorContains)
 				}

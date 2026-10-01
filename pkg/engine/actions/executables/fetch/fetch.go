@@ -9,7 +9,6 @@ import (
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/integration"
 	"github.com/Servflow/servflow/pkg/engine/integration/integrations/filters"
-	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/Servflow/servflow/pkg/logging"
 	"go.uber.org/zap"
 )
@@ -83,7 +82,7 @@ func (f *Fetch) Execute(ctx context.Context, modifiedConfig string) (interface{}
 	ret = resp
 	if len(resp) < 1 {
 		if f.cfg.FailIfEmpty {
-			return nil, nil, fmt.Errorf("%w: no data found", plan.ErrFailure)
+			return nil, nil, fmt.Errorf("%w: no data found", actions.ErrFailure)
 		}
 		return map[string]interface{}{}, nil, nil
 	}

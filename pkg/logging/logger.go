@@ -53,9 +53,18 @@ func GetNewLogger() *zap.Logger {
 	return root
 }
 
+// loggerCtxKey stores the request logger in a context.
+type loggerCtxKey struct{}
+
 // WithLogger adds a logger to the context
 func WithLogger(ctx context.Context, logger *zap.Logger) context.Context {
-	return requestctx.WithLogger(ctx, logger)
+	return context.WithValue(ctx, loggerCtxKey{}, logger)
+}
+
+// LoggerFromContext returns the logger installed by WithLogger, if any.
+func LoggerFromContext(ctx context.Context) (*zap.Logger, bool) {
+	l, ok := ctx.Value(loggerCtxKey{}).(*zap.Logger)
+	return l, ok
 }
 
 // FromContext retrieves a logger from the context.
@@ -64,7 +73,7 @@ func WithLogger(ctx context.Context, logger *zap.Logger) context.Context {
 // resolved secrets must not be able to log them through the fallback path.
 func FromContext(ctx context.Context) *zap.Logger {
 	if ctx != nil {
-		if logger, ok := requestctx.LoggerFromContext(ctx); ok {
+		if logger, ok := LoggerFromContext(ctx); ok {
 			return logger
 		}
 		if rc, ok := requestctx.FromContext(ctx); ok {

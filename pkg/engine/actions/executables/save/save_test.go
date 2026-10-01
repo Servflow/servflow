@@ -7,14 +7,14 @@ import (
 
 	"github.com/Servflow/servflow/pkg/engine/integration"
 	"github.com/Servflow/servflow/pkg/engine/integration/integrations/filters"
-	"github.com/Servflow/servflow/pkg/engine/requestctx"
+	"github.com/Servflow/servflow/pkg/engine/requestctx/requestctxtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )
 
 func setupTestContext(t *testing.T) context.Context {
-	ctx := requestctx.NewTestContext()
+	ctx := requestctxtest.NewContext()
 	return ctx
 }
 

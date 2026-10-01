@@ -3,12 +3,19 @@ package store_key
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"testing"
 
-	"github.com/Servflow/servflow/pkg/storage"
+	"github.com/Servflow/servflow/pkg/engine/kv"
+	"github.com/Servflow/servflow/pkg/engine/kv/kvtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestMain(m *testing.M) {
+	kv.SetStore(kvtest.New())
+	os.Exit(m.Run())
+}
 
 func TestStoreKey_Execute(t *testing.T) {
 	t.Run("basic store and verify", func(t *testing.T) {
@@ -24,7 +31,7 @@ func TestStoreKey_Execute(t *testing.T) {
 		assert.Nil(t, fields)
 		assert.Equal(t, "processed-value", result)
 
-		stored, found, err := storage.Get("test-store-key")
+		stored, found, err := kv.Get("test-store-key")
 		require.NoError(t, err)
 		assert.True(t, found)
 		assert.Equal(t, "processed-value", stored)
@@ -45,7 +52,7 @@ func TestStoreKey_Execute(t *testing.T) {
 		_, _, err = exec.Execute(context.Background(), string(secondConfig))
 		require.NoError(t, err)
 
-		stored, found, err := storage.Get("test-overwrite-key")
+		stored, found, err := kv.Get("test-overwrite-key")
 		require.NoError(t, err)
 		assert.True(t, found)
 		assert.Equal(t, "second-value", stored)
@@ -77,7 +84,7 @@ func TestStoreKey_Execute(t *testing.T) {
 		assert.Nil(t, fields)
 		assert.Equal(t, "test-value", result)
 
-		stored, found, err := storage.Get("dynamic-key")
+		stored, found, err := kv.Get("dynamic-key")
 		require.NoError(t, err)
 		assert.True(t, found)
 		assert.Equal(t, "test-value", stored)

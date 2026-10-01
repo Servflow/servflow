@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/Servflow/servflow/pkg/engine/requestctx"
+	"github.com/Servflow/servflow/pkg/engine/requestctx/requestctxtest"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest/observer"
@@ -31,8 +31,7 @@ func TestWithContextEnriched(t *testing.T) {
 	testLogger := zap.New(core)
 
 	// Create a request context
-	reqCtx := requestctx.NewRequestContext("test-request-123")
-	ctx := requestctx.WithAggregationContext(context.Background(), reqCtx)
+	ctx := requestctxtest.NewContext()
 	ctxWithLogger := WithLogger(ctx, testLogger)
 
 	// Get enriched logger and log a message
@@ -44,7 +43,7 @@ func TestWithContextEnriched(t *testing.T) {
 	assert.Equal(t, 1, len(logs), "expected one log entry")
 
 	fields := logs[0].ContextMap()
-	assert.Equal(t, "test-request-123", fields["request_id"], "request_id should match")
+	assert.Equal(t, "test", fields["request_id"], "request_id should match")
 }
 
 func TestInfoContext(t *testing.T) {
@@ -143,8 +142,7 @@ func TestContextLoggingWithRequestContext(t *testing.T) {
 	testLogger := zap.New(core)
 
 	// Create a request context
-	reqCtx := requestctx.NewRequestContext("test-request-456")
-	ctx := requestctx.WithAggregationContext(context.Background(), reqCtx)
+	ctx := requestctxtest.NewContext()
 	ctxWithLogger := WithLogger(ctx, testLogger)
 
 	// Test all context logging functions with request context
@@ -159,6 +157,6 @@ func TestContextLoggingWithRequestContext(t *testing.T) {
 
 	for i, log := range logs {
 		fields := log.ContextMap()
-		assert.Equal(t, "test-request-456", fields["request_id"], "request_id should be present in log %d", i)
+		assert.Equal(t, "test", fields["request_id"], "request_id should be present in log %d", i)
 	}
 }

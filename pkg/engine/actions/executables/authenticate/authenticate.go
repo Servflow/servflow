@@ -9,7 +9,6 @@ import (
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/integration"
 	"github.com/Servflow/servflow/pkg/engine/integration/integrations/filters"
-	"github.com/Servflow/servflow/pkg/engine/plan"
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -90,7 +89,7 @@ func (a *Action) Execute(ctx context.Context, modifiedConfig string) (interface{
 	}
 	if subject == "" {
 		if cfg.FailOnAuthError {
-			return nil, nil, fmt.Errorf("%w: invalid token subject", plan.ErrFailure)
+			return nil, nil, fmt.Errorf("%w: invalid token subject", actions.ErrFailure)
 		}
 		return nil, nil, errors.New("token subject is invalid")
 	}
@@ -105,7 +104,7 @@ func (a *Action) Execute(ctx context.Context, modifiedConfig string) (interface{
 	}
 	if len(resp) < 1 {
 		if cfg.FailOnAuthError {
-			return nil, nil, fmt.Errorf("%w: authentication failed - user not found", plan.ErrFailure)
+			return nil, nil, fmt.Errorf("%w: authentication failed - user not found", actions.ErrFailure)
 		}
 		return nil, nil, errors.New("token subject is invalid")
 	}

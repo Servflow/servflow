@@ -8,7 +8,6 @@ import (
 
 	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/integration"
-	"github.com/Servflow/servflow/pkg/engine/plan"
 )
 
 type Config struct {
@@ -73,7 +72,7 @@ func (m *MGOQuery) Execute(ctx context.Context, modifiedConfig string) (interfac
 	}
 
 	if len(result) == 0 && cfg.FailIfEmpty {
-		return nil, nil, fmt.Errorf("%w: no documents found", plan.ErrFailure)
+		return nil, nil, fmt.Errorf("%w: no documents found", actions.ErrFailure)
 	}
 
 	return result, nil, nil

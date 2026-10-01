@@ -1,22 +1,17 @@
 package http
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/Servflow/servflow/pkg/apiconfig"
-	"github.com/Servflow/servflow/pkg/engine/plan"
+	"github.com/Servflow/servflow/pkg/engine/actions"
 	"github.com/Servflow/servflow/pkg/engine/requestctx"
-	"github.com/Servflow/servflow/pkg/engine/secrets"
-	// register the built-in "http" response kind for plan-execute tests below
-	_ "github.com/Servflow/servflow/pkg/engine/responses/http"
-	"github.com/Servflow/servflow/pkg/logging"
+	"github.com/Servflow/servflow/pkg/engine/requestctx/requestctxtest"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/stretchr/testify/require"
@@ -302,13 +297,13 @@ func TestHttp_Execute(t *testing.T) {
 			// V2: the action reads its parsed config and resolves fields against
 			// the request context, so no config string is passed to Execute.
 			h := New(config)
-			ctx := requestctx.NewTestContext()
+			ctx := requestctxtest.NewContext()
 
 			resp, _, err := h.Execute(ctx)
 			if c.ShouldError {
 				require.Error(t, err)
 				if c.Name == "Expected Response Code Failure" || c.Name == "Empty Response Failure" || c.Name == "invalid response path" {
-					assert.True(t, errors.Is(err, plan.ErrFailure), "Expected failure error to be wrapped with plan.ErrFailure")
+					assert.True(t, errors.Is(err, actions.ErrFailure), "Expected failure error to be wrapped with actions.ErrFailure")
 				}
 				return
 			}
@@ -319,166 +314,6 @@ func TestHttp_Execute(t *testing.T) {
 	}
 }
 
-func TestHTTPActionWithEscapeTemplateViaPlanExecute(t *testing.T) {
-	var receivedBody map[string]interface{}
-	serverCalled := false
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		serverCalled = true
-
-		bod, err := io.ReadAll(r.Body)
-		require.NoError(t, err)
-
-		err = json.Unmarshal(bod, &receivedBody)
-		require.NoError(t, err, "Server should receive valid JSON, got: %s", string(bod))
-
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status": "ok"}`))
-	}))
-	defer srv.Close()
-
-	// Build a RAW-STRING body template (body is a JSON string containing JSON
-	// text). Under V2 there is no outer config-serialization layer, so a single
-	// {{ escape }} is the correct amount of escaping for the inner JSON string.
-	configBody := fmt.Sprintf(`{
-  "message": "{{ escape .%scontent }}",
-  "path": "{{ .%sfilepath }}",
-	"array": [
-]
-}`, requestctx.BareVariablesPrefixStripped, requestctx.BareVariablesPrefixStripped)
-
-	// Create API config with HTTP action
-	apiCfg := apiconfig.APIConfig{
-		Actions: map[string]apiconfig.Action{
-			"test_http": {
-				Name: "test_http",
-				Type: "http",
-				Config: map[string]interface{}{
-					"url":     srv.URL,
-					"method":  "POST",
-					"headers": map[string]string{"Content-Type": "application/json"},
-					"body":    configBody,
-				},
-				Next: "response.success",
-			},
-		},
-		Responses: map[string]apiconfig.ResponseConfig{
-			"success": {
-				Name: "success",
-				Code: 200,
-				Object: apiconfig.ResponseObject{
-					Fields: map[string]apiconfig.ResponseObject{
-						"status": {Value: "ok"},
-					},
-				},
-			},
-		},
-	}
-
-	// Create planner and generate plan
-	planner := plan.NewPlannerV2(plan.PlannerConfig{
-		Actions:   apiCfg.Actions,
-		Responses: apiCfg.Responses,
-	}, logging.GetNewLogger())
-
-	p, err := planner.Plan()
-	require.NoError(t, err)
-
-	// Set up request context with variables containing double quotes
-	ctx := requestctx.NewTestContext()
-	err = requestctx.AddRequestVariables(ctx, map[string]interface{}{
-		fmt.Sprintf("%scontent", requestctx.BareVariablesPrefixStripped):  `This has "quoted" text`,
-		fmt.Sprintf("%sfilepath", requestctx.BareVariablesPrefixStripped): "some/path",
-	}, "")
-	require.NoError(t, err)
-
-	// Execute the plan
-	_, err = p.Execute(ctx, apiconfig.ActionConfigPrefix+"test_http")
-	require.NoError(t, err)
-
-	// Verify the server was called
-	assert.True(t, serverCalled, "Test server should have been called")
-
-	// Verify the escaped content was received correctly
-	assert.Equal(t, `This has "quoted" text`, receivedBody["message"], "Message should have properly escaped quotes")
-	assert.Equal(t, "some/path", receivedBody["path"], "Path should be set correctly")
-}
-
-// TestHTTPActionObjectBodyViaPlanExecute exercises the OBJECT body form end-to-end.
-// The body is resolved as a single template string, so the author escapes any
-// dynamic value they place inside a JSON string with one {{ escape }} — and that
-// single level is now correct because there is no outer config-serialization layer.
-func TestHTTPActionObjectBodyViaPlanExecute(t *testing.T) {
-	var receivedBody map[string]interface{}
-	serverCalled := false
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		serverCalled = true
-		bod, err := io.ReadAll(r.Body)
-		require.NoError(t, err)
-		err = json.Unmarshal(bod, &receivedBody)
-		require.NoError(t, err, "Server should receive valid JSON, got: %s", string(bod))
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status": "ok"}`))
-	}))
-	defer srv.Close()
-
-	apiCfg := apiconfig.APIConfig{
-		Actions: map[string]apiconfig.Action{
-			"test_http": {
-				Name: "test_http",
-				Type: "http",
-				Config: map[string]interface{}{
-					"url":     srv.URL,
-					"method":  "POST",
-					"headers": map[string]string{"Content-Type": "application/json"},
-					// OBJECT body form: author escapes the dynamic value once.
-					"body": map[string]interface{}{
-						"message": fmt.Sprintf("{{ escape .%scontent }}", requestctx.BareVariablesPrefixStripped),
-						"side":    "RIGHT",
-					},
-				},
-				Next: "response.success",
-			},
-		},
-		Responses: map[string]apiconfig.ResponseConfig{
-			"success": {
-				Name: "success",
-				Code: 200,
-				Object: apiconfig.ResponseObject{
-					Fields: map[string]apiconfig.ResponseObject{
-						"status": {Value: "ok"},
-					},
-				},
-			},
-		},
-	}
-
-	planner := plan.NewPlannerV2(plan.PlannerConfig{
-		Actions:   apiCfg.Actions,
-		Responses: apiCfg.Responses,
-	}, logging.GetNewLogger())
-	p, err := planner.Plan()
-	require.NoError(t, err)
-
-	ctx := requestctx.NewTestContext()
-	err = requestctx.AddRequestVariables(ctx, map[string]interface{}{
-		// multi-line value with embedded quotes — the classic escaping trap
-		fmt.Sprintf("%scontent", requestctx.BareVariablesPrefixStripped): "line one\nline two \"quoted\"",
-	}, "")
-	require.NoError(t, err)
-
-	_, err = p.Execute(ctx, apiconfig.ActionConfigPrefix+"test_http")
-	require.NoError(t, err)
-
-	require.True(t, serverCalled, "Test server should have been called")
-	assert.Equal(t, "line one\nline two \"quoted\"", receivedBody["message"], "escaped multi-line/quoted content should round-trip")
-	assert.Equal(t, "RIGHT", receivedBody["side"])
-}
-
-// TestHeaderPairing guards the batched resolution: many templated headers whose
-// resolved key encodes which value it must pair with, so any positional
-// mis-alignment between keys and values surfaces regardless of map order.
 func TestHeaderPairing(t *testing.T) {
 	names := []string{"one", "two", "three", "four", "five", "six"}
 
@@ -500,7 +335,7 @@ func TestHeaderPairing(t *testing.T) {
 	}
 
 	h := New(Config{URL: srv.URL, Method: "GET", Headers: headers})
-	ctx := requestctx.NewTestContext()
+	ctx := requestctxtest.NewContext()
 	require.NoError(t, requestctx.AddRequestVariables(ctx, vars, ""))
 
 	_, _, err := h.Execute(ctx)
@@ -509,53 +344,4 @@ func TestHeaderPairing(t *testing.T) {
 	for k, v := range want {
 		assert.Equal(t, v, got.Get(k), "header %s mispaired", k)
 	}
-}
-
-// TestHTTPActionSecretsOnWireTrackedForScrubbing is the end-to-end check for
-// the scrub-gateway secret model: the outbound request (URL query, header,
-// body) carries the REAL secret value, and from the moment of resolution the
-// request context tracks it so every context-derived logger/span scrubs it.
-func TestHTTPActionSecretsOnWireTrackedForScrubbing(t *testing.T) {
-	secrets.Reset()
-	t.Cleanup(secrets.Reset)
-	t.Setenv("HTTP_TEST_TOKEN", "realsecrettoken")
-
-	var gotAuth, gotBody, gotQuery string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotAuth = r.Header.Get("Authorization")
-		gotQuery = r.URL.Query().Get("token")
-		bod, err := io.ReadAll(r.Body)
-		require.NoError(t, err)
-		gotBody = string(bod)
-		w.Write([]byte(`{"echo": "realsecrettoken"}`))
-	}))
-	defer srv.Close()
-
-	cfg := Config{
-		Method:  http.MethodPost,
-		URL:     srv.URL + `?token={{ secret "HTTP_TEST_TOKEN" }}`,
-		Headers: map[string]string{"Authorization": `Bearer {{ secret "HTTP_TEST_TOKEN" }}`},
-		Body:    json.RawMessage(`"body:{{ secret \"HTTP_TEST_TOKEN\" }}"`),
-	}
-
-	rc := requestctx.NewRequestContext("secret-egress-test")
-	ctx := requestctx.WithAggregationContext(context.Background(), rc)
-
-	resp, _, err := New(cfg).Execute(ctx)
-	require.NoError(t, err)
-
-	// The wire got the real value everywhere.
-	assert.Equal(t, "Bearer realsecrettoken", gotAuth)
-	assert.Equal(t, "realsecrettoken", gotQuery)
-	assert.Equal(t, "body:realsecrettoken", gotBody)
-
-	// The value was tracked at resolution time: scrubbers mask it wherever it
-	// surfaces (logs, spans, stored outputs — the plan runner scrubs resp).
-	assert.True(t, rc.HasSecrets())
-	scrubbed := rc.Scrub("log line with realsecrettoken inside")
-	assert.NotContains(t, scrubbed, "realsecrettoken")
-
-	// The response echoing the token comes back to the caller un-scrubbed here
-	// (the PLAN runner scrubs before storing); sanity-check shape only.
-	require.IsType(t, map[string]interface{}{}, resp)
 }

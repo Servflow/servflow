@@ -1,8 +1,0 @@
-integrations:
-  mongo:
-    type: mongo
-    config:
-      connectionString:
-        secret: MONGODB_STRING
-      dbName:
-        value: servflow

@@ -1,6 +1,7 @@
 package actions
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -67,7 +68,7 @@ func Definitions() []actions.Definition {
 					},
 				},
 			},
-			New: func(config json.RawMessage) (actions.ActionExecutable, error) {
+			New: func(_ context.Context, config json.RawMessage) (actions.ActionExecutable, error) {
 				var cfg getprice.Config
 				if err := json.Unmarshal(config, &cfg); err != nil {
 					return nil, fmt.Errorf("error creating getprice action: %v", err)
@@ -151,7 +152,7 @@ func Definitions() []actions.Definition {
 					{Path: "status", Type: "string", Description: "The order's status at the time it was placed."},
 				},
 			},
-			New: func(config json.RawMessage) (actions.ActionExecutable, error) {
+			New: func(_ context.Context, config json.RawMessage) (actions.ActionExecutable, error) {
 				var cfg spotorder.Config
 				if err := json.Unmarshal(config, &cfg); err != nil {
 					return nil, fmt.Errorf("error creating spotorder action: %v", err)
@@ -206,7 +207,7 @@ func Definitions() []actions.Definition {
 					{Path: "priceHistory", Type: "array", Description: "The candles behind the comparison, each with openTime, open, high, low, close, volume, and closeTime."},
 				},
 			},
-			New: func(config json.RawMessage) (actions.ActionExecutable, error) {
+			New: func(_ context.Context, config json.RawMessage) (actions.ActionExecutable, error) {
 				var cfg pricedifference.Config
 				if err := json.Unmarshal(config, &cfg); err != nil {
 					return nil, fmt.Errorf("error creating pricedifference action: %v", err)
@@ -237,7 +238,7 @@ func Definitions() []actions.Definition {
 				Kind:        actions.OutputDynamic,
 				Description: "Open orders under orders, or open positions under positions when reading futures positions. A single order when one is asked for by id.",
 			},
-			New: func(config json.RawMessage) (actions.ActionExecutable, error) {
+			New: func(_ context.Context, config json.RawMessage) (actions.ActionExecutable, error) {
 				var cfg tradeinfo.Config
 				if err := json.Unmarshal(config, &cfg); err != nil {
 					return nil, fmt.Errorf("error creating tradeinfo action: %v", err)
@@ -280,7 +281,7 @@ func Definitions() []actions.Definition {
 					{Path: "time", Type: "number", Description: "When the balance was read, in milliseconds."},
 				},
 			},
-			New: func(config json.RawMessage) (actions.ActionExecutable, error) {
+			New: func(_ context.Context, config json.RawMessage) (actions.ActionExecutable, error) {
 				var cfg accountbalance.Config
 				if err := json.Unmarshal(config, &cfg); err != nil {
 					return nil, fmt.Errorf("error creating accountbalance action: %v", err)
@@ -376,7 +377,7 @@ func Definitions() []actions.Definition {
 					{Path: "reduceOnly", Type: "boolean", Description: "Whether the order may only reduce an open position."},
 				},
 			},
-			New: func(config json.RawMessage) (actions.ActionExecutable, error) {
+			New: func(_ context.Context, config json.RawMessage) (actions.ActionExecutable, error) {
 				var cfg futuresorder.Config
 				if err := json.Unmarshal(config, &cfg); err != nil {
 					return nil, fmt.Errorf("error creating futuresorder action: %v", err)

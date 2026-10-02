@@ -117,7 +117,7 @@ func Definition() actions.Definition {
 			Kind:        actions.OutputNone,
 			Description: "Storing vectors reports success by continuing; it publishes nothing.",
 		},
-		New: func(config json.RawMessage) (actions.ActionExecutable, error) {
+		New: func(_ context.Context, config json.RawMessage) (actions.ActionExecutable, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {
 				return nil, fmt.Errorf("error creating storevector action: %v", err)

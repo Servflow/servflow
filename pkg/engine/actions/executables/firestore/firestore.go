@@ -101,7 +101,7 @@ func Definition() actions.Definition {
 			Kind:        actions.OutputValue,
 			Description: "The document that was written, as the JSON text it was sent as.",
 		},
-		New: func(config json.RawMessage) (actions.ActionExecutable, error) {
+		New: func(_ context.Context, config json.RawMessage) (actions.ActionExecutable, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {
 				return nil, fmt.Errorf("error creating firestore action: %v", err)

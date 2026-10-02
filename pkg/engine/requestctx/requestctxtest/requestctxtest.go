@@ -139,7 +139,7 @@ func (c *Context) Request() *http.Request {
 	return c.request
 }
 
-func (c *Context) Integration(id string) (integration.Integration, error) {
+func (c *Context) Integration(_ context.Context, id string) (integration.Integration, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	integ, ok := c.integrations[id]

@@ -1,6 +1,9 @@
 package actions
 
-import "encoding/json"
+import (
+	"context"
+	"encoding/json"
+)
 
 // Definition describes an action to a host that offers it: what the action is
 // called, the config fields it takes, what it publishes, and how to build it
@@ -17,9 +20,11 @@ type Definition struct {
 	// is offered whole.
 	Output OutputInfo `json:"output"`
 	// Exactly one of New and NewV2 is set. A V1 action receives its config with
-	// templates already resolved; a V2 action resolves its own.
-	New   func(config json.RawMessage) (ActionExecutable, error)   `json:"-"`
-	NewV2 func(config json.RawMessage) (ActionExecutableV2, error) `json:"-"`
+	// templates already resolved; a V2 action resolves its own. ctx is the
+	// context the action is built for, so what a constructor looks up is
+	// looked up for it.
+	New   func(ctx context.Context, config json.RawMessage) (ActionExecutable, error)   `json:"-"`
+	NewV2 func(ctx context.Context, config json.RawMessage) (ActionExecutableV2, error) `json:"-"`
 }
 
 type FieldType string

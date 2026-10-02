@@ -52,7 +52,7 @@ func Definition() actions.Definition {
 			Kind:        actions.OutputDynamic,
 			Description: "The configured response, echoed back as it was written.",
 		},
-		New: func(config json.RawMessage) (actions.ActionExecutable, error) {
+		New: func(_ context.Context, config json.RawMessage) (actions.ActionExecutable, error) {
 			var fields map[string]interface{}
 			if err := json.Unmarshal(config, &fields); err != nil {
 				return nil, fmt.Errorf("error creating stub action: %v", err)

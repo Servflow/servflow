@@ -92,7 +92,7 @@ func Definition() actions.Definition {
 			Kind:        actions.OutputValue,
 			Description: "The hash of the value.",
 		},
-		NewV2: func(config json.RawMessage) (actions.ActionExecutableV2, error) {
+		NewV2: func(_ context.Context, config json.RawMessage) (actions.ActionExecutableV2, error) {
 			var cfg map[string]interface{}
 			if err := json.Unmarshal(config, &cfg); err != nil {
 				return nil, fmt.Errorf("error creating hash action: %v", err)

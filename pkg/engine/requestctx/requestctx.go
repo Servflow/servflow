@@ -47,8 +47,10 @@ type RequestContext interface {
 	// it did not arrive over HTTP.
 	Request() *http.Request
 
-	// Integration returns the live integration configured under id.
-	Integration(id string) (integration.Integration, error)
+	// Integration returns the live integration configured under id. ctx is
+	// the context the lookup is made for, so the host can decide what it may
+	// reach.
+	Integration(ctx context.Context, id string) (integration.Integration, error)
 }
 
 type contextKey struct{}
@@ -80,5 +82,5 @@ func GetIntegration(ctx context.Context, id string) (integration.Integration, er
 	if err != nil {
 		return nil, err
 	}
-	return rc.Integration(id)
+	return rc.Integration(ctx, id)
 }

@@ -110,7 +110,7 @@ func Definition() actions.Definition {
 			Kind:        actions.OutputDynamic,
 			Description: "A list of the nearest stored vectors, each carrying the fields it was saved with.",
 		},
-		New: func(config json.RawMessage) (actions.ActionExecutable, error) {
+		New: func(_ context.Context, config json.RawMessage) (actions.ActionExecutable, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {
 				return nil, fmt.Errorf("error creating fetchvector action: %v", err)

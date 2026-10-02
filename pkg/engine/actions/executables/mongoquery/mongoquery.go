@@ -123,7 +123,7 @@ func Definition() actions.Definition {
 			Kind:        actions.OutputDynamic,
 			Description: "A list of the matching documents, with the collection's own field names.",
 		},
-		New: func(config json.RawMessage) (actions.ActionExecutable, error) {
+		New: func(_ context.Context, config json.RawMessage) (actions.ActionExecutable, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {
 				return nil, fmt.Errorf("error creating mongoquery action: %v", err)

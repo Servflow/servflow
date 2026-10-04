@@ -1,0 +1,46 @@
+slug: discord-agent-memory
+name: Discord Agent with Memory
+version: 1.0.0
+description: >-
+  A Discord bot for one server. It answers when mentioned, looks up members and
+  channels, searches and sends messages, and keeps standing notes in a workspace
+  that only its super user may change.
+
+inputs:
+  - name: instanceName
+    label: Instance name
+    description: Names the agent. Install under a different name to run a second bot.
+    type: text
+    required: true
+    default: discord-assistant
+
+  - name: superUser
+    label: Super user
+    description: >-
+      Your Discord username written as @name, or your user id. Only this person
+      can change the bot's memory.
+    type: text
+    required: true
+
+  - name: requireMention
+    label: Answer only when mentioned
+    description: When false, the bot answers every message it can see.
+    type: select
+    required: true
+    default: "true"
+    options: ["true", "false"]
+
+integrations:
+  - key: discord
+    label: Discord bot
+    description: >-
+      The bot the agent listens and speaks as, and the server it works in. In
+      the Discord developer portal, switch on the Message Content intent for
+      this bot: the gateway always asks for it, and Discord closes the
+      connection with code 4014 when it is off.
+    type: discord
+    required: true
+
+resources:
+  configs:
+    - file: configs/agent.yaml

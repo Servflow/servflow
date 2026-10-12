@@ -95,4 +95,7 @@ make hooks
 
 ## License
 
-See [LICENSE](LICENSE).
+AGPL-3.0. See [LICENSE](LICENSE).
+
+Contributions need the [Contributor License Agreement](CLA.md); see
+[CONTRIBUTING.md](CONTRIBUTING.md).

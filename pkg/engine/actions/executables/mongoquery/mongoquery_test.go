@@ -136,3 +136,30 @@ func TestNew_Validation(t *testing.T) {
 		assert.ErrorContains(t, err, "unknown operation")
 	})
 }
+
+func TestMGOQuery_ConfigKeepsItsTemplates(t *testing.T) {
+	mock := NewMockmongoDBIntegration(gomock.NewController(t))
+	gomock.InOrder(
+		mock.EXPECT().ListCollections(gomock.Any()).Return([]string{"users"}, nil),
+		mock.EXPECT().ExecuteQuery(gomock.Any(), "users", "{}", "").Return([]map[string]interface{}{{"name": "ada"}}, nil),
+	)
+	ctx := withIntegration(t, mock)
+
+	// The stored config carries templates; each call hands Execute what they
+	// rendered to. A second call must not see the first call's values.
+	q, err := New(Config{Integration: "mongo", Operation: `{{ tool_param "operation" }}`, Collection: `{{ tool_param "collection" }}`})
+	require.NoError(t, err)
+	stored := q.Config()
+
+	first, err := json.Marshal(Config{Integration: "mongo", Operation: OperationListCollections})
+	require.NoError(t, err)
+	_, _, err = q.Execute(ctx, string(first))
+	require.NoError(t, err)
+	assert.Equal(t, stored, q.Config())
+
+	second, err := json.Marshal(Config{Integration: "mongo", Operation: OperationFind, Collection: "users", FilterQuery: "{}"})
+	require.NoError(t, err)
+	res, _, err := q.Execute(ctx, string(second))
+	require.NoError(t, err)
+	assert.Equal(t, []map[string]interface{}{{"name": "ada"}}, res)
+}

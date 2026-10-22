@@ -134,7 +134,8 @@ func (m *MGOQuery) Execute(ctx context.Context, modifiedConfig string) (interfac
 	if err := json.Unmarshal([]byte(modifiedConfig), &cfg); err != nil {
 		return nil, nil, err
 	}
-	m.config = cfg
+	// cfg is this call's rendered config. m.config keeps the templates, which
+	// Config returns so the next call renders them again.
 
 	if err := validate(cfg); err != nil {
 		return nil, nil, fmt.Errorf("%w: %v", actions.ErrFailure, err)

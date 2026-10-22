@@ -563,3 +563,61 @@ func TestMongo_Delete(t *testing.T) {
 		2,
 	))
 }
+
+func TestMongo_Aggregate(t *testing.T) {
+	t.Parallel()
+	uri := startMongoContainer(t)
+	mng, err := newWrapper(Config{ConnectionString: uri, DBName: "servflow"})
+	require.NoError(t, err)
+
+	adaID, cleanup := writeDataAndReturnCleanupFn(mng.client, "servflow", "users", map[string]interface{}{"name": "ada"})
+	t.Cleanup(cleanup)
+	_, cleanup = writeDataAndReturnCleanupFn(mng.client, "servflow", "users", map[string]interface{}{"name": "bob"})
+	t.Cleanup(cleanup)
+	_, cleanup = writeDataAndReturnCleanupFn(mng.client, "servflow", "orders", map[string]interface{}{"userId": adaID, "total": 30})
+	t.Cleanup(cleanup)
+
+	t.Run("joins another collection", func(t *testing.T) {
+		results, err := mng.Aggregate(context.Background(), "users",
+			`[{"$match":{"name":"ada"}},{"$lookup":{"from":"orders","localField":"_id","foreignField":"userId","as":"orders"}}]`)
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		assert.Equal(t, "ada", results[0]["name"])
+		orders, ok := results[0]["orders"].(bson.A)
+		require.True(t, ok)
+		require.Len(t, orders, 1)
+		assert.EqualValues(t, 30, orders[0].(bson.M)["total"])
+	})
+
+	t.Run("groups", func(t *testing.T) {
+		results, err := mng.Aggregate(context.Background(), "users", `[{"$group":{"_id":null,"count":{"$sum":1}}}]`)
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		assert.EqualValues(t, 2, results[0]["count"])
+	})
+
+	t.Run("invalid pipeline", func(t *testing.T) {
+		_, err := mng.Aggregate(context.Background(), "users", `{"$match":{}}`)
+		assert.ErrorContains(t, err, "error processing pipeline")
+	})
+}
+
+func TestMongo_ListCollections(t *testing.T) {
+	t.Parallel()
+	uri := startMongoContainer(t)
+	mng, err := newWrapper(Config{ConnectionString: uri, DBName: "servflow"})
+	require.NoError(t, err)
+
+	names, err := mng.ListCollections(context.Background())
+	require.NoError(t, err)
+	assert.Empty(t, names)
+
+	_, cleanup := writeDataAndReturnCleanupFn(mng.client, "servflow", "users", map[string]interface{}{"name": "ada"})
+	t.Cleanup(cleanup)
+	_, cleanup = writeDataAndReturnCleanupFn(mng.client, "servflow", "orders", map[string]interface{}{"total": 30})
+	t.Cleanup(cleanup)
+
+	names, err = mng.ListCollections(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, []string{"orders", "users"}, names)
+}

@@ -3,6 +3,7 @@ package mongo
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -98,7 +99,7 @@ func (m *Mongo) ExecuteQuery(ctx context.Context, collection string, filterQuery
 	coll := db.Collection(collection)
 	opts := options.Find().SetProjection(projection)
 
-	cur, err := coll.Find(context.Background(), filter, opts)
+	cur, err := coll.Find(ctx, filter, opts)
 	if err != nil {
 		return nil, fmt.Errorf("error executing query: %v", err)
 	}
@@ -113,6 +114,53 @@ func (m *Mongo) ExecuteQuery(ctx context.Context, collection string, filterQuery
 		results = append(results, m)
 	}
 	return results, nil
+}
+
+// Aggregate runs an aggregation pipeline, written as an extended JSON array of
+// stages, against collection.
+func (m *Mongo) Aggregate(ctx context.Context, collection string, pipeline string) ([]map[string]interface{}, error) {
+	if err := m.ensureConnected(ctx); err != nil {
+		return nil, fmt.Errorf("connection error: %w", err)
+	}
+
+	// Extended JSON only decodes a document at the top level, so the array is
+	// read as the one field of a wrapping document.
+	var wrapped struct {
+		Pipeline bson.A `bson:"pipeline"`
+	}
+	if err := bson.UnmarshalExtJSON([]byte(`{"pipeline":`+pipeline+`}`), false, &wrapped); err != nil {
+		return nil, fmt.Errorf("error processing pipeline: %v", err)
+	}
+
+	cur, err := m.client.Database(m.dbName).Collection(collection).Aggregate(ctx, wrapped.Pipeline)
+	if err != nil {
+		return nil, fmt.Errorf("error executing pipeline: %v", err)
+	}
+
+	var r []bson.M
+	if err := cur.All(ctx, &r); err != nil {
+		return nil, err
+	}
+
+	results := make([]map[string]interface{}, len(r))
+	for i, doc := range r {
+		results[i] = doc
+	}
+	return results, nil
+}
+
+// ListCollections returns the names of the database's collections, sorted.
+func (m *Mongo) ListCollections(ctx context.Context) ([]string, error) {
+	if err := m.ensureConnected(ctx); err != nil {
+		return nil, fmt.Errorf("connection error: %w", err)
+	}
+
+	names, err := m.client.Database(m.dbName).ListCollectionNames(ctx, bson.D{})
+	if err != nil {
+		return nil, fmt.Errorf("error listing collections: %v", err)
+	}
+	slices.Sort(names)
+	return names, nil
 }
 
 func (m *Mongo) Delete(ctx context.Context, options map[string]string, filters ...dbfilters.Filter) error {

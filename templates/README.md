@@ -37,7 +37,9 @@ The template gallery shows a picture of the agent's flow on each card. Save it
 as `screenshot.png` in the template's folder:
 
 1. Import the template's config into the studio with placeholder values.
-2. Capture the editor canvas around the flow, at about 16:9.
+2. Capture the entry, the sub agents, and their tools at about 2:1, the
+   shape of the gallery card's cover. Leave out "Final response" and the
+   cursor.
 
 The control plane's catalog links the file by its raw URL, so the image changes
 as soon as a new one is merged here.

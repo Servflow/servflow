@@ -1,0 +1,130 @@
+slug: mongo-outreach-drafts
+name: Outreach Drafts from MongoDB
+version: 1.0.0
+description: >-
+  On a schedule, finds people in your MongoDB who need a nudge, drafts a short
+  personal email for each kind of nudge in Zoho Mail, remembers who it has
+  written to, and asks you on Discord to review and send. It never sends an
+  email itself.
+
+inputs:
+  - name: instanceName
+    label: Agent name
+    description: Names the agent. Install under a different name to run a second one.
+    type: text
+    required: true
+    default: outreach-drafts
+
+  - name: schedule
+    label: Schedule
+    description: >-
+      When the agent runs, as a six-field cron expression with seconds first.
+      The default is 09:00 on weekdays.
+    type: text
+    required: true
+    default: "0 0 9 * * 1-5"
+
+  - name: audience
+    label: Who to contact
+    description: >-
+      How to find the people to email in your database, in plain English: the
+      collections to read, the fields that hold an email address and an id, and
+      what counts as needing a nudge. For example: "Users are in the users
+      collection with email and team_id. A user has not activated when their
+      team has no record in agent_configs with a matching teamId."
+    type: content
+    required: true
+    formats: [markdown, text]
+
+  - name: outreachTypes
+    label: Kinds of email
+    description: >-
+      The kinds of email the agent can draft, and when each one applies. One
+      draft is saved per kind, with everyone it applies to in BCC. For example:
+      "not activated: signed up but never created a team. no integration:
+      created a team but never connected an integration."
+    type: content
+    required: true
+    formats: [markdown, text]
+
+  - name: senderName
+    label: Your name
+    description: The emails are written in your voice and signed by the layout.
+    type: text
+    required: true
+
+  - name: senderRole
+    label: Your role
+    type: text
+    required: true
+    default: Founder
+
+  - name: productName
+    label: Product name
+    type: text
+    required: true
+
+  - name: fromAddress
+    label: From address
+    description: The address the drafts are sent from. It must belong to the Zoho Mail account.
+    type: text
+    required: true
+
+  - name: reviewAddress
+    label: Review address
+    description: >-
+      Each draft's To address. Zoho Mail needs one, and the people being
+      contacted are in BCC, so this is usually your own or a team inbox.
+    type: text
+    required: true
+
+  - name: reviewerDiscordId
+    label: Your Discord user id
+    description: >-
+      Who the review message goes to. In Discord, turn on Developer Mode, then
+      right-click your name and choose Copy User ID.
+    type: text
+    required: true
+
+  - name: emailLayout
+    label: Email layout
+    description: >-
+      The HTML every draft is laid out in. Put {{ tool_param "body" }} where the
+      agent's note goes; the greeting, links, and signature belong here, since
+      the agent writes only the note.
+    type: content
+    required: true
+    formats: [html]
+    tags: ['tool_param "body"', 'tool_param "subject"']
+    default: |-
+      <!DOCTYPE html>
+      <html>
+      <body style="margin:0;padding:24px;font-family:Helvetica,Arial,sans-serif;font-size:16px;line-height:25px;color:#1a1523">
+      <p style="margin:0 0 16px">Hi,</p>
+      <div style="margin:0 0 24px;white-space:pre-line">{{ tool_param "body" }}</div>
+      <p style="margin:0">Thanks,</p>
+      </body>
+      </html>
+
+integrations:
+  - key: mongo
+    label: MongoDB
+    description: The database the agent reads people from. It only reads.
+    type: mongo
+    required: true
+
+  - key: zoho
+    label: Zoho Mail
+    description: The Zoho Mail account the drafts are saved in.
+    group: composio:zoho_mail
+    required: true
+
+  - key: discord
+    label: Discord bot
+    description: The bot that sends you the review message. It must share a server with you.
+    type: discord
+    required: true
+
+resources:
+  configs:
+    - file: configs/agent.yaml

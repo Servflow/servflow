@@ -1,0 +1,115 @@
+# The outreach agent this template installs.
+#
+# providerID and workspaceID are absent from the sub agent on purpose: both are
+# local database keys, so the install fills them in from the provider and the
+# workspace the person installing chose. The workspace is the agent's memory of
+# who it has already written to.
+#
+# Values that can hold quotes, colons, or line breaks go in through json, or
+# through indent inside a block scalar, so they cannot reshape this file.
+config_id: << .instanceName >>
+name: << .instanceName | json >>
+description: Drafts outreach emails from MongoDB for review on Discord
+kind: agent
+enabled: true
+config:
+  name: << .instanceName | json >>
+  entries:
+    - type: trigger
+      trigger:
+        cron: << .schedule | json >>
+      start: agent.outreach
+  agents:
+    outreach:
+      name: Outreach drafter
+      systemPrompt: |-
+        You prepare outreach email drafts for << .productName >>, for a person to review and send. You never send an email yourself.
+
+        ## Who to contact
+
+        << .audience | indent 8 >>
+
+        ## Kinds of email
+
+        << .outreachTypes | indent 8 >>
+
+        ## How to work
+
+        1. Before choosing anyone, read your outreach history in your workspace. Do not queue someone for a kind of email they were already drafted for, and use what you recorded to choose the next best kind.
+        2. Use the MongoDB query tool to find the people described under "Who to contact". Prefer one aggregation query where you can. You can only read.
+        3. Choose one kind of email for each person, from "Kinds of email", based on what you found and what your history says.
+        4. Get the mail account id with the mail accounts tool, then save one draft per kind of email with the draft tool. Put everyone who needs that kind in bccAddress, separated by commas.
+        5. If nobody matches, create no drafts.
+
+        ## Writing a draft
+
+        - body: one or two short paragraphs of plain text, separated by a blank line, in the voice of << .senderName >>, << .senderRole >> of << .productName >>. Say why the person may be stuck and offer brief, relevant help.
+        - Leave out the greeting, links, sign-off, and any follow-up action such as replying, booking a call, or logging in. The email layout adds those.
+        - subject: plain and specific, as if << .senderName >> wrote it personally. Not witty and not promotional.
+
+        ## Afterwards
+
+        1. Record in your workspace who was included in each draft: their email, their id when there is one, the kind of email, and the date.
+        2. Send the review message on Discord: how many people are in each kind of email, the list of people (email and id), and a note to check, approve, and send the saved drafts. If nobody matched, say that no outreach candidates were found.
+        3. Answer briefly that the drafts were saved, the history was updated, and the review message was sent.
+      userPrompt: >-
+        Find the people who need outreach, draft the emails, record the
+        outreach history, and send the review message.
+      tools:
+        - type: action
+          name: query_mongo
+          description: Read people and their status from MongoDB
+          params: [collection, operation, filterQuery, projection, pipeline]
+          actionConfig:
+            type: mongoquery
+            config:
+              integration: {type: raw, value: "<< .integrations.mongo >>"}
+              collection: {type: param, value: collection}
+              operation: {type: param, value: operation}
+              filterQuery: {type: param, value: filterQuery}
+              projection: {type: param, value: projection}
+              pipeline: {type: param, value: pipeline}
+        - type: action
+          name: list_mail_accounts
+          description: Get the Zoho Mail account id the draft tool needs
+          actionConfig:
+            type: external:ZOHO_MAIL_ACCOUNTS_LIST_ACCOUNTS
+            config:
+              integration: {type: raw, value: "<< .integrations.zoho >>"}
+              accept_language: {type: raw, value: ""}
+              region: {type: raw, value: ""}
+        - type: action
+          name: create_email_draft
+          description: >-
+            Save one email draft, never sent. body: the note in plain text,
+            paragraphs separated by a blank line, with no greeting, links,
+            sign-off, or follow-up action. subject: plain and hand-written.
+          params: [accountId, bccAddress, subject, body]
+          actionConfig:
+            type: external:ZOHO_MAIL_MESSAGES_CREATE_DRAFT
+            config:
+              integration: {type: raw, value: "<< .integrations.zoho >>"}
+              accountId: {type: param, value: accountId}
+              bccAddress: {type: param, value: bccAddress}
+              subject: {type: param, value: subject}
+              fromAddress: {type: raw, value: << .fromAddress | json >>}
+              toAddress: {type: raw, value: << .reviewAddress | json >>}
+              ccAddress: {type: raw, value: ""}
+              content: {type: raw, value: << .emailLayout | json >>}
+              mailFormat: {type: raw, value: html}
+              accept_language: {type: raw, value: ""}
+              askReceipt: {type: raw, value: ""}
+              encoding: {type: raw, value: ""}
+              region: {type: raw, value: ""}
+        - type: action
+          name: send_review_message
+          description: Send the review message to the reviewer on Discord
+          params: [message]
+          actionConfig:
+            type: discord/sendmessage
+            config:
+              integration: {type: raw, value: "<< .integrations.discord >>"}
+              user_id: {type: raw, value: << .reviewerDiscordId | json >>}
+              content: {type: param, value: message}
+              mentions: {type: raw, value: users}
+              split: {type: raw, value: true}

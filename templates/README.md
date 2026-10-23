@@ -30,3 +30,14 @@ toolkit with `group: composio:<toolkit>`, for example `composio:zoho_mail`.
 
 Every template here is also a fixture in the control plane's drift guard, which
 installs it against the current config model on every build.
+
+## Adding a screenshot
+
+The template gallery shows a picture of the agent's flow on each card. Save it
+as `screenshot.png` in the template's folder:
+
+1. Import the template's config into the studio with placeholder values.
+2. Capture the editor canvas around the flow, at about 16:9.
+
+The control plane's catalog links the file by its raw URL, so the image changes
+as soon as a new one is merged here.

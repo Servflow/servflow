@@ -1,0 +1,70 @@
+slug: team-memory-bot
+name: Team Memory Bot
+version: 1.0.0
+description: >-
+  One assistant in both your Telegram and your Discord. It answers questions,
+  remembers what you tell it to remember, and uses the same memory on both
+  apps. Only you can change what it remembers.
+
+inputs:
+  - name: instanceName
+    label: Instance name
+    description: Names the agent and its Telegram webhook address.
+    type: text
+    required: true
+    default: team-memory-bot
+
+  - name: persona
+    label: What the bot is for
+    description: Who the bot works for and what it helps with.
+    type: content
+    required: true
+    formats: [markdown, text]
+    default: You are a helpful assistant for our team.
+
+  - name: telegramOwner
+    label: Your Telegram user id
+    description: >-
+      The number Telegram knows you by. Message @userinfobot on Telegram and
+      it replies with your id.
+    type: text
+    required: true
+
+  - name: telegramMention
+    label: Telegram bot name
+    description: >-
+      Your bot's @username, as BotFather showed it, for example
+      @acme_helper_bot. In a group, the bot answers only messages that contain
+      it. Direct messages are always answered.
+    type: text
+    required: true
+
+  - name: discordOwner
+    label: Your Discord user id
+    description: >-
+      In Discord, turn on Developer Mode in Settings > Advanced, then
+      right-click your name and choose Copy User ID.
+    type: text
+    required: true
+
+integrations:
+  - key: telegram
+    label: Telegram bot
+    description: >-
+      The bot on Telegram. Create one with @BotFather and paste its token.
+      After install, follow the Telegram setup steps on the agent's entry,
+      which connect the bot to this agent.
+    type: telegram_bot
+    required: true
+
+  - key: discord
+    label: Discord bot
+    description: >-
+      The bot on Discord. In the Discord developer portal, switch on the
+      Message Content intent for this bot, or Discord closes the connection.
+    type: discord
+    required: true
+
+resources:
+  configs:
+    - file: configs/agent.yaml

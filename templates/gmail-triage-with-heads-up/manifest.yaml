@@ -1,0 +1,75 @@
+slug: gmail-triage-with-heads-up
+name: Gmail Triage with a Heads-up
+version: 1.0.0
+description: >-
+  Reads every new email that matches your filter, saves a reply as a draft in
+  Gmail for you to check and send, and messages you on Discord when one is
+  urgent. It never sends an email itself.
+
+inputs:
+  - name: instanceName
+    label: Instance name
+    description: Names the agent.
+    type: text
+    required: true
+    default: gmail-triage
+
+  - name: gmailQuery
+    label: Which emails
+    description: >-
+      A Gmail search, as you would type it in Gmail's search box. Only new
+      emails that match are handled.
+    type: text
+    required: true
+    default: "in:inbox -category:promotions -category:social -category:updates -from:me"
+
+  - name: instructions
+    label: How to reply
+    description: >-
+      Who you are, what you can help with, the facts replies may use, and how
+      they should sound. Say which emails need no reply at all.
+    type: content
+    required: true
+    formats: [markdown, text]
+    default: |-
+      I run a small business. Reply to customer questions politely and
+      briefly. Do not promise refunds, dates, or prices. Newsletters,
+      receipts, and automated notifications need no reply.
+
+  - name: urgencyRules
+    label: What counts as urgent
+    description: Emails that match these get a message to you on Discord as well as a draft.
+    type: content
+    required: true
+    formats: [markdown, text]
+    default: |-
+      The customer reports lost data, a security problem, or a charge they
+      did not make, or says they will cancel.
+
+  - name: ownerDiscordId
+    label: Your Discord user id
+    description: >-
+      Who gets the urgent messages. In Discord, turn on Developer Mode in
+      Settings > Advanced, then right-click your name and choose Copy User ID.
+    type: text
+    required: true
+
+integrations:
+  - key: gmail
+    label: Gmail
+    description: The Gmail account the agent watches and saves drafts in.
+    group: composio:gmail
+    required: true
+
+  - key: discord
+    label: Discord bot
+    description: >-
+      The bot that sends you urgent messages. It must share a server with you,
+      and your Discord privacy settings must allow direct messages from that
+      server's members.
+    type: discord
+    required: true
+
+resources:
+  configs:
+    - file: configs/agent.yaml

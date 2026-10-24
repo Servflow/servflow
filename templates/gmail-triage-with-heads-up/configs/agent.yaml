@@ -1,0 +1,90 @@
+# The Gmail triage agent this template installs.
+#
+# providerID is absent from the sub agent on purpose: it is a local database
+# key, so the install fills it in from the provider the person chose. The
+# entry's step reads the whole thread before the agent runs. The draft tool
+# fixes the thread and the recipient to the email that started the run, and
+# the heads-up tool fixes the person it goes to, so the model chooses only the
+# words. There is no send tool.
+config_id: << .instanceName >>
+name: << .instanceName >>
+description: Drafts Gmail replies and sends a Discord heads-up for urgent ones
+kind: agent
+enabled: true
+config:
+  name: << .instanceName >>
+  entries:
+    - type: handler
+      handlerConfig:
+        path: ""
+        type: app_event
+        config:
+          integration: "<< .integrations.gmail >>"
+          trigger: GMAIL_NEW_GMAIL_MESSAGE
+          settings:
+            query: << .gmailQuery | json >>
+            userId: me
+            interval: 2
+      steps:
+        - id: thread
+          type: external:GMAIL_FETCH_MESSAGE_BY_THREAD_ID
+          config:
+            integration: "<< .integrations.gmail >>"
+            thread_id: "{{ .event.data.thread_id }}"
+            user_id: me
+      start: agent.triage
+  agents:
+    triage:
+      name: Inbox triage
+      next: end
+      systemPrompt: |-
+        You look after the user's Gmail inbox. For each new email you decide whether it needs a reply, save a draft reply for the user to check and send, and tell the user when something is urgent. You never send an email.
+
+        ## How to reply
+
+        << .instructions | indent 8 >>
+
+        ## What counts as urgent
+
+        << .urgencyRules | indent 8 >>
+
+        ## How to work
+
+        1. Read the email and its thread. Decide whether it needs a reply. If not, do nothing else and answer in one line why.
+        2. Save one draft with save_draft. body is plain text: the reply only, with a greeting, and no quoted copy of the email. Write in the language of the email.
+        3. If the email is urgent, send one heads-up with notify_me: who wrote, the subject, why it is urgent in one sentence, and that a draft is waiting. At most four lines.
+        4. Answer in one line what you did.
+      userPrompt: |-
+        New email.
+        From: {{ escape (tostring .event.data.sender) }}
+        Subject: {{ escape (tostring .event.data.subject) }}
+
+        {{ escape (tostring .event.data.message_text) }}
+
+        The whole thread (JSON):
+        {{ escape (jsonout .thread) }}
+      tools:
+        - type: action
+          name: save_draft
+          description: Save the reply as a draft in this email's thread. It is not sent.
+          actionConfig:
+            type: external:GMAIL_CREATE_EMAIL_DRAFT
+            config:
+              integration: {type: raw, value: "<< .integrations.gmail >>"}
+              thread_id: {type: raw, value: "{{ .event.data.thread_id }}"}
+              recipient_email: {type: raw, value: "{{ .event.data.sender }}"}
+              subject: {type: raw, value: ""}
+              body: {type: param, value: body}
+              is_html: {type: raw, value: false}
+              user_id: {type: raw, value: me}
+        - type: action
+          name: notify_me
+          description: Send the user a short Discord message about an urgent email. Only for urgent emails.
+          actionConfig:
+            type: discord/sendmessage
+            config:
+              integration: {type: raw, value: "<< .integrations.discord >>"}
+              user_id: {type: raw, value: << .ownerDiscordId | json >>}
+              content: {type: param, value: content}
+              mentions: {type: raw, value: none}
+              split: {type: raw, value: true}

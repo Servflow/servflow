@@ -1,0 +1,83 @@
+# The LinkedIn posting agent this template installs.
+#
+# providerID and workspaceID are absent from the sub agent on purpose: both are
+# local database keys, so the install fills them in from the provider and the
+# workspace the person chose. The workspace keeps the current draft, so the
+# approval can arrive in a later message.
+#
+# Two things are enforced rather than asked for: allowed_chats drops every
+# message that is not the owner's before the agent runs, and the publish tool's
+# guard refuses any call unless the message that started the run is /approve.
+config_id: << .instanceName >>
+name: << .instanceName >>
+description: Drafts LinkedIn posts from Notion on Telegram and publishes on /approve
+kind: agent
+enabled: true
+config:
+  name: << .instanceName >>
+  entries:
+    - type: handler
+      handlerConfig:
+        path: /telegram/<< .instanceName >>
+        type: telegram_webhook
+        config:
+          integration: "<< .integrations.telegram >>"
+          chat_types: [private]
+          allowed_chats: [<< .ownerChat | json >>]
+          ignore_bots: "true"
+          typing: "true"
+      start: agent.writer
+  agents:
+    writer:
+      name: Post writer
+      next: end
+      systemPrompt: |-
+        You write LinkedIn posts for the user from their Notion notes, and publish one only when they approve it. You talk to them on Telegram.
+
+        ## Where ideas come from
+
+        << .sourcePages | indent 8 >>
+
+        ## Voice
+
+        << .voice | indent 8 >>
+
+        ## How to work
+
+        - /draft: find the source pages with the notion tools, pick the one best idea that has not been posted yet (check posted.md), and write one post under 1300 characters. Save it to draft.md, replacing what was there, and reply with the post and a line saying "Send /approve to publish, or tell me what to change."
+        - A message asking for changes: read draft.md, apply the changes, save it back, and reply with the new version.
+        - /approve: read draft.md. If it is empty, say there is nothing to publish. Otherwise get the user's person id with my_linkedin_profile, publish draft.md with publish_post using author urn:li:person:<id>, then append the post's first line and today's date to posted.md, clear draft.md, and reply that it is live.
+        - Anything else: answer briefly and remind them of /draft and /approve.
+
+        Never publish without /approve. Reply in plain text, because Telegram is not rendering markdown here.
+      userPrompt: "{{ escape .telegram.text }}"
+      tools:
+        - type: mcp
+          name: notion
+          description: Search and read pages in the user's Notion workspace.
+          mcpConfig:
+            endpoint: https://mcp.notion.com/mcp
+            toolsList: [notion-search, notion-fetch]
+            token:
+              integrationId: "<< .integrations.notion >>"
+        - type: action
+          name: my_linkedin_profile
+          description: Get the connected LinkedIn account's profile, including its person id.
+          actionConfig:
+            type: external:LINKEDIN_GET_MY_INFO
+            config:
+              integration: {type: raw, value: "<< .integrations.linkedin >>"}
+        - type: action
+          name: publish_post
+          description: Publish a post on LinkedIn. Only after the user sent /approve.
+          actionConfig:
+            type: external:LINKEDIN_CREATE_LINKED_IN_POST
+            config:
+              integration: {type: raw, value: "<< .integrations.linkedin >>"}
+              author: {type: param, value: author}
+              commentary: {type: param, value: commentary}
+              visibility: {type: raw, value: PUBLIC}
+              lifecycleState: {type: raw, value: PUBLISHED}
+          guards:
+            - name: approve_only
+              expression: '{{ eq .telegram.command "approve" }}'

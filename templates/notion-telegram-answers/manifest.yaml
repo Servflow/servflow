@@ -1,0 +1,48 @@
+slug: notion-telegram-answers
+name: Notion Answers on Telegram
+version: 1.0.0
+description: >-
+  Ask your Telegram bot a question and it answers from your Notion pages,
+  with links to the pages it used. Good for a team handbook, product notes,
+  or a help center written in Notion.
+
+inputs:
+  - name: instanceName
+    label: Instance name
+    description: Names the agent and its webhook address.
+    type: text
+    required: true
+    default: notion-answers
+
+  - name: instructions
+    label: What the bot answers
+    description: >-
+      What your Notion holds and what the bot should not answer. For example
+      "Our handbook and product guides. Do not answer questions about pay or
+      people's personal details."
+    type: content
+    required: true
+    formats: [markdown, text]
+    default: |-
+      Answer questions about how we work and about our products, using our
+      Notion pages.
+
+integrations:
+  - key: telegram
+    label: Telegram bot
+    description: >-
+      The bot people message. Create one with @BotFather in Telegram and paste
+      its token. After install, follow the Telegram setup steps on the agent's
+      entry, which connect the bot to this agent.
+    type: telegram_bot
+    required: true
+
+  - key: notion
+    label: Notion
+    description: The Notion workspace the answers come from. The bot only reads it.
+    type: notion_mcp
+    required: true
+
+resources:
+  configs:
+    - file: configs/agent.yaml

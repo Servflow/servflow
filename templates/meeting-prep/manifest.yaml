@@ -1,0 +1,70 @@
+slug: meeting-prep
+name: Meeting Prep
+version: 1.0.0
+description: >-
+  Shortly before each meeting, sends you a brief on Discord: who is coming,
+  what you last discussed with them by email, and what your Notion notes say
+  about them.
+
+inputs:
+  - name: instanceName
+    label: Instance name
+    description: Names the agent.
+    type: text
+    required: true
+    default: meeting-prep
+
+  - name: minutesBefore
+    label: Minutes before the meeting
+    description: How long before a meeting the brief arrives, in minutes.
+    type: select
+    required: true
+    default: "15"
+    options: ["5", "10", "15", "30", "60"]
+
+  - name: ownerDiscordId
+    label: Your Discord user id
+    description: >-
+      Who gets the brief. In Discord, turn on Developer Mode in Settings >
+      Advanced, then right-click your name and choose Copy User ID.
+    type: text
+    required: true
+
+  - name: focus
+    label: What you always want to know
+    description: Anything a brief should always cover, or leave out.
+    type: content
+    required: false
+    formats: [markdown, text]
+    default: |-
+      Open questions and promises from our last emails, and anything I
+      noted about the person or their company.
+
+integrations:
+  - key: calendar
+    label: Google Calendar
+    description: The calendar whose meetings get a brief.
+    group: composio:googlecalendar
+    required: true
+
+  - key: gmail
+    label: Gmail
+    description: Where the agent looks for your recent emails with the attendees. It only reads.
+    group: composio:gmail
+    required: true
+
+  - key: notion
+    label: Notion
+    description: Where the agent looks for your notes on the attendees. It only reads.
+    type: notion_mcp
+    required: true
+
+  - key: discord
+    label: Discord bot
+    description: The bot that sends you the brief. It must share a server with you.
+    type: discord
+    required: true
+
+resources:
+  configs:
+    - file: configs/agent.yaml

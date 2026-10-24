@@ -1,0 +1,69 @@
+slug: notion-to-linkedin-post
+name: LinkedIn Posts from Notion
+version: 1.0.0
+description: >-
+  Message your Telegram bot /draft and it writes a LinkedIn post from your
+  Notion notes and shows it to you. Ask for changes in plain words, then send
+  /approve and it publishes the post. Nothing is published without /approve.
+
+inputs:
+  - name: instanceName
+    label: Instance name
+    description: Names the agent and its webhook address.
+    type: text
+    required: true
+    default: linkedin-posts
+
+  - name: ownerChat
+    label: Your Telegram user id
+    description: >-
+      The one account the bot works for. Message @userinfobot on Telegram and
+      it replies with your id. Messages from anyone else are ignored.
+    type: text
+    required: true
+
+  - name: sourcePages
+    label: Which Notion pages
+    description: >-
+      Where your post ideas live in Notion, in plain words. For example "pages
+      in the Post Ideas database whose Status is Ready".
+    type: content
+    required: true
+    formats: [markdown, text]
+    default: Pages in my Post Ideas database that are marked Ready.
+
+  - name: voice
+    label: How your posts sound
+    description: Your voice on LinkedIn, and anything to avoid.
+    type: content
+    required: true
+    formats: [markdown, text]
+    default: |-
+      First person, warm and direct. Short paragraphs, one idea per post,
+      no more than three hashtags, and no emoji walls.
+
+integrations:
+  - key: telegram
+    label: Telegram bot
+    description: >-
+      The bot you talk to. Create one with @BotFather and paste its token.
+      After install, follow the Telegram setup steps on the agent's entry,
+      which connect the bot to this agent.
+    type: telegram_bot
+    required: true
+
+  - key: notion
+    label: Notion
+    description: Where your post ideas come from. The bot only reads it.
+    type: notion_mcp
+    required: true
+
+  - key: linkedin
+    label: LinkedIn
+    description: The LinkedIn account the posts are published as.
+    group: composio:linkedin
+    required: true
+
+resources:
+  configs:
+    - file: configs/agent.yaml

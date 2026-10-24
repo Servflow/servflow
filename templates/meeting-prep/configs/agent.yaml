@@ -1,0 +1,91 @@
+# The meeting prep agent this template installs.
+#
+# providerID is absent from the sub agent on purpose: it is a local database
+# key, so the install fills it in from the provider the person chose. The
+# entry has no steps: the email search depends on who is attending, which only
+# the model can turn into a query. The brief tool fixes who it goes to.
+config_id: << .instanceName >>
+name: << .instanceName >>
+description: Sends a brief on Discord before each meeting
+kind: agent
+enabled: true
+config:
+  name: << .instanceName >>
+  entries:
+    - type: handler
+      handlerConfig:
+        path: ""
+        type: app_event
+        config:
+          integration: "<< .integrations.calendar >>"
+          trigger: GOOGLECALENDAR_EVENT_STARTING_SOON_TRIGGER
+          settings:
+            calendarId: primary
+            minutesBeforeStart: << .minutesBefore >>
+            includeAllDay: false
+            interval: 2
+      start: agent.brief
+  agents:
+    brief:
+      name: Meeting prep
+      next: end
+      systemPrompt: |-
+        You prepare the user for a meeting that is about to start, and send them one short brief on Discord.
+
+        ## What the brief covers
+
+        << .focus | indent 8 >>
+
+        ## How to work
+
+        1. Look at the attendees. Ignore the user and meeting rooms. If nobody else is attending, send nothing and answer in one line that there was nobody to prepare for.
+        2. For each other attendee, find your recent emails with them using search_email, with a query such as from:name@example.com OR to:name@example.com newer_than:60d and max_results 10.
+        3. Search Notion for each attendee's name, their company, and the meeting title, and read the one or two pages that matter.
+        4. Send the brief once with send_brief.
+
+        ## The brief
+
+        Discord markdown, under 20 lines: a bold line with the meeting title and start time and the meeting link if there is one; then one short block per attendee with who they are, the last thing you discussed, and anything still open; then the Notion pages used, as links. Base everything on what you found. When you found nothing about someone, say so in a few words.
+
+        Finish by answering in one line that the brief was sent.
+      userPrompt: |-
+        A meeting starts in {{ .event.data.minutes_until_start }} minutes.
+        Title: {{ escape (tostring .event.data.summary) }}
+        Starts: {{ .event.data.start_time }}
+        Link: {{ .event.data.hangout_link }}
+        Organizer: {{ .event.data.organizer_email }}
+        Description: {{ escape (tostring .event.data.description) }}
+
+        Attendees (JSON):
+        {{ escape (jsonout .event.data.attendees) }}
+      tools:
+        - type: action
+          name: search_email
+          description: Search the user's Gmail with a Gmail query. Returns the sender, recipients, subject, and date of each email, without its text.
+          actionConfig:
+            type: external:GMAIL_FETCH_EMAILS
+            config:
+              integration: {type: raw, value: "<< .integrations.gmail >>"}
+              query: {type: param, value: query}
+              max_results: {type: param, value: max_results}
+              verbose: {type: raw, value: false}
+              user_id: {type: raw, value: me}
+        - type: mcp
+          name: notion
+          description: Search and read pages in the user's Notion workspace.
+          mcpConfig:
+            endpoint: https://mcp.notion.com/mcp
+            toolsList: [notion-search, notion-fetch]
+            token:
+              integrationId: "<< .integrations.notion >>"
+        - type: action
+          name: send_brief
+          description: Send the brief to the user on Discord. Call it once.
+          actionConfig:
+            type: discord/sendmessage
+            config:
+              integration: {type: raw, value: "<< .integrations.discord >>"}
+              user_id: {type: raw, value: << .ownerDiscordId | json >>}
+              content: {type: param, value: content}
+              mentions: {type: raw, value: none}
+              split: {type: raw, value: true}

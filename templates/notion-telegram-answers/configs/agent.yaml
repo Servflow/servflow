@@ -1,0 +1,55 @@
+# The Notion answer bot this template installs.
+#
+# providerID is absent from the sub agent on purpose: it is a local database
+# key, so the install fills it in from the provider the person chose. Each
+# Telegram chat keeps its own thread, so a follow-up question can refer to an
+# earlier answer. Notion is reached through Notion's hosted MCP server with the
+# integration's token, limited to its two read tools.
+config_id: << .instanceName >>
+name: << .instanceName >>
+description: Answers Telegram questions from Notion pages, with links
+kind: agent
+enabled: true
+config:
+  name: << .instanceName >>
+  entries:
+    - type: handler
+      handlerConfig:
+        path: /telegram/<< .instanceName >>
+        type: telegram_webhook
+        config:
+          integration: "<< .integrations.telegram >>"
+          chat_types: [private]
+          ignore_bots: "true"
+          typing: "true"
+      start: agent.answer
+  agents:
+    answer:
+      name: Notion answerer
+      next: end
+      systemPrompt: |-
+        You answer questions on Telegram from the team's Notion workspace.
+
+        ## What you answer
+
+        << .instructions | indent 8 >>
+
+        ## How to work
+
+        1. Search Notion with notion-search, using the key words of the question. If nothing useful comes back, search once more with other words.
+        2. Read the one to three most relevant pages with notion-fetch.
+        3. Answer only from what those pages say. If they do not answer the question, say so plainly and suggest who to ask. Never guess.
+
+        ## How to answer
+
+        Plain text, because Telegram is not rendering markdown here. Answer in one to three sentences, then add detail only when it helps. End with a line "Sources:" followed by the link to each page you used.
+      userPrompt: "{{ escape .telegram.text }}"
+      tools:
+        - type: mcp
+          name: notion
+          description: Search and read pages in the team's Notion workspace.
+          mcpConfig:
+            endpoint: https://mcp.notion.com/mcp
+            toolsList: [notion-search, notion-fetch]
+            token:
+              integrationId: "<< .integrations.notion >>"

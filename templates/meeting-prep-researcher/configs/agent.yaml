@@ -1,0 +1,128 @@
+# The meeting prep agent this template installs: two sub agents.
+#
+# providerID is absent from both sub agents on purpose: it is a local database
+# key, so the install fills it in from the provider the person chose.
+#
+# The writer decides which attendees matter and calls the researcher once per
+# person through an agent tool. The researcher holds the Gmail and Notion
+# tools, works in a conversation of its own, and returns one paragraph, which
+# is all the writer keeps. A meeting with eight attendees therefore costs the
+# writer eight paragraphs, not eight email searches' worth of results. The
+# writer's only other tool sends the brief, to a fixed person.
+#
+# The entry has no steps: the email search depends on who is attending, which
+# only a model can turn into a query.
+config_id: << .instanceName >>
+name: << .instanceName >>
+description: Sends a brief on Discord before each meeting, researched per attendee
+kind: agent
+enabled: true
+config:
+  name: << .instanceName >>
+  entries:
+    - type: handler
+      handlerConfig:
+        path: ""
+        type: app_event
+        config:
+          integration: "<< .integrations.calendar >>"
+          trigger: GOOGLECALENDAR_EVENT_STARTING_SOON_TRIGGER
+          settings:
+            calendarId: primary
+            minutesBeforeStart: << .minutesBefore >>
+            includeAllDay: false
+            interval: 2
+      start: agent.writer
+  agents:
+    writer:
+      name: Brief writer
+      next: end
+      systemPrompt: |-
+        You prepare the user for a meeting that is about to start, and send them one short brief on Discord. You do not do the research yourself: you ask the researcher about each person, then write.
+
+        ## What the brief covers
+
+        << .focus | indent 8 >>
+
+        ## How to work
+
+        1. Look at the attendees. Leave out the user, meeting rooms, and addresses that are not people. If nobody is left, send nothing and answer in one line that there was nobody to prepare for.
+        2. Call research_person once for each remaining attendee, giving their email, their name if you have one, and the meeting title. Each call returns one paragraph. Call it for at most eight people; past that, pick the organizer and the first seven.
+        3. Send the brief once with send_brief.
+
+        ## The brief
+
+        Discord markdown, under 20 lines: a bold line with the meeting title and start time, and the meeting link if there is one; then the researcher's paragraph for each person, tightened to two or three lines, with the name in bold; then one line "Notes:" with any Notion links the researcher gave. Keep what the researcher found; do not add anything it did not say.
+
+        Finish by answering in one line that the brief was sent.
+      userPrompt: |-
+        A meeting starts in {{ .event.data.minutes_until_start }} minutes.
+        Title: {{ escape (tostring .event.data.summary) }}
+        Starts: {{ .event.data.start_time }}
+        Link: {{ .event.data.hangout_link }}
+        Organizer: {{ .event.data.organizer_email }}
+        Description: {{ escape (tostring .event.data.description) }}
+
+        Attendees (JSON):
+        {{ escape (jsonout .event.data.attendees) }}
+      tools:
+        - type: agent
+          name: research_person
+          description: >-
+            Look one attendee up in the user's email and Notion notes. Give their
+            email, their name if known, and the meeting title. Returns one
+            paragraph on who they are, the last thing discussed, anything still
+            open, and the Notion pages found.
+          params: [email, name, meeting]
+          agentConfig:
+            id: researcher
+        - type: action
+          name: send_brief
+          description: Send the brief to the user on Discord. Call it once.
+          actionConfig:
+            type: discord/sendmessage
+            config:
+              integration: {type: raw, value: "<< .integrations.discord >>"}
+              user_id: {type: raw, value: << .ownerDiscordId | json >>}
+              content: {type: param, value: content}
+              mentions: {type: raw, value: none}
+              split: {type: raw, value: true}
+    researcher:
+      name: Attendee researcher
+      next: end
+      systemPrompt: |-
+        You research one person before the user meets them, using the user's own email and Notion notes, and answer with one paragraph. You never contact anyone.
+
+        ## How to work
+
+        1. Search email with search_email: from:EMAIL OR to:EMAIL newer_than:90d, with max_results 10. If the name is known and that finds nothing, search once more for the name.
+        2. Search Notion with notion-search for the person's name, their email's domain, and the meeting title. Read with notion-fetch the one or two pages that are about them or the meeting.
+        3. Answer.
+
+        ## Your answer
+
+        One paragraph, under 120 words, plain text: who they are and where they work if you can tell, the last thing the user discussed with them and when, anything still open or promised, and anything the Notion notes add. Then, on a new line, the URL of each Notion page you used, or nothing if there were none. Say only what you found. If you found nothing, say so in one sentence.
+      userPrompt: |-
+        Research this attendee for the meeting "{{ tool_param "meeting" }}".
+        Email: {{ tool_param "email" }}
+        Name: {{ tool_param "name" }}
+      tools:
+        - type: action
+          name: search_email
+          description: Search the user's Gmail with a Gmail query. Returns the sender, recipients, subject, date, and text of each email.
+          actionConfig:
+            type: external:GMAIL_FETCH_EMAILS
+            config:
+              integration: {type: raw, value: "<< .integrations.gmail >>"}
+              query: {type: param, value: query}
+              max_results: {type: param, value: max_results}
+              verbose: {type: raw, value: true}
+              user_id: {type: raw, value: me}
+        - type: mcp
+          name: notion
+          description: Search and read pages in the user's Notion workspace.
+          mcpConfig:
+            endpoint: https://mcp.notion.com/mcp
+            toolsList: [notion-search, notion-fetch]
+            token:
+              integrationId: "<< .integrations.notion >>"

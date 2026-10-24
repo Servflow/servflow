@@ -1,0 +1,74 @@
+# The meeting follow-up agent this template installs.
+#
+# providerID is absent from the sub agent on purpose: it is a local database
+# key, so the install fills it in from the provider the person chose. The
+# entry has no steps: today's time window has to be computed from the current
+# time, and templates cannot do date arithmetic, so the model fills timeMin and
+# timeMax. There is no send tool.
+config_id: << .instanceName >>
+name: << .instanceName >>
+description: Drafts a follow-up email for each of today's meetings
+kind: agent
+enabled: true
+config:
+  name: << .instanceName >>
+  entries:
+    - type: trigger
+      trigger:
+        cron: "0 0 << .draftHour >> * * 1-5"
+      start: agent.followups
+  agents:
+    followups:
+      name: Follow-up writer
+      next: end
+      systemPrompt: |-
+        Each evening you write follow-up emails for the meetings the user had that day, and save them as Gmail drafts. You never send an email.
+
+        ## Meetings to skip
+
+        << .skipRules | indent 8 >>
+
+        Also skip cancelled meetings and all-day events.
+
+        ## How to work
+
+        1. List today's meetings with list_events. timeMin is today at 00:00 and timeMax is the current time, both as RFC 3339 timestamps with the time zone offset, for example 2026-10-24T00:00:00+01:00.
+        2. For each meeting that is not skipped, save one draft with save_draft: recipient_email is one attendee, extra_recipients lists the others, never including the user.
+        3. Answer with one line per meeting: its title and whether you drafted or skipped it.
+
+        ## The email
+
+        Plain text, two short paragraphs, in the language the meeting was held in if you can tell, otherwise English. Thank them for their time. If the meeting's description says what was agreed, restate it as next steps; otherwise ask them to confirm the next steps. Do not invent decisions. End with:
+
+        << .signOff >>,
+        << .senderName >>
+
+        The subject is "Following up: " and the meeting title.
+      userPrompt: "It is now {{ now }}. Draft today's follow-ups."
+      tools:
+        - type: action
+          name: list_events
+          description: List the meetings on the user's main calendar between timeMin and timeMax, in start order.
+          actionConfig:
+            type: external:GOOGLECALENDAR_EVENTS_LIST
+            config:
+              integration: {type: raw, value: "<< .integrations.calendar >>"}
+              calendarId: {type: raw, value: primary}
+              timeMin: {type: param, value: timeMin}
+              timeMax: {type: param, value: timeMax}
+              singleEvents: {type: raw, value: true}
+              orderBy: {type: raw, value: startTime}
+        - type: action
+          name: save_draft
+          description: Save one follow-up email as a Gmail draft. It is not sent.
+          actionConfig:
+            type: external:GMAIL_CREATE_EMAIL_DRAFT
+            config:
+              integration: {type: raw, value: "<< .integrations.gmail >>"}
+              recipient_email: {type: param, value: recipient_email}
+              extra_recipients: {type: param, value: extra_recipients}
+              subject: {type: param, value: subject}
+              body: {type: param, value: body}
+              is_html: {type: raw, value: false}
+              include_signature: {type: raw, value: false}
+              user_id: {type: raw, value: me}

@@ -1,0 +1,65 @@
+slug: meeting-follow-ups
+name: Meeting Follow-ups
+version: 1.0.0
+description: >-
+  Every weekday evening, looks at the meetings you had that day and saves a thank-you
+  and next-steps email to each meeting's attendees as a draft in Gmail. You
+  check and send them. It never sends an email itself.
+
+inputs:
+  - name: instanceName
+    label: Instance name
+    description: Names the agent.
+    type: text
+    required: true
+    default: meeting-follow-ups
+
+  - name: draftHour
+    label: Hour to draft
+    description: >-
+      The hour, on the 24-hour clock, when each weekday's drafts are written.
+      It is the server's time, which is UTC: 18 is 18:00 UTC.
+    type: select
+    required: true
+    default: "18"
+    options: ["16", "17", "18", "19", "20", "21"]
+
+  - name: senderName
+    label: Your name
+    description: The emails are written in your voice and signed with this name.
+    type: text
+    required: true
+
+  - name: signOff
+    label: Sign-off
+    description: The line before your name at the end of each email.
+    type: text
+    required: true
+    default: Best regards
+
+  - name: skipRules
+    label: Meetings to skip
+    description: Which meetings get no follow-up.
+    type: content
+    required: true
+    formats: [markdown, text]
+    default: |-
+      Meetings where every attendee has the same email domain as me, and
+      meetings with nobody but me.
+
+integrations:
+  - key: calendar
+    label: Google Calendar
+    description: The calendar the agent reads today's meetings from. It only reads.
+    group: composio:googlecalendar
+    required: true
+
+  - key: gmail
+    label: Gmail
+    description: The Gmail account the drafts are saved in.
+    group: composio:gmail
+    required: true
+
+resources:
+  configs:
+    - file: configs/agent.yaml

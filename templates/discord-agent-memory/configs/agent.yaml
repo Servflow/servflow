@@ -116,4 +116,3 @@ config:
               integration: {type: raw, value: "<< .integrations.discord >>"}
               order: {type: raw, value: desc}
               sort_by: {type: raw, value: timestamp}
-  contextGroups: {}

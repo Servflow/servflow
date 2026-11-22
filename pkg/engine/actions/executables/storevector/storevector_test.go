@@ -2,7 +2,6 @@ package storevector
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"testing"
 
@@ -14,60 +13,55 @@ import (
 )
 
 func TestStoreVectors_Execute(t *testing.T) {
+	vectors := []float32{1.1, 2.2, 3.3}
+	options := map[string]string{"optiontest": "{{ .variable_note }}"}
 
-	t.Run("successful run", func(t *testing.T) {
-		ctr := gomock.NewController(t)
-		defer ctr.Finish()
+	tests := []struct {
+		name       string
+		cfg        Config
+		wantFields map[string]any
+		storeErr   error
+	}{
+		{
+			name:       "successful run",
+			cfg:        Config{Vectors: "[1.1,2.2,3.3]", Fields: map[string]any{"id": "1", "name": "test1"}},
+			wantFields: map[string]any{"id": "1", "name": "test1"},
+		},
+		{
+			name: "templated vectors and fields resolve to their text unchanged",
+			cfg: Config{
+				Vectors: "{{ .variable_vectors }}",
+				Fields:  map[string]any{"id": "1", "tags": []any{"{{ .variable_note }}"}},
+			},
+			wantFields: map[string]any{"id": "1", "tags": []any{"say \"hi\"\nthen go"}},
+		},
+		{
+			name:       "store vectors fails",
+			cfg:        Config{Vectors: "[1.1,2.2,3.3]", Fields: map[string]any{"id": "1", "name": "test1"}},
+			wantFields: map[string]any{"id": "1", "name": "test1"},
+			storeErr:   errors.New("dummy error"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockIntegration := NewMockstoreVectorIntegration(gomock.NewController(t))
+			// Options are passed as configured.
+			mockIntegration.EXPECT().StoreVectors(vectors, tt.wantFields, options).Return(tt.storeErr)
+			rc := requestctxtest.New()
+			rc.SetIntegration("mockid", mockIntegration)
+			rc.AddVariables(map[string]any{"variable_vectors": "[1.1,2.2,3.3]", "variable_note": "say \"hi\"\nthen go"}, "")
+			ctx := requestctx.With(context.Background(), rc)
 
-		vectors := []float32{1.1, 2.2, 3.3}
-		fields := map[string]interface{}{"id": "1", "name": "test1"}
+			tt.cfg.Integration, tt.cfg.Options = "mockid", options
+			storeVectors, err := New(tt.cfg)
+			require.NoError(t, err)
 
-		jsonVectors, err := json.Marshal(vectors)
-		require.NoError(t, err)
-
-		mockIntegration := NewMockstoreVectorIntegration(ctr)
-		mockIntegration.EXPECT().StoreVectors(vectors, fields, map[string]string{"optiontest": "test"}).Return(nil)
-		rc := requestctxtest.New()
-		rc.SetIntegration("mockid", mockIntegration)
-		ctx := requestctx.With(context.Background(), rc)
-
-		storeVectors, err := New(Config{
-			Integration: "mockid",
-			Fields:      fields,
-			Options:     map[string]string{"optiontest": "test"},
-			Vectors:     string(jsonVectors),
+			_, _, err = storeVectors.Execute(ctx)
+			if tt.storeErr != nil {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
 		})
-		require.NoError(t, err)
-
-		_, _, err = storeVectors.Execute(ctx, storeVectors.Config())
-		require.NoError(t, err)
-	})
-
-	t.Run("store vectors fails", func(t *testing.T) {
-		ctr := gomock.NewController(t)
-		defer ctr.Finish()
-
-		vectors := []float32{1.1, 2.2, 3.3}
-		fields := map[string]interface{}{"id": "1", "name": "test1"}
-
-		jsonVectors, err := json.Marshal(vectors)
-		require.NoError(t, err)
-
-		mockIntegration := NewMockstoreVectorIntegration(ctr)
-		mockIntegration.EXPECT().StoreVectors(vectors, fields, map[string]string{"optiontest": "test"}).Return(errors.New("dummy error"))
-		rc := requestctxtest.New()
-		rc.SetIntegration("mockid", mockIntegration)
-		ctx := requestctx.With(context.Background(), rc)
-
-		storeVectors, err := New(Config{
-			Integration: "mockid",
-			Fields:      fields,
-			Options:     map[string]string{"optiontest": "test"},
-			Vectors:     string(jsonVectors),
-		})
-		require.NoError(t, err)
-
-		_, _, err = storeVectors.Execute(ctx, storeVectors.Config())
-		assert.Error(t, err)
-	})
+	}
 }

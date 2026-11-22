@@ -2,7 +2,6 @@ package pricedifference
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -49,11 +48,6 @@ type Executable struct {
 
 func (e *Executable) Type() string {
 	return "binance/pricedifference"
-}
-
-func (e *Executable) Config() string {
-	configBytes, _ := json.Marshal(e.config)
-	return string(configBytes)
 }
 
 func (e *Executable) loadIntegration(ctx context.Context) (binance.Integration, error) {
@@ -145,19 +139,6 @@ func (e *Executable) calculatePriceDifferenceForSymbol(ctx context.Context, bina
 	}, nil
 }
 
-// parseConfig parses the modified config or returns the default config
-func (e *Executable) parseConfig(modifiedConfig string) (Config, error) {
-	var config Config
-	if modifiedConfig != "" {
-		if err := json.Unmarshal([]byte(modifiedConfig), &config); err != nil {
-			return config, fmt.Errorf("error parsing config: %v", err)
-		}
-	} else {
-		config = e.config
-	}
-	return config, nil
-}
-
 // validateAndNormalizeConfig validates and normalizes the configuration
 func validateAndNormalizeConfig(config *Config) (int, error) {
 	// Validate required fields
@@ -242,16 +223,24 @@ func formatResponse(responses []*Response) interface{} {
 	return responseValues
 }
 
-func (e *Executable) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
+func (e *Executable) Execute(ctx context.Context) (any, map[string]string, error) {
 	binanceIntegration, err := e.loadIntegration(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error loading integration: %v", err)
 	}
 
-	config, err := e.parseConfig(modifiedConfig)
+	rc, err := requestctx.FromContextOrError(ctx)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("error getting request context: %w", err)
 	}
+	resolved, err := rc.ResolveBatch(ctx, e.config.Symbol, e.config.Interval, e.config.Period)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error resolving config: %w", err)
+	}
+	config := e.config
+	config.Symbol = resolved[0]
+	config.Interval = resolved[1]
+	config.Period = resolved[2]
 
 	periods, err := validateAndNormalizeConfig(&config)
 	if err != nil {

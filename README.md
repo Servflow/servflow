@@ -62,7 +62,7 @@ Actions and integrations compile against these packages. A host implements or
 supplies what they declare:
 
 `pkg/engine/actions`
-: The `ActionExecutable` and `ActionExecutableV2` interfaces, `Definition`, the
+: The `ActionExecutable` interface, `Definition`, the
   field and output types, and `ErrFailure`, which an action wraps to mark a
   failure the run can recover from.
 

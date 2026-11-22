@@ -2,7 +2,6 @@ package mongoquery
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 
 	"github.com/Servflow/servflow/pkg/engine/actions"
@@ -23,7 +22,7 @@ func execute(t *testing.T, ctx context.Context, cfg Config) (any, error) {
 	cfg.Integration = "mongo"
 	q, err := New(cfg)
 	require.NoError(t, err)
-	res, _, err := q.Execute(ctx, q.Config())
+	res, _, err := q.Execute(ctx)
 	return res, err
 }
 
@@ -124,42 +123,52 @@ func TestNew_Validation(t *testing.T) {
 		assert.ErrorContains(t, err, "integration is required")
 	})
 
-	t.Run("a templated operation is checked once rendered", func(t *testing.T) {
-		q, err := New(Config{Integration: "mongo", Operation: `{{ tool_param "operation" }}`, Collection: `{{ tool_param "collection" }}`})
+	t.Run("a templated operation is checked once resolved", func(t *testing.T) {
+		q, err := New(Config{Integration: "mongo", Operation: "{{ .variable_operation }}", Collection: "{{ .variable_collection }}"})
 		require.NoError(t, err)
 
-		rendered, err := json.Marshal(Config{Integration: "mongo", Operation: "insert", Collection: "users"})
-		require.NoError(t, err)
-		mock := NewMockmongoDBIntegration(gomock.NewController(t))
-		_, _, err = q.Execute(withIntegration(t, mock), string(rendered))
+		rc := requestctxtest.New()
+		rc.SetIntegration("mongo", NewMockmongoDBIntegration(gomock.NewController(t)))
+		rc.AddVariables(map[string]any{"variable_operation": "insert", "variable_collection": "users"}, "")
+		_, _, err = q.Execute(requestctx.With(context.Background(), rc))
 		require.ErrorIs(t, err, actions.ErrFailure)
 		assert.ErrorContains(t, err, "unknown operation")
 	})
 }
 
-func TestMGOQuery_ConfigKeepsItsTemplates(t *testing.T) {
-	mock := NewMockmongoDBIntegration(gomock.NewController(t))
-	gomock.InOrder(
-		mock.EXPECT().ListCollections(gomock.Any()).Return([]string{"users"}, nil),
-		mock.EXPECT().ExecuteQuery(gomock.Any(), "users", "{}", "").Return([]map[string]interface{}{{"name": "ada"}}, nil),
-	)
-	ctx := withIntegration(t, mock)
+func TestMGOQuery_ResolvesTemplates(t *testing.T) {
+	t.Run("each call resolves the stored templates again", func(t *testing.T) {
+		mock := NewMockmongoDBIntegration(gomock.NewController(t))
+		gomock.InOrder(
+			mock.EXPECT().ListCollections(gomock.Any()).Return([]string{"users"}, nil),
+			mock.EXPECT().ExecuteQuery(gomock.Any(), "users", "{}", "").Return([]map[string]interface{}{{"name": "ada"}}, nil),
+		)
+		rc := requestctxtest.New()
+		rc.SetIntegration("mongo", mock)
+		ctx := requestctx.With(context.Background(), rc)
 
-	// The stored config carries templates; each call hands Execute what they
-	// rendered to. A second call must not see the first call's values.
-	q, err := New(Config{Integration: "mongo", Operation: `{{ tool_param "operation" }}`, Collection: `{{ tool_param "collection" }}`})
-	require.NoError(t, err)
-	stored := q.Config()
+		q, err := New(Config{Integration: "mongo", Operation: "{{ .variable_operation }}", Collection: "{{ .variable_collection }}", FilterQuery: "{{ .variable_filter }}"})
+		require.NoError(t, err)
 
-	first, err := json.Marshal(Config{Integration: "mongo", Operation: OperationListCollections})
-	require.NoError(t, err)
-	_, _, err = q.Execute(ctx, string(first))
-	require.NoError(t, err)
-	assert.Equal(t, stored, q.Config())
+		rc.AddVariables(map[string]any{"variable_operation": OperationListCollections}, "")
+		_, _, err = q.Execute(ctx)
+		require.NoError(t, err)
 
-	second, err := json.Marshal(Config{Integration: "mongo", Operation: OperationFind, Collection: "users", FilterQuery: "{}"})
-	require.NoError(t, err)
-	res, _, err := q.Execute(ctx, string(second))
-	require.NoError(t, err)
-	assert.Equal(t, []map[string]interface{}{{"name": "ada"}}, res)
+		rc.AddVariables(map[string]any{"variable_operation": OperationFind, "variable_collection": "users", "variable_filter": "{}"}, "")
+		res, _, err := q.Execute(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, []map[string]interface{}{{"name": "ada"}}, res)
+	})
+
+	t.Run("a resolved value reaches the query unchanged", func(t *testing.T) {
+		filter := "{\"note\":\"say \\\"hi\\\"\\nthen go\"}"
+		mock := NewMockmongoDBIntegration(gomock.NewController(t))
+		mock.EXPECT().ExecuteQuery(gomock.Any(), "users", filter, "").Return([]map[string]interface{}{{"name": "ada"}}, nil)
+		rc := requestctxtest.New()
+		rc.SetIntegration("mongo", mock)
+		rc.AddVariables(map[string]any{"variable_filter": filter}, "")
+
+		_, err := execute(t, requestctx.With(context.Background(), rc), Config{Collection: "users", FilterQuery: "{{ .variable_filter }}"})
+		require.NoError(t, err)
+	})
 }

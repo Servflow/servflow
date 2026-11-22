@@ -11,12 +11,12 @@ import (
 	"go.uber.org/zap"
 )
 
-// ExecutableV2 is the V2 implementation that handles its own template resolution
-type ExecutableV2 struct {
+// Executable returns a value it resolves when it runs.
+type Executable struct {
 	Return string
 }
 
-func (s *ExecutableV2) Type() string {
+func (s *Executable) Type() string {
 	return "static"
 }
 
@@ -24,14 +24,14 @@ type Config struct {
 	Return string `json:"return"`
 }
 
-func NewExecutableV2(cfg Config) *ExecutableV2 {
-	return &ExecutableV2{
+func NewExecutable(cfg Config) *Executable {
+	return &Executable{
 		Return: cfg.Return,
 	}
 }
 
 // Execute resolves the return value template and returns the result
-func (s *ExecutableV2) Execute(ctx context.Context) (interface{}, map[string]string, error) {
+func (s *Executable) Execute(ctx context.Context) (interface{}, map[string]string, error) {
 	logger := logging.FromContext(ctx).With(zap.String("execution_type", s.Type()))
 	ctx = logging.WithLogger(ctx, logger)
 
@@ -78,12 +78,12 @@ func Definition() actions.Definition {
 			Kind:        actions.OutputValue,
 			Description: "The text of the return template, with its variables filled in.",
 		},
-		NewV2: func(_ context.Context, config json.RawMessage) (actions.ActionExecutableV2, error) {
+		New: func(_ context.Context, config json.RawMessage) (actions.ActionExecutable, error) {
 			var cfg Config
 			if err := json.Unmarshal(config, &cfg); err != nil {
 				return nil, fmt.Errorf("error creating static action: %v", err)
 			}
-			return NewExecutableV2(cfg), nil
+			return NewExecutable(cfg), nil
 		},
 	}
 }

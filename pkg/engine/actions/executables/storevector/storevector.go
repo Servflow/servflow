@@ -31,26 +31,18 @@ func (s StoreVectors) Type() string {
 	return "storevector"
 }
 
-func (s StoreVectors) Config() string {
-	cfg := *s.cfg
-	cfg.Options = nil
-	cfg.Integration = ""
-	dat, err := json.Marshal(cfg)
-	if err != nil {
-		return ""
-	}
-	return string(dat)
-}
-
-func (s StoreVectors) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
-	var newCfg Config
-	err := json.Unmarshal([]byte(modifiedConfig), &newCfg)
+// Execute resolves the vectors and fields and stores them.
+func (s StoreVectors) Execute(ctx context.Context) (interface{}, map[string]string, error) {
+	resolved, err := requestctx.ResolveValues(ctx, map[string]any{"vectors": s.cfg.Vectors, "fields": s.cfg.Fields})
 	if err != nil {
 		return nil, nil, err
 	}
+	values := resolved.(map[string]any)
+	vectorsText, _ := values["vectors"].(string)
+	fields, _ := values["fields"].(map[string]any)
 
 	var vectors []float32
-	err = json.Unmarshal([]byte(newCfg.Vectors), &vectors)
+	err = json.Unmarshal([]byte(vectorsText), &vectors)
 	if err != nil {
 		return nil, nil, fmt.Errorf("invalid value for vectors: %w", err)
 	}
@@ -64,7 +56,7 @@ func (s StoreVectors) Execute(ctx context.Context, modifiedConfig string) (inter
 		return nil, nil, errors.New("integration does not implement vector storage")
 	}
 
-	err = impl.StoreVectors(vectors, newCfg.Fields, s.cfg.Options)
+	err = impl.StoreVectors(vectors, fields, s.cfg.Options)
 	if err != nil {
 		return nil, nil, err
 	}

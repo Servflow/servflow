@@ -10,19 +10,10 @@ import (
 // step's failure branch instead of stopping the run. Any other error stops it.
 var ErrFailure = errors.New("action failed")
 
-// ActionExecutable is the v1 action interface.
-// Actions return their config as a string template, and receive
-// the template-resolved config in Execute.
+// ActionExecutable is a built action. It resolves its own templated fields
+// against the request context when it runs, with RequestContext.Resolve,
+// RequestContext.ResolveBatch or requestctx.ResolveValues.
 type ActionExecutable interface {
-	Config() string
-	Execute(ctx context.Context, modifiedConfig string) (resp interface{}, fields map[string]string, err error)
-	Type() string
-}
-
-// ActionExecutableV2 is the v2 action interface.
-// Actions handle their own template resolution using RequestContext.Resolve()
-// or RequestContext.ResolveBatch() methods.
-type ActionExecutableV2 interface {
 	Type() string
 	Execute(ctx context.Context) (resp interface{}, fields map[string]string, err error)
 }

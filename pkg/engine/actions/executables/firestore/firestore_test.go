@@ -6,6 +6,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
+	"github.com/Servflow/servflow/pkg/engine/requestctx/requestctxtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -32,11 +34,13 @@ func TestFirestore_Execute(t *testing.T) {
 		ProjectID:        testProjectID,
 		CollectionID:     "users",
 		ServiceAccount:   string(contents),
-		DocumentTemplate: `{"email":"{{ in.email }}","first_name":"{{ in.first_name }}","last_name":"{{ in.last_name }}"}`,
+		DocumentTemplate: `{"email":"{{ .variable_email }}","first_name":"{{ .variable_first_name }}","last_name":"{{ .variable_last_name }}"}`,
 	})
 	require.NoError(t, err, "error creating client")
 
-	_, _, err = client.Execute(context.Background(), `{"email":"test_execute@gmail.com","first_name":"test","last_name":"user"}`)
+	rc := requestctxtest.New()
+	rc.AddVariables(map[string]any{"variable_email": "test_execute@gmail.com", "variable_first_name": "test", "variable_last_name": "user"}, "")
+	_, _, err = client.Execute(requestctx.With(context.Background(), rc))
 	require.NoError(t, err, "error executing firestore client")
 
 	// fetch created user

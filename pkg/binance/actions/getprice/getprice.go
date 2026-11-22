@@ -2,7 +2,6 @@ package getprice
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -33,11 +32,6 @@ func (e *Executable) Type() string {
 	return "binance/getprice"
 }
 
-func (e *Executable) Config() string {
-	configBytes, _ := json.Marshal(e.config)
-	return string(configBytes)
-}
-
 func (e *Executable) loadIntegration(ctx context.Context) (binance.Integration, error) {
 	if e.integration != nil {
 		return e.integration, nil
@@ -53,15 +47,18 @@ func (e *Executable) loadIntegration(ctx context.Context) (binance.Integration, 
 	return binanceIntegration, nil
 }
 
-func (e *Executable) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
-	var config Config
-	if modifiedConfig != "" {
-		if err := json.Unmarshal([]byte(modifiedConfig), &config); err != nil {
-			return nil, nil, fmt.Errorf("error parsing config: %v", err)
-		}
-	} else {
-		config = e.config
+func (e *Executable) Execute(ctx context.Context) (any, map[string]string, error) {
+	rc, err := requestctx.FromContextOrError(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error getting request context: %w", err)
 	}
+	resolved, err := rc.ResolveBatch(ctx, e.config.Symbol, e.config.PriceType)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error resolving config: %w", err)
+	}
+	config := e.config
+	config.Symbol = resolved[0]
+	config.PriceType = resolved[1]
 
 	if config.Symbol == "" {
 		return nil, nil, errors.New("symbol is required")

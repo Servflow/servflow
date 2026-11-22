@@ -2,7 +2,6 @@ package tradeinfo
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -34,11 +33,6 @@ func (e *Executable) Type() string {
 	return "binance/tradeinfo"
 }
 
-func (e *Executable) Config() string {
-	configBytes, _ := json.Marshal(e.config)
-	return string(configBytes)
-}
-
 func (e *Executable) loadIntegration(ctx context.Context) (binance.Integration, error) {
 	if e.integration != nil {
 		return e.integration, nil
@@ -54,15 +48,19 @@ func (e *Executable) loadIntegration(ctx context.Context) (binance.Integration, 
 	return binanceIntegration, nil
 }
 
-func (e *Executable) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
-	var config Config
-	if modifiedConfig != "" {
-		if err := json.Unmarshal([]byte(modifiedConfig), &config); err != nil {
-			return nil, nil, fmt.Errorf("error parsing config: %v", err)
-		}
-	} else {
-		config = e.config
+func (e *Executable) Execute(ctx context.Context) (any, map[string]string, error) {
+	rc, err := requestctx.FromContextOrError(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error getting request context: %w", err)
 	}
+	resolved, err := rc.ResolveBatch(ctx, e.config.Symbol, e.config.OrderID, e.config.InfoType)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error resolving config: %w", err)
+	}
+	config := e.config
+	config.Symbol = resolved[0]
+	config.OrderID = resolved[1]
+	config.InfoType = resolved[2]
 
 	binanceIntegration, err := e.loadIntegration(ctx)
 	if err != nil {

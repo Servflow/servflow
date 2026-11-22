@@ -2,7 +2,6 @@ package futuresorder
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -66,11 +65,6 @@ func (e *Executable) Type() string {
 	return ActionType
 }
 
-func (e *Executable) Config() string {
-	configBytes, _ := json.Marshal(e.config)
-	return string(configBytes)
-}
-
 func (e *Executable) loadIntegration(ctx context.Context) (binance.Integration, error) {
 	if e.integration != nil {
 		return e.integration, nil
@@ -86,20 +80,30 @@ func (e *Executable) loadIntegration(ctx context.Context) (binance.Integration, 
 	return binanceIntegration, nil
 }
 
-func (e *Executable) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
+func (e *Executable) Execute(ctx context.Context) (any, map[string]string, error) {
 	binanceIntegration, err := e.loadIntegration(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error loading integration: %v", err)
 	}
 
-	var config Config
-	if modifiedConfig != "" {
-		if err := json.Unmarshal([]byte(modifiedConfig), &config); err != nil {
-			return nil, nil, fmt.Errorf("error parsing config: %v", err)
-		}
-	} else {
-		config = e.config
+	rc, err := requestctx.FromContextOrError(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error getting request context: %w", err)
 	}
+	resolved, err := rc.ResolveBatch(ctx, e.config.Symbol, e.config.Side, e.config.Quantity, e.config.Type, e.config.Price, e.config.TimeInForce, e.config.PositionSide, e.config.ReduceOnly, e.config.Leverage)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error resolving config: %w", err)
+	}
+	config := e.config
+	config.Symbol = resolved[0]
+	config.Side = resolved[1]
+	config.Quantity = resolved[2]
+	config.Type = resolved[3]
+	config.Price = resolved[4]
+	config.TimeInForce = resolved[5]
+	config.PositionSide = resolved[6]
+	config.ReduceOnly = resolved[7]
+	config.Leverage = resolved[8]
 
 	// Validate required fields
 	if config.Symbol == "" {

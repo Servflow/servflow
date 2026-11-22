@@ -17,14 +17,6 @@ type Delete struct {
 	cfg *Config
 }
 
-func (d *Delete) Config() string {
-	filtersStr, err := json.Marshal(d.cfg.Filters)
-	if err != nil {
-		return ""
-	}
-	return string(filtersStr)
-}
-
 func (d *Delete) Type() string {
 	return "delete"
 }
@@ -51,10 +43,20 @@ func New(config Config) (*Delete, error) {
 	return &Delete{cfg: &config}, nil
 }
 
-func (d *Delete) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
-	var filters []filters.Filter
-	if err := json.Unmarshal([]byte(modifiedConfig), &filters); err != nil {
+// Execute resolves the filters and deletes the rows they match.
+func (d *Delete) Execute(ctx context.Context) (interface{}, map[string]string, error) {
+	templated := make([]any, len(d.cfg.Filters))
+	for i, f := range d.cfg.Filters {
+		templated[i] = []any{f.Field, f.Operation, f.Comparator}
+	}
+	resolved, err := requestctx.ResolveValues(ctx, templated)
+	if err != nil {
 		return "", nil, err
+	}
+	resolvedFilters := make([]filters.Filter, len(templated))
+	for i, r := range resolved.([]any) {
+		parts := r.([]any)
+		resolvedFilters[i] = filters.Filter{Field: parts[0].(string), Operation: parts[1].(string), Comparator: parts[2]}
 	}
 
 	i, err := requestctx.GetIntegration(ctx, d.cfg.Integration)
@@ -67,7 +69,7 @@ func (d *Delete) Execute(ctx context.Context, modifiedConfig string) (interface{
 	}
 
 	var ret interface{}
-	err = impl.Delete(ctx, map[string]string{"collection": d.cfg.Table}, filters...)
+	err = impl.Delete(ctx, map[string]string{"collection": d.cfg.Table}, resolvedFilters...)
 	if err != nil {
 		return "", nil, fmt.Errorf("delete with filters: %v", err)
 	}

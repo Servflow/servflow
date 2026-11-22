@@ -4,119 +4,98 @@ import (
 	"context"
 	"testing"
 
-	"github.com/Servflow/servflow/pkg/binance"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+
+	"github.com/Servflow/servflow/pkg/binance"
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
+	"github.com/Servflow/servflow/pkg/engine/requestctx/requestctxtest"
 )
 
-func TestExecute_PlacesOrder(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockIntegration := binance.NewMockIntegration(ctrl)
-	mockIntegration.EXPECT().PlaceFuturesOrder(
-		"BTCUSDT",
-		"BUY",
-		0.001,
-		"MARKET",
-		(*float64)(nil),
-		"",
-		"",
-		false,
-	).Return(&binance.FuturesOrderResponse{
-		OrderID: 12345,
-		Symbol:  "BTCUSDT",
-		Status:  "FILLED",
-	}, nil)
-
-	executable := &Executable{
-		config: Config{
-			Integration: "test",
-			Symbol:      "BTCUSDT",
-			Side:        "BUY",
-			Quantity:    "0.001",
-			Type:        "MARKET",
-		},
-		integration: mockIntegration,
-	}
-
-	_, _, err := executable.Execute(context.Background(), "")
-	require.NoError(t, err)
-}
-
-func TestExecute_LimitOrder(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockIntegration := binance.NewMockIntegration(ctrl)
+func TestExecute(t *testing.T) {
 	price := 45000.0
-	mockIntegration.EXPECT().PlaceFuturesOrder(
-		"BTCUSDT",
-		"SELL",
-		0.002,
-		"LIMIT",
-		&price,
-		"GTC",
-		"LONG",
-		true,
-	).Return(&binance.FuturesOrderResponse{
-		OrderID: 12346,
-		Symbol:  "BTCUSDT",
-		Status:  "NEW",
-	}, nil)
-
-	executable := &Executable{
-		config: Config{
-			Integration:  "test",
-			Symbol:       "BTCUSDT",
-			Side:         "SELL",
-			Quantity:     "0.002",
-			Type:         "LIMIT",
-			Price:        "45000",
-			TimeInForce:  "GTC",
-			PositionSide: "LONG",
-			ReduceOnly:   "true",
+	tests := []struct {
+		name      string
+		config    Config
+		variables map[string]any
+		expect    func(m *binance.MockIntegration)
+	}{
+		{
+			name:   "market order",
+			config: Config{Symbol: "BTCUSDT", Side: "BUY", Quantity: "0.001", Type: "MARKET"},
+			expect: func(m *binance.MockIntegration) {
+				m.EXPECT().PlaceFuturesOrder("BTCUSDT", "BUY", 0.001, "MARKET", (*float64)(nil), "", "", false).
+					Return(&binance.FuturesOrderResponse{OrderID: 12345, Symbol: "BTCUSDT", Status: "FILLED"}, nil)
+			},
 		},
-		integration: mockIntegration,
+		{
+			name: "limit order",
+			config: Config{
+				Symbol:       "BTCUSDT",
+				Side:         "SELL",
+				Quantity:     "0.002",
+				Type:         "LIMIT",
+				Price:        "45000",
+				TimeInForce:  "GTC",
+				PositionSide: "LONG",
+				ReduceOnly:   "true",
+			},
+			expect: func(m *binance.MockIntegration) {
+				m.EXPECT().PlaceFuturesOrder("BTCUSDT", "SELL", 0.002, "LIMIT", &price, "GTC", "LONG", true).
+					Return(&binance.FuturesOrderResponse{OrderID: 12346, Symbol: "BTCUSDT", Status: "NEW"}, nil)
+			},
+		},
+		{
+			name:   "sets leverage",
+			config: Config{Symbol: "BTCUSDT", Side: "BUY", Quantity: "0.001", Type: "MARKET", Leverage: "10"},
+			expect: func(m *binance.MockIntegration) {
+				m.EXPECT().SetLeverage("BTCUSDT", 10).Return(nil, nil)
+				m.EXPECT().PlaceFuturesOrder("BTCUSDT", "BUY", 0.001, "MARKET", (*float64)(nil), "", "", false).
+					Return(&binance.FuturesOrderResponse{OrderID: 12347, Symbol: "BTCUSDT", Status: "FILLED"}, nil)
+			},
+		},
+		{
+			name: "templated fields resolve against the request",
+			config: Config{
+				Symbol:       "{{ .symbol }}",
+				Side:         "{{ .side }}",
+				Quantity:     "{{ .quantity }}",
+				Type:         "{{ .type }}",
+				Price:        "{{ .price }}",
+				TimeInForce:  "{{ .tif }}",
+				PositionSide: "{{ .position_side }}",
+				ReduceOnly:   "{{ .reduce_only }}",
+				Leverage:     "{{ .leverage }}",
+			},
+			variables: map[string]any{
+				"symbol":        "BTC\"USDT\"\nX",
+				"side":          "SELL",
+				"quantity":      "0.002",
+				"type":          "LIMIT",
+				"price":         "45000",
+				"tif":           "IOC",
+				"position_side": "SHORT",
+				"reduce_only":   "true",
+				"leverage":      "5",
+			},
+			expect: func(m *binance.MockIntegration) {
+				m.EXPECT().SetLeverage("BTC\"USDT\"\nX", 5).Return(nil, nil)
+				m.EXPECT().PlaceFuturesOrder("BTC\"USDT\"\nX", "SELL", 0.002, "LIMIT", &price, "IOC", "SHORT", true).
+					Return(&binance.FuturesOrderResponse{OrderID: 12348, Status: "NEW"}, nil)
+			},
+		},
 	}
 
-	_, _, err := executable.Execute(context.Background(), "")
-	require.NoError(t, err)
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := binance.NewMockIntegration(gomock.NewController(t))
+			tt.expect(mock)
+			rc := requestctxtest.New()
+			rc.AddVariables(tt.variables, "")
 
-func TestExecute_SetsLeverage(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockIntegration := binance.NewMockIntegration(ctrl)
-	mockIntegration.EXPECT().SetLeverage("BTCUSDT", 10).Return(nil, nil)
-	mockIntegration.EXPECT().PlaceFuturesOrder(
-		"BTCUSDT",
-		"BUY",
-		0.001,
-		"MARKET",
-		(*float64)(nil),
-		"",
-		"",
-		false,
-	).Return(&binance.FuturesOrderResponse{
-		OrderID: 12347,
-		Symbol:  "BTCUSDT",
-		Status:  "FILLED",
-	}, nil)
-
-	executable := &Executable{
-		config: Config{
-			Integration: "test",
-			Symbol:      "BTCUSDT",
-			Side:        "BUY",
-			Quantity:    "0.001",
-			Type:        "MARKET",
-			Leverage:    "10",
-		},
-		integration: mockIntegration,
+			executable := &Executable{config: tt.config, integration: mock}
+			_, _, err := executable.Execute(requestctx.With(context.Background(), rc))
+			require.NoError(t, err)
+		})
 	}
-
-	_, _, err := executable.Execute(context.Background(), "")
-	require.NoError(t, err)
 }

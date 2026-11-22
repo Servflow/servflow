@@ -19,12 +19,10 @@ type Definition struct {
 	// OutputDynamic: an action that has not been described yet keeps working and
 	// is offered whole.
 	Output OutputInfo `json:"output"`
-	// Exactly one of New and NewV2 is set. A V1 action receives its config with
-	// templates already resolved; a V2 action resolves its own. ctx is the
-	// context the action is built for, so what a constructor looks up is
-	// looked up for it.
-	New   func(ctx context.Context, config json.RawMessage) (ActionExecutable, error)   `json:"-"`
-	NewV2 func(ctx context.Context, config json.RawMessage) (ActionExecutableV2, error) `json:"-"`
+	// New builds the action from its config, with templates unresolved. ctx
+	// is the context the action is built for, so what a constructor looks up
+	// is looked up for it.
+	New func(ctx context.Context, config json.RawMessage) (ActionExecutable, error) `json:"-"`
 }
 
 type FieldType string

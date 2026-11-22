@@ -2,7 +2,6 @@ package spotorder
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -56,11 +55,6 @@ func (e *Executable) Type() string {
 	return ActionType
 }
 
-func (e *Executable) Config() string {
-	configBytes, _ := json.Marshal(e.config)
-	return string(configBytes)
-}
-
 func (e *Executable) loadIntegration(ctx context.Context) (binance.Integration, error) {
 	i, err := requestctx.GetIntegration(ctx, e.config.Integration)
 	if err != nil {
@@ -73,15 +67,24 @@ func (e *Executable) loadIntegration(ctx context.Context) (binance.Integration, 
 	return binanceIntegration, nil
 }
 
-func (e *Executable) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
-	var config Config
-	if modifiedConfig != "" {
-		if err := json.Unmarshal([]byte(modifiedConfig), &config); err != nil {
-			return nil, nil, fmt.Errorf("error parsing config: %v", err)
-		}
-	} else {
-		config = e.config
+func (e *Executable) Execute(ctx context.Context) (any, map[string]string, error) {
+	rc, err := requestctx.FromContextOrError(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error getting request context: %w", err)
 	}
+	resolved, err := rc.ResolveBatch(ctx, e.config.Symbol, e.config.Side, e.config.Quantity, e.config.QuoteOrderQty, e.config.Type, e.config.Price, e.config.StopPrice, e.config.TimeInForce)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error resolving config: %w", err)
+	}
+	config := e.config
+	config.Symbol = resolved[0]
+	config.Side = resolved[1]
+	config.Quantity = resolved[2]
+	config.QuoteOrderQty = resolved[3]
+	config.Type = resolved[4]
+	config.Price = resolved[5]
+	config.StopPrice = resolved[6]
+	config.TimeInForce = resolved[7]
 
 	binanceIntegration, err := e.loadIntegration(ctx)
 	if err != nil {

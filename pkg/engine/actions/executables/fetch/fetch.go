@@ -45,21 +45,23 @@ func New(config Config) (*Fetch, error) {
 	return &Fetch{cfg: &config}, nil
 }
 
-func (f *Fetch) Config() string {
-	filtersStr, err := json.Marshal(f.cfg.Filters)
-	if err != nil {
-		return ""
-	}
-	return string(filtersStr)
-}
-
-func (f *Fetch) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
+// Execute resolves the filters and reads the rows they match.
+func (f *Fetch) Execute(ctx context.Context) (interface{}, map[string]string, error) {
 	logger := logging.FromContext(ctx).With(zap.String("execution_type", f.Type()))
 	ctx = logging.WithLogger(ctx, logger)
 
-	var filters []filters.Filter
-	if err := json.Unmarshal([]byte(modifiedConfig), &filters); err != nil {
+	templated := make([]any, len(f.cfg.Filters))
+	for i, filter := range f.cfg.Filters {
+		templated[i] = []any{filter.Field, filter.Operation, filter.Comparator}
+	}
+	resolved, err := requestctx.ResolveValues(ctx, templated)
+	if err != nil {
 		return "", nil, err
+	}
+	resolvedFilters := make([]filters.Filter, len(templated))
+	for i, r := range resolved.([]any) {
+		parts := r.([]any)
+		resolvedFilters[i] = filters.Filter{Field: parts[0].(string), Operation: parts[1].(string), Comparator: parts[2]}
 	}
 
 	i, err := requestctx.GetIntegration(ctx, f.cfg.Integration)
@@ -72,7 +74,7 @@ func (f *Fetch) Execute(ctx context.Context, modifiedConfig string) (interface{}
 	}
 
 	var ret interface{}
-	resp, err := impl.Fetch(ctx, map[string]string{"collection": f.cfg.Table}, filters...)
+	resp, err := impl.Fetch(ctx, map[string]string{"collection": f.cfg.Table}, resolvedFilters...)
 	if err != nil {
 		return "", nil, fmt.Errorf("fetch with filters: %v", err)
 	}

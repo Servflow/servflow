@@ -32,22 +32,19 @@ func (f FetchVector) Type() string {
 	return "fetchvector"
 }
 
-func (f FetchVector) Config() string {
-	dat, err := json.Marshal(f.cfg)
+// Execute resolves the vector and options and returns the nearest stored
+// vectors.
+func (f FetchVector) Execute(ctx context.Context) (interface{}, map[string]string, error) {
+	resolved, err := requestctx.ResolveValues(ctx, map[string]any{"vector": f.cfg.Vector, "options": f.cfg.Options})
 	if err != nil {
-		return ""
-	}
-	return string(dat)
-}
-
-func (f FetchVector) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
-	var newCfg Config
-	if err := json.Unmarshal([]byte(modifiedConfig), &newCfg); err != nil {
 		return nil, nil, err
 	}
+	fields := resolved.(map[string]any)
+	vector, _ := fields["vector"].(string)
+	options, _ := fields["options"].(map[string]any)
 
 	var vectors []float32
-	if err := json.Unmarshal([]byte(newCfg.Vector), &vectors); err != nil {
+	if err := json.Unmarshal([]byte(vector), &vectors); err != nil {
 		return nil, nil, fmt.Errorf("invalid value for vectors: %v", err)
 	}
 
@@ -60,7 +57,7 @@ func (f FetchVector) Execute(ctx context.Context, modifiedConfig string) (interf
 		return nil, nil, errors.New("integration does not implement vector storage")
 	}
 
-	resultFields, err := impl.FetchVector(vectors, newCfg.Options)
+	resultFields, err := impl.FetchVector(vectors, options)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error fetching vectors: %v", err)
 	}

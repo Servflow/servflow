@@ -17,18 +17,18 @@ const (
 	Bcrypt = "bcrypt"
 )
 
-// HashV2 is the V2 implementation that handles its own template resolution
-type HashV2 struct {
+// Hash hashes a value it resolves when it runs.
+type Hash struct {
 	algorithm string
 	value     string
 }
 
-func (h *HashV2) Type() string {
+func (h *Hash) Type() string {
 	return "hash"
 }
 
-func NewV2(value, algorithm string) (*HashV2, error) {
-	hash := &HashV2{value: value}
+func New(value, algorithm string) (*Hash, error) {
+	hash := &Hash{value: value}
 	switch algorithm {
 	case Bcrypt:
 		hash.algorithm = Bcrypt
@@ -40,7 +40,7 @@ func NewV2(value, algorithm string) (*HashV2, error) {
 }
 
 // Execute resolves the value template and generates the hash
-func (h *HashV2) Execute(ctx context.Context) (interface{}, map[string]string, error) {
+func (h *Hash) Execute(ctx context.Context) (interface{}, map[string]string, error) {
 	logger := logging.FromContext(ctx).With(zap.String("execution_type", h.Type()))
 	ctx = logging.WithLogger(ctx, logger)
 
@@ -92,7 +92,7 @@ func Definition() actions.Definition {
 			Kind:        actions.OutputValue,
 			Description: "The hash of the value.",
 		},
-		NewV2: func(_ context.Context, config json.RawMessage) (actions.ActionExecutableV2, error) {
+		New: func(_ context.Context, config json.RawMessage) (actions.ActionExecutable, error) {
 			var cfg map[string]interface{}
 			if err := json.Unmarshal(config, &cfg); err != nil {
 				return nil, fmt.Errorf("error creating hash action: %v", err)
@@ -101,7 +101,7 @@ func Definition() actions.Definition {
 				if a, ok := cfg["algorithm"]; ok {
 					field, algo := f.(string), a.(string)
 					if field != "" && algo != "" {
-						return NewV2(field, algo)
+						return New(field, algo)
 					}
 				}
 			}

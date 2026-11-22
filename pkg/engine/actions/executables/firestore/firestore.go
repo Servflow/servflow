@@ -7,6 +7,7 @@ import (
 
 	"cloud.google.com/go/firestore"
 	"github.com/Servflow/servflow/pkg/engine/actions"
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
 	"google.golang.org/api/option"
 )
 
@@ -46,21 +47,27 @@ func NewFirestoreExecutable(cfg Config) (*Firestore, error) {
 	}, nil
 }
 
-func (f *Firestore) Config() string {
-	return f.config.DocumentTemplate
-}
-
-func (f *Firestore) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
-	cfg := make(map[string]interface{})
-	if err := json.Unmarshal([]byte(modifiedConfig), &cfg); err != nil {
+// Execute resolves every text value in the document template and adds the
+// document to the collection.
+func (f *Firestore) Execute(ctx context.Context) (interface{}, map[string]string, error) {
+	var document map[string]any
+	if err := json.Unmarshal([]byte(f.config.DocumentTemplate), &document); err != nil {
 		return "", nil, err
 	}
-
-	_, _, err := f.client.Collection(f.collectionID).Add(ctx, cfg)
+	resolved, err := requestctx.ResolveValues(ctx, document)
 	if err != nil {
 		return "", nil, err
 	}
-	return modifiedConfig, nil, nil
+
+	_, _, err = f.client.Collection(f.collectionID).Add(ctx, resolved)
+	if err != nil {
+		return "", nil, err
+	}
+	written, err := json.Marshal(resolved)
+	if err != nil {
+		return "", nil, err
+	}
+	return string(written), nil, nil
 }
 
 // Definition describes the firestore action to a host that offers it.

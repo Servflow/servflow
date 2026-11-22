@@ -50,19 +50,11 @@ type MGOQuery struct {
 	config Config
 }
 
-func (m *MGOQuery) Config() string {
-	b, err := json.Marshal(m.config)
-	if err != nil {
-		return ""
-	}
-	return string(b)
-}
-
 func New(config Config) (*MGOQuery, error) {
 	if config.Integration == "" {
 		return nil, errors.New("integration is required")
 	}
-	// A templated operation or collection is only known once it is rendered,
+	// A templated operation or collection is only known once it is resolved,
 	// so Execute checks it then.
 	if !strings.Contains(config.Operation+config.Collection, "{{") {
 		if err := validate(config); err != nil {
@@ -129,13 +121,20 @@ func walk(v any) error {
 	return nil
 }
 
-func (m *MGOQuery) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
-	var cfg Config
-	if err := json.Unmarshal([]byte(modifiedConfig), &cfg); err != nil {
+// Execute resolves the config's text fields into a copy, checks it, and runs
+// the operation. m.config keeps its templates, so each call resolves them
+// again.
+func (m *MGOQuery) Execute(ctx context.Context) (interface{}, map[string]string, error) {
+	rc, err := requestctx.FromContextOrError(ctx)
+	if err != nil {
 		return nil, nil, err
 	}
-	// cfg is this call's rendered config. m.config keeps the templates, which
-	// Config returns so the next call renders them again.
+	resolved, err := rc.ResolveBatch(ctx, m.config.Operation, m.config.Collection, m.config.FilterQuery, m.config.Projection, m.config.Pipeline, m.config.Integration)
+	if err != nil {
+		return nil, nil, err
+	}
+	cfg := m.config
+	cfg.Operation, cfg.Collection, cfg.FilterQuery, cfg.Projection, cfg.Pipeline, cfg.Integration = resolved[0], resolved[1], resolved[2], resolved[3], resolved[4], resolved[5]
 
 	if err := validate(cfg); err != nil {
 		return nil, nil, fmt.Errorf("%w: %v", actions.ErrFailure, err)

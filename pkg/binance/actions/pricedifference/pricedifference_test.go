@@ -4,68 +4,77 @@ import (
 	"context"
 	"testing"
 
-	"github.com/Servflow/servflow/pkg/engine/requestctx"
-	"github.com/Servflow/servflow/pkg/engine/requestctx/requestctxtest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	"github.com/Servflow/servflow/pkg/binance"
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
+	"github.com/Servflow/servflow/pkg/engine/requestctx/requestctxtest"
 )
 
-// rc is the request every test here runs in; setupMockIntegration configures
-// its integrations.
-var rc = requestctxtest.New()
+func TestExecute(t *testing.T) {
+	tests := []struct {
+		name      string
+		config    Config
+		variables map[string]any
+		expect    func(m *binance.MockIntegration)
+		wantErr   bool
+	}{
+		{
+			name:   "single symbol",
+			config: Config{Symbol: "BTCUSDT", Interval: "1h", Period: "24"},
+			expect: func(m *binance.MockIntegration) {
+				m.EXPECT().GetCurrentPrice("BTCUSDT").Return(50000.0, nil)
+				m.EXPECT().GetHistoricalPrice("BTCUSDT", "1h", 24).Return([]*binance.KlineData{{Close: "48000.00"}}, nil)
+			},
+		},
+		{
+			name:   "multiple symbols",
+			config: Config{Symbol: "BTCUSDT,ETHUSDT", Interval: "1h", Period: "24"},
+			expect: func(m *binance.MockIntegration) {
+				m.EXPECT().GetCurrentPrice("BTCUSDT").Return(50000.0, nil)
+				m.EXPECT().GetHistoricalPrice("BTCUSDT", "1h", 24).Return([]*binance.KlineData{{Close: "48000.00"}}, nil)
+				m.EXPECT().GetCurrentPrice("ETHUSDT").Return(3000.0, nil)
+				m.EXPECT().GetHistoricalPrice("ETHUSDT", "1h", 24).Return([]*binance.KlineData{{Close: "2900.00"}}, nil)
+			},
+		},
+		{
+			name:      "templated fields resolve against the request",
+			config:    Config{Symbol: "{{ .symbol }}", Interval: "{{ .interval }}", Period: "{{ .period }}"},
+			variables: map[string]any{"symbol": "BTC\"USDT\"", "interval": "4h", "period": "6"},
+			expect: func(m *binance.MockIntegration) {
+				m.EXPECT().GetCurrentPrice("BTC\"USDT\"").Return(50000.0, nil)
+				m.EXPECT().GetHistoricalPrice("BTC\"USDT\"", "4h", 6).Return([]*binance.KlineData{{Close: "48000.00"}}, nil)
+			},
+		},
+		{
+			name:   "api error",
+			config: Config{Symbol: "BTCUSDT", Interval: "1h", Period: "24"},
+			expect: func(m *binance.MockIntegration) {
+				m.EXPECT().GetCurrentPrice("BTCUSDT").Return(0.0, assert.AnError)
+			},
+			wantErr: true,
+		},
+	}
 
-func setupMockIntegration(t *testing.T, ctrl *gomock.Controller, integrationID string) *binance.MockIntegration {
-	t.Helper()
-	mockIntegration := binance.NewMockIntegration(ctrl)
-	rc.SetIntegration(integrationID, mockIntegration)
-	return mockIntegration
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := binance.NewMockIntegration(gomock.NewController(t))
+			tt.expect(mock)
+			rc := requestctxtest.New()
+			rc.SetIntegration("binance", mock)
+			rc.AddVariables(tt.variables, "")
 
-func TestExecute_SingleSymbol(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	integrationID := "test-single"
-	mockIntegration := setupMockIntegration(t, ctrl, integrationID)
-
-	mockIntegration.EXPECT().GetCurrentPrice("BTCUSDT").Return(50000.0, nil)
-	mockIntegration.EXPECT().GetHistoricalPrice("BTCUSDT", "1h", 24).Return([]*binance.KlineData{{Close: "48000.00"}}, nil)
-
-	executable := &Executable{config: Config{Integration: integrationID, Symbol: "BTCUSDT", Interval: "1h", Period: "24"}}
-	_, _, err := executable.Execute(requestctx.With(context.Background(), rc), "")
-	require.NoError(t, err)
-}
-
-func TestExecute_MultipleSymbols(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	integrationID := "test-multi"
-	mockIntegration := setupMockIntegration(t, ctrl, integrationID)
-
-	mockIntegration.EXPECT().GetCurrentPrice("BTCUSDT").Return(50000.0, nil)
-	mockIntegration.EXPECT().GetHistoricalPrice("BTCUSDT", "1h", 24).Return([]*binance.KlineData{{Close: "48000.00"}}, nil)
-	mockIntegration.EXPECT().GetCurrentPrice("ETHUSDT").Return(3000.0, nil)
-	mockIntegration.EXPECT().GetHistoricalPrice("ETHUSDT", "1h", 24).Return([]*binance.KlineData{{Close: "2900.00"}}, nil)
-
-	executable := &Executable{config: Config{Integration: integrationID, Symbol: "BTCUSDT,ETHUSDT", Interval: "1h", Period: "24"}}
-	_, _, err := executable.Execute(requestctx.With(context.Background(), rc), "")
-	require.NoError(t, err)
-}
-
-func TestExecute_APIError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	integrationID := "test-error"
-	mockIntegration := setupMockIntegration(t, ctrl, integrationID)
-
-	mockIntegration.EXPECT().GetCurrentPrice("BTCUSDT").Return(0.0, assert.AnError)
-
-	executable := &Executable{config: Config{Integration: integrationID, Symbol: "BTCUSDT", Interval: "1h", Period: "24"}}
-	_, _, err := executable.Execute(requestctx.With(context.Background(), rc), "")
-	require.Error(t, err)
+			cfg := tt.config
+			cfg.Integration = "binance"
+			executable := &Executable{config: cfg}
+			_, _, err := executable.Execute(requestctx.With(context.Background(), rc))
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
 }

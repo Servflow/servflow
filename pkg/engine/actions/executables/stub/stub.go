@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/Servflow/servflow/pkg/engine/actions"
+	"github.com/Servflow/servflow/pkg/engine/requestctx"
 )
 
 type Executable struct {
@@ -22,21 +23,17 @@ func NewExecutable(cfg map[string]interface{}) *Executable {
 	}
 }
 
-func (s *Executable) Config() string {
-	d, err := json.Marshal(s.Fields)
-	if err != nil {
-		panic(err)
+// Execute returns the configured fields with every string in them resolved.
+func (s *Executable) Execute(ctx context.Context) (interface{}, map[string]string, error) {
+	fields := make(map[string]any, len(s.Fields))
+	for k, v := range s.Fields {
+		fields[k] = v
 	}
-	return string(d)
-}
-
-func (s *Executable) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
-
-	var newFields map[string]interface{}
-	if err := json.Unmarshal([]byte(modifiedConfig), &newFields); err != nil {
+	resolved, err := requestctx.ResolveValues(ctx, fields)
+	if err != nil {
 		return nil, nil, err
 	}
-	return newFields, nil, nil
+	return resolved, nil, nil
 }
 
 // Definition describes the stub action to a host that offers it.

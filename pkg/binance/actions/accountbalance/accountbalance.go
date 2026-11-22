@@ -2,7 +2,6 @@ package accountbalance
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -32,11 +31,6 @@ func (e *Executable) Type() string {
 	return "binance/accountbalance"
 }
 
-func (e *Executable) Config() string {
-	configBytes, _ := json.Marshal(e.config)
-	return string(configBytes)
-}
-
 func (e *Executable) loadIntegration(ctx context.Context) (binance.Integration, error) {
 	i, err := requestctx.GetIntegration(ctx, e.config.Integration)
 	if err != nil {
@@ -49,13 +43,17 @@ func (e *Executable) loadIntegration(ctx context.Context) (binance.Integration, 
 	return binanceIntegration, nil
 }
 
-func (e *Executable) Execute(ctx context.Context, modifiedConfig string) (interface{}, map[string]string, error) {
-	config := e.config
-	if modifiedConfig != "" {
-		if err := json.Unmarshal([]byte(modifiedConfig), &config); err != nil {
-			return nil, nil, fmt.Errorf("error parsing config: %v", err)
-		}
+func (e *Executable) Execute(ctx context.Context) (any, map[string]string, error) {
+	rc, err := requestctx.FromContextOrError(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error getting request context: %w", err)
 	}
+	resolved, err := rc.ResolveBatch(ctx, e.config.Symbol)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error resolving config: %w", err)
+	}
+	config := e.config
+	config.Symbol = resolved[0]
 
 	binanceIntegration, err := e.loadIntegration(ctx)
 	if err != nil {

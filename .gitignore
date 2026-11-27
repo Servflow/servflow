@@ -2,7 +2,7 @@
 apidesigner
 testconfs
 test_serviceaccount.json
-servflow
+/servflow
 servflow-debug
 .env
 *.prof

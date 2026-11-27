@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "servflow": {
+      "type": "http",
+      "url": "https://server.servflow.io/api/mcp",
+      "oauth": {
+        "clientId": "W4BjkKoNAyAsLIYrZ7NzCoPQUhjWUXKV",
+        "callbackPort": 8976
+      }
+    }
+  }
+}

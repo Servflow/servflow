@@ -1,0 +1,11 @@
+{
+  "name": "servflow",
+  "displayName": "Servflow",
+  "version": "0.1.0",
+  "description": "Create Servflow agents and support agents from a description",
+  "author": { "name": "Servflow", "url": "https://servflow.io" },
+  "homepage": "https://docs.servflow.io",
+  "repository": "https://github.com/Servflow/servflow",
+  "license": "MIT",
+  "keywords": ["servflow", "agents", "support", "mcp"]
+}

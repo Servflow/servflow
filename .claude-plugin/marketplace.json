@@ -1,0 +1,12 @@
+{
+  "name": "servflow",
+  "owner": { "name": "Servflow" },
+  "description": "Skills for building on Servflow from an AI agent",
+  "plugins": [
+    {
+      "name": "servflow",
+      "source": "./skills/servflow",
+      "description": "Create Servflow agents and support agents from a description"
+    }
+  ]
+}
